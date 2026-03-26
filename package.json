@@ -6,17 +6,20 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "predeploy": "cmd /c npm run build",
+    "deploy": "cmd /c npx gh-pages -d dist"
   },
   "dependencies": {
+    "lucide-react": "^0.354.0",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "lucide-react": "^0.354.0"
+    "react-dom": "^18.2.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.64",
     "@types/react-dom": "^18.2.21",
     "@vitejs/plugin-react": "^4.2.1",
+    "gh-pages": "^6.3.0",
     "typescript": "^5.2.2",
     "vite": "^5.1.6"
   }
