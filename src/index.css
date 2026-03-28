@@ -395,28 +395,24 @@ canvas {
 }
 
 .modal-header {
-  padding: 40px 60px;
+  padding: 32px 60px 20px;
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
 }
 
 .header-title-group h2 {
   font-family: var(--font-display);
-  font-size: 48px;
+  font-size: 32px;
   font-weight: 700;
   color: var(--text);
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  margin: 0 0 16px 0;
+  margin: 0;
 }
 
 .header-subtitle {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--accent);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  display: none;
 }
 
 .modal-actions {
@@ -435,27 +431,62 @@ canvas {
 
 .surprise-btn {
   font-family: var(--font-display);
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.1em;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   display: flex;
   align-items: center;
   gap: 8px;
+  padding: 8px 16px;
+  background: rgba(242, 98, 47, 0.1);
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  border-radius: 20px;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s;
 }
 
-.surprise-btn:hover, .close-btn:hover {
-  color: var(--accent);
+.surprise-btn::after {
+  content: "";
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    45deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0) 40%,
+    rgba(255, 255, 255, 0.4) 50%,
+    rgba(255, 255, 255, 0) 60%,
+    transparent 100%
+  );
+  transform: rotate(45deg);
+  animation: shimmer 3s infinite;
+  pointer-events: none;
+}
+
+@keyframes shimmer {
+  0% { transform: translate(-100%, -100%) rotate(45deg); }
+  100% { transform: translate(100%, 100%) rotate(45deg); }
+}
+
+.surprise-btn:hover {
+  background: var(--accent);
+  color: #000;
+  box-shadow: 0 0 20px var(--accent);
 }
 
 .close-btn {
-  font-size: 32px;
-  font-weight: 300;
+  font-size: 24px;
+  line-height: 1;
 }
 
 /* MODAL SEARCH */
 .modal-search-wrapper {
-  padding: 0 60px 32px;
+  padding: 0 60px 16px;
 }
 
 .modal-search {
@@ -476,7 +507,7 @@ canvas {
   border: none;
   color: var(--text);
   font-family: var(--font-display);
-  font-size: 24px;
+  font-size: 16px;
   outline: none;
   letter-spacing: 0.05em;
 }
@@ -495,26 +526,29 @@ canvas {
 
 /* CATEGORIES */
 .modal-categories {
-  padding: 0 60px 48px;
+  padding: 0 60px 32px;
   display: flex;
-  gap: 12px;
+  gap: 8px;
   overflow-x: auto;
   scrollbar-width: none;
 }
 .modal-categories::-webkit-scrollbar { display: none; }
 
 .category-chip {
-  padding: 6px 16px;
+  padding: 4px 12px;
   background: #111;
   border: none;
   border-radius: 20px;
   color: var(--text-dark);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 9px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   cursor: pointer;
   transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 .category-chip:hover {
   color: var(--text);
@@ -528,34 +562,50 @@ canvas {
 
 /* ACTIVE BAR */
 .active-palette-section {
-  padding: 0 0 48px 0;
+  padding: 0 0 32px 0;
 }
 
 .active-palette-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 24px 0;
+  padding: 12px 24px;
   border-top: 1px solid var(--panel-border);
   border-bottom: 1px solid var(--panel-border);
+  position: relative;
+  overflow: hidden;
+}
+
+.active-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  z-index: 2;
+  width: 100%;
 }
 
 .active-name {
   font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 14px;
-  letter-spacing: 0.15em;
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--accent);
+  color: #fff;
+  text-shadow: 0 2px 10px rgba(0,0,0,0.8);
 }
 
 .active-dots {
   display: flex;
   gap: 12px;
 }
+
 .active-dots .color-dot {
-  width: 16px; height: 16px;
-  border-radius: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255,255,255,0.8);
+  box-shadow: 0 0 5px rgba(0,0,0,0.5);
 }
 
 /* MODAL CONTENT */
@@ -569,20 +619,23 @@ canvas {
 .modal-content::-webkit-scrollbar-thumb { background: var(--panel-border); }
 
 .results-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   margin-bottom: 32px;
 }
 .results-label, .results-count {
   font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--text-dim);
+  font-size: 9px;
+  color: var(--text-dark);
   letter-spacing: 0.2em;
   text-transform: uppercase;
 }
 
 .palette-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 40px;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 32px;
 }
 
 /* REDESIGNED CARDS */
@@ -597,11 +650,12 @@ canvas {
 .palette-card:hover { transform: translateY(-4px); }
 
 .card-preview {
-  height: 140px;
+  height: 90px;
   width: 100%;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
   filter: grayscale(0.5);
   transition: filter 0.3s;
+  position: relative;
 }
 .palette-card:hover .card-preview, .palette-card.active .card-preview {
   filter: grayscale(0);
@@ -615,11 +669,12 @@ canvas {
 
 .card-name {
   font-family: var(--font-display);
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 10px;
+  font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--text-dark);
+  transition: color 0.2s;
 }
 .palette-card:hover .card-name, .palette-card.active .card-name {
   color: var(--text);
@@ -641,11 +696,20 @@ canvas {
 }
 
 .fav-btn {
+  position: absolute;
+  top: 4px;
+  left: 4px;
   background: transparent;
   border: none;
-  color: var(--text-dim);
+  color: rgba(255,255,255,0.4);
   cursor: pointer;
-  font-size: 14px;
+  font-size: 13px;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+  transition: all 0.2s;
 }
 .fav-btn:hover { color: var(--accent); }
 .fav-btn.active { color: var(--accent); }
@@ -674,22 +738,25 @@ canvas {
 /* TOGGLE UI BTN */
 #toggle-ui {
   position: fixed;
-  bottom: 32px;
-  right: 32px;
-  width: 40px; height: 40px;
-  background: #000;
+  bottom: 12px;
+  right: 12px;
+  width: 20px; height: 20px;
+  background: rgba(0,0,0,0.4);
+  backdrop-filter: blur(4px);
   border: 1px solid var(--accent);
   color: var(--accent);
   cursor: pointer;
   z-index: 200;
   display: flex; align-items: center; justify-content: center;
-  font-family: var(--font-display);
-  font-size: 12px;
-  font-weight: 700;
-  text-transform: uppercase;
+  opacity: 0.3;
   transition: all 0.2s;
 }
+#toggle-ui svg {
+  width: 10px;
+  height: 10px;
+}
 #toggle-ui:hover {
+  opacity: 1;
   background: var(--accent);
   color: #000;
 }
