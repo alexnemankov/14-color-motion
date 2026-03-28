@@ -1,4 +1,17 @@
 import React, { useState, useEffect } from 'react';
+import { 
+  Drop, 
+  Waves, 
+  Hexagon, 
+  Atom, 
+  ShareNetwork, 
+  Pentagon,
+  PlayPause,
+  CornersOut,
+  EyeSlash,
+  Plus,
+  Trash
+} from '@phosphor-icons/react';
 import { GradientParams, ColorRgb, AnimationType } from '../App';
 
 interface PanelProps {
@@ -73,7 +86,11 @@ const ColorRow = ({
         }}
         onBlur={() => setLocalHex(`#${rgbToHex(rgb[0], rgb[1], rgb[2])}`)} // reset on blur if invalid
       />
-      {showRemove && <button className="btn-remove" onClick={remove} title="Remove">×</button>}
+      {showRemove && (
+        <button className="btn-remove" onClick={remove} title="Remove Color">
+          <Trash size={14} weight="bold" />
+        </button>
+      )}
     </div>
   );
 };
@@ -149,12 +166,24 @@ export default function Panel({
   return (
     <>
       <div className="mode-switcher">
-        <button className={`mode-btn ${animationType === 'liquid' ? 'active' : ''}`} onClick={() => setAnimationType('liquid')} title="Fluid FBM">FLUID</button>
-        <button className={`mode-btn ${animationType === 'waves' ? 'active' : ''}`} onClick={() => setAnimationType('waves')} title="Interference Waves">WAVES</button>
-        <button className={`mode-btn ${animationType === 'voronoi' ? 'active' : ''}`} onClick={() => setAnimationType('voronoi')} title="Cellular Voronoi">CELLS</button>
-        <button className={`mode-btn ${animationType === 'turing' ? 'active' : ''}`} onClick={() => setAnimationType('turing')} title="Reaction-Diffusion">TURING</button>
-        <button className={`mode-btn ${animationType === 'particles' ? 'active' : ''}`} onClick={() => setAnimationType('particles')} title="Particle Web">NODES</button>
-        <button className={`mode-btn ${animationType === 'geometry' ? 'active' : ''}`} onClick={() => setAnimationType('geometry')} title="Spirograph">MATH</button>
+        <button className={`mode-btn ${animationType === 'liquid' ? 'active' : ''}`} onClick={() => setAnimationType('liquid')} title="Fluid FBM">
+          <Drop size={16} weight={animationType === 'liquid' ? 'fill' : 'bold'} />
+        </button>
+        <button className={`mode-btn ${animationType === 'waves' ? 'active' : ''}`} onClick={() => setAnimationType('waves')} title="Interference Waves">
+          <Waves size={16} weight={animationType === 'waves' ? 'fill' : 'bold'} />
+        </button>
+        <button className={`mode-btn ${animationType === 'voronoi' ? 'active' : ''}`} onClick={() => setAnimationType('voronoi')} title="Cellular Voronoi">
+          <Hexagon size={16} weight={animationType === 'voronoi' ? 'fill' : 'bold'} />
+        </button>
+        <button className={`mode-btn ${animationType === 'turing' ? 'active' : ''}`} onClick={() => setAnimationType('turing')} title="Reaction-Diffusion">
+          <Atom size={16} weight={animationType === 'turing' ? 'fill' : 'bold'} />
+        </button>
+        <button className={`mode-btn ${animationType === 'particles' ? 'active' : ''}`} onClick={() => setAnimationType('particles')} title="Particle Web">
+          <ShareNetwork size={16} weight={animationType === 'particles' ? 'fill' : 'bold'} />
+        </button>
+        <button className={`mode-btn ${animationType === 'geometry' ? 'active' : ''}`} onClick={() => setAnimationType('geometry')} title="Spirograph">
+          <Pentagon size={16} weight={animationType === 'geometry' ? 'fill' : 'bold'} />
+        </button>
       </div>
 
       <div id="color-list">
@@ -170,8 +199,10 @@ export default function Panel({
       </div>
 
       <div className="add-color-row">
-        <button className="add-color-btn" onClick={addColor}>+</button>
-        <span className="add-color-label">Add color…</span>
+        <button className="add-color-btn" onClick={addColor} title="Add Color">
+          <Plus size={16} weight="bold" />
+        </button>
+        <span className="add-color-label">Add color...</span>
       </div>
 
       <div className="param-row">
@@ -225,14 +256,25 @@ export default function Panel({
       </div>
 
       <div className="bottom-controls">
-        <button className={`ctrl-btn ${paused ? 'active' : ''}`} onClick={() => setPaused(p => !p)}>
-          {paused ? '▶ Play' : '⏸ Pause'}
+        <button 
+          className={`ctrl-btn ${paused ? 'active' : ''}`} 
+          onClick={() => setPaused(!paused)}
+          title={paused ? 'Resume' : 'Pause'}
+        >
+          <PlayPause size={14} weight="bold" />
+          {paused ? 'PLAY' : 'PAUSE'}
         </button>
-        <button className={`ctrl-btn ${fullscreen ? 'active' : ''}`} onClick={toggleFullscreen}>
-          ⛶ Full
+        <button 
+          className={`ctrl-btn ${fullscreen ? 'active' : ''}`} 
+          onClick={toggleFullscreen}
+          title="Fullscreen"
+        >
+          <CornersOut size={14} weight="bold" />
+          FULL
         </button>
-        <button className="ctrl-btn" onClick={hideUI}>
-          ✕ Hide
+        <button className="ctrl-btn" onClick={hideUI} title="Hide UI (H)">
+          <EyeSlash size={14} weight="bold" />
+          HIDE
         </button>
       </div>
     </>
