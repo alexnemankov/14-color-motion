@@ -2,8 +2,6 @@
 
 A high-performance, interactive generative art engine built with React, TypeScript, and modern web technologies. Create, manipulate, and explore infinite fluid dynamics and mathematical geometries.
 
-![Liquid Gradient Preview](https://raw.githubusercontent.com/alexnemankov/14-color-motion/main/preview.png)
-
 ## ✨ Features
 
 ### 🎨 The Palette Library
