@@ -4,19 +4,28 @@ A customizable, interactive WebGL-based liquid gradient animation rewritten in R
 
 ## Product Requirements Document (PRD)
 
-### 1. Overview
-The goal of this project is to rewrite a vanilla HTML/JS/WebGL liquid gradient animation into a modern, scalable React application using Vite and TypeScript.
+Liquid Gradient is a high-performance, interactive WebGL-based animation that allows users to create and manipulate a fluid, chromatographic color space.
 
-### 2. Features
-- **WebGL Animation rendering**: A smooth, mesmerizing liquid gradient animation using a custom fragment shader.
-- **Customizable Parameters**:
-  - Seed, Speed, Scale, Amplitude, Frequency, Definition, Bands.
+### 1. Features
+- **WebGL Animation Engine**: A custom fragment shader pipeline that renders mesmerizing, Distorted Mesh fluid dynamics at 60fps.
+- **Parametric Control Suite**:
+  - **Seed**: Change the procedural noise origin for infinite variations.
+  - **Speed**: Adjust the flow velocity of the liquid.
+  - **Scale**: Zoom in or out of the noise pattern.
+  - **Amplitude**: Control the intensity of the "liquify" warping.
+  - **Frequency**: Change the density of the fluid waves.
+  - **Definition**: Adjust the complexity and layering (FBM) of the movement.
+  - **Blend**: A dynamic edge-control slider. Set to 1.0 for smooth organic diffusion; set to 0.0 for sharp, high-contrast hard edges ("posterized" look).
 - **Color Palette Management**:
-  - Add, remove, and modify colors within the gradient.
-- **UI Controls**:
-  - A responsive floating panel to manage variables.
-  - Controls to Pause/Play and enter Fullscreen.
-  - Ability to hide/show the UI via a button or keyboard shortcuts (H for UI, F for fullscreen, Space for pause).
+  - Live color picking with real-time feedback.
+  - Support for up to 8 colors.
+  - Intelligent UI that prevents dropping below the 2-color threshold.
+- **Interaction & Workflow**:
+  - **Floating UI Panel**: Quick access to all parameters.
+  - **Play/Pause**: Freeze the motion at any frame.
+  - **Fullscreen (F)**: Enter immersive mode.
+  - **Hide UI (H)**: Clear the workspace for a distraction-free view.
+  - **Space**: Toggle animation state.
 
 ### 3. Tech Stack
 - React (Hooks for state management)

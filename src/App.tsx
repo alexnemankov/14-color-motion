@@ -9,6 +9,7 @@ export interface GradientParams {
   amplitude: number;
   frequency: number;
   definition: number;
+  blend: number;
 }
 
 export type ColorRgb = [number, number, number];
@@ -27,7 +28,8 @@ function App() {
     scale: 0.76,
     amplitude: 0.99,
     frequency: 1.19,
-    definition: 2
+    definition: 2,
+    blend: 1.0
   });
 
   const [colors, setColors] = useState<ColorRgb[]>(DEFAULT_COLORS);

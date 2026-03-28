@@ -21,6 +21,7 @@ uniform float uAmplitude;
 uniform float uFrequency;
 uniform float uDefinition;
 uniform float uSeed;
+uniform float uBlend;
 uniform vec3  uColors[8];
 uniform int   uColorCount;
 
@@ -70,8 +71,10 @@ vec3 paletteColor(float t){
     if(i==idx)   c0 = uColors[i];
     if(i==idx+1) c1 = uColors[i];
   }
-  // smooth step
-  f = f*f*(3.0-2.0*f);
+  // smooth step with adjustable edge hardness
+  float b = max(0.0001, uBlend * 0.5);
+  f = smoothstep(0.5 - b, 0.5 + b, f);
+  
   return lerpColor(c0, c1, f);
 }
 
@@ -169,7 +172,7 @@ export default function LiquidCanvas({ params, colors, paused }: LiquidCanvasPro
     gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
 
     const U: Record<string, WebGLUniformLocation | null> = {};
-    const uniforms = ['uRes','uTime','uScale','uAmplitude','uFrequency','uDefinition','uSeed','uColors','uColorCount'];
+    const uniforms = ['uRes','uTime','uScale','uAmplitude','uFrequency','uDefinition','uSeed','uColors','uColorCount','uBlend'];
     uniforms.forEach(n => {
       U[n] = gl.getUniformLocation(prog, n);
     });
@@ -204,6 +207,7 @@ export default function LiquidCanvas({ params, colors, paused }: LiquidCanvasPro
       gl.uniform1f(U.uFrequency,  currentState.params.frequency);
       gl.uniform1f(U.uDefinition, currentState.params.definition);
       gl.uniform1f(U.uSeed,       currentState.params.seed);
+      gl.uniform1f(U.uBlend,      currentState.params.blend);
 
       const flat: number[] = [];
       currentState.colors.forEach(c => { flat.push(c[0]/255, c[1]/255, c[2]/255); });

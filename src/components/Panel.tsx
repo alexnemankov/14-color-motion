@@ -178,6 +178,12 @@ export default function Panel({
         <input className="param-slider" type="range" min="1" max="12" step="1" value={params.definition} onChange={e => updateParam('definition', +e.target.value)} />
       </div>
 
+      <div className="param-row">
+        <span className="param-label">Blend</span>
+        <input className="param-input" type="number" value={params.blend} step="0.01" onChange={e => updateParam('blend', +e.target.value)} />
+        <input className="param-slider" type="range" min="0" max="1" step="0.01" value={params.blend} onChange={e => updateParam('blend', +e.target.value)} />
+      </div>
+
       <div className="bottom-controls">
         <button className={`ctrl-btn ${paused ? 'active' : ''}`} onClick={() => setPaused(p => !p)}>
           {paused ? '▶ Play' : '⏸ Pause'}
