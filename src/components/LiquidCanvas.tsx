@@ -61,7 +61,7 @@ float fbm(vec3 p, int octaves){
 vec3 lerpColor(vec3 a, vec3 b, float t){ return mix(a, b, clamp(t,0.0,1.0)); }
 
 vec3 paletteColor(float t){
-  t = fract(t);
+  t = clamp(t, 0.0, 1.0);
   float segment = t * float(uColorCount - 1);
   int idx = int(floor(segment));
   float f = fract(segment);
@@ -104,8 +104,8 @@ void main(){
   float banded = floor(f * uBands + 0.5) / uBands;
   float blended = mix(f, banded, 0.5);
 
-  // smooth value → color index
-  float colorT = blended * 0.5 + 0.5;
+  // stretch value gracefully, ensuring extreme colors are reached
+  float colorT = smoothstep(-0.5, 0.5, blended);
   vec3 col = paletteColor(colorT);
 
   // subtle vignette

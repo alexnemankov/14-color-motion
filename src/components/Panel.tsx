@@ -26,11 +26,13 @@ const rgbToHex = (r: number, g: number, b: number): string => {
 const ColorRow = ({ 
   rgb, 
   update, 
-  remove 
+  remove,
+  showRemove
 }: { 
   rgb: ColorRgb, 
   update: (hex: string) => void, 
-  remove: () => void 
+  remove: () => void,
+  showRemove: boolean
 }) => {
   const [localHex, setLocalHex] = useState(rgbToHex(rgb[0], rgb[1], rgb[2]));
   const fullHexStr = `#${rgbToHex(rgb[0], rgb[1], rgb[2])}`;
@@ -63,7 +65,7 @@ const ColorRow = ({
         }}
         onBlur={() => setLocalHex(rgbToHex(rgb[0], rgb[1], rgb[2]))} // reset on blur if invalid
       />
-      <button className="btn-remove" onClick={remove} title="Remove">×</button>
+      {showRemove && <button className="btn-remove" onClick={remove} title="Remove">×</button>}
     </div>
   );
 };
@@ -122,6 +124,7 @@ export default function Panel({
             rgb={rgb} 
             update={(hex) => updateColor(i, hex)} 
             remove={() => removeColor(i)} 
+            showRemove={colors.length > 2}
           />
         ))}
       </div>
