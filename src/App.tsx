@@ -1,6 +1,10 @@
 import { useState, useEffect } from 'react';
 import LiquidCanvas from './components/LiquidCanvas';
+import WavesCanvas from './components/WavesCanvas';
+import VoronoiCanvas from './components/VoronoiCanvas';
 import Panel from './components/Panel';
+
+export type AnimationType = 'liquid' | 'waves' | 'voronoi';
 
 export interface GradientParams {
   seed: number;
@@ -33,6 +37,7 @@ function App() {
   });
 
   const [colors, setColors] = useState<ColorRgb[]>(DEFAULT_COLORS);
+  const [animationType, setAnimationType] = useState<AnimationType>('liquid');
   const [uiVisible, setUiVisible] = useState(true);
   const [paused, setPaused] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
@@ -68,7 +73,9 @@ function App() {
 
   return (
     <>
-      <LiquidCanvas params={params} colors={colors} paused={paused} />
+      {animationType === 'liquid' && <LiquidCanvas params={params} colors={colors} paused={paused} />}
+      {animationType === 'waves' && <WavesCanvas params={params} colors={colors} paused={paused} />}
+      {animationType === 'voronoi' && <VoronoiCanvas params={params} colors={colors} paused={paused} />}
       
       <div id="panel" className={uiVisible ? '' : 'hidden'}>
         <div className="panel-header">
@@ -82,6 +89,8 @@ function App() {
           setColors={setColors} 
           paused={paused}
           setPaused={setPaused}
+          animationType={animationType}
+          setAnimationType={setAnimationType}
           fullscreen={fullscreen}
           toggleFullscreen={toggleFullscreen}
           hideUI={() => setUiVisible(false)}
