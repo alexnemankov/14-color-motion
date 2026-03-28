@@ -1,7 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { X, MagnifyingGlass, Heart, Sparkle, Lightning, Leaf, Moon, Sun, Scroll, Flame, Palette as PaletteIcon, ThermometerHot, Snowflake } from '@phosphor-icons/react';
-import { PALETTES, PaletteTag } from '../data/palettes';
+import { motion, AnimatePresence } from 'framer-motion';
+import confetti from 'canvas-confetti';
+import { 
+  X, MagnifyingGlass, Heart, Sparkle, Lightning, Leaf, Moon, Sun, Scroll, Flame, 
+  Palette as PaletteIcon, ThermometerHot, Snowflake, Tray, ArrowsClockwise 
+} from '@phosphor-icons/react';
+import { PALETTES, PaletteTag, PaletteDescriptor } from '../data/palettes';
 
 interface PaletteModalProps {
   isOpen: boolean;
@@ -25,6 +30,7 @@ const CATEGORIES: { id: 'All' | PaletteTag; label: string; Icon: any }[] = [
 export default function PaletteModal({ isOpen, onClose, onSelect }: PaletteModalProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState<'All' | PaletteTag>('All');
+  const [activePaletteName, setActivePaletteName] = useState<string | null>(null);
   const [favorites, setFavorites] = useState<string[]>([]);
   
   // Load favorites from local storage
@@ -46,44 +52,66 @@ export default function PaletteModal({ isOpen, onClose, onSelect }: PaletteModal
 
   const toggleFavorite = (e: React.MouseEvent, name: string) => {
     e.stopPropagation();
-    setFavorites(prev => 
-      prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name]
+    setFavorites((prev: string[]) => 
+      prev.includes(name) ? prev.filter((n: string) => n !== name) : [...prev, name]
     );
   };
 
-  const handleSelect = (colors: string[]) => {
-    onSelect(colors);
-    onClose();
+  const handleSelect = (p: PaletteDescriptor) => {
+    setActivePaletteName(p.name);
+    onSelect(p.colors);
+    setTimeout(onClose, 250);
   };
 
   const handleSurprise = () => {
     const random = PALETTES[Math.floor(Math.random() * PALETTES.length)];
-    handleSelect(random.colors);
+    
+    confetti({
+      particleCount: 150,
+      spread: 70,
+      origin: { y: 0.6 },
+      colors: random.colors
+    });
+
+    setActivePaletteName(random.name);
+    onSelect(random.colors);
+    
+    // Auto-close immediately
+    onClose();
   };
 
   const filteredPalettes = useMemo(() => {
-    return PALETTES.filter(p => {
+    return PALETTES.filter((p: PaletteDescriptor) => {
       const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesCategory = activeCategory === 'All' || p.tags.includes(activeCategory as PaletteTag);
       return matchesSearch && matchesCategory;
     });
   }, [searchQuery, activeCategory]);
 
-  const favoritePalettes = useMemo(() => {
-    return filteredPalettes.filter(p => favorites.includes(p.name));
-  }, [filteredPalettes, favorites]);
-
-  const nonFavoritePalettes = useMemo(() => {
-    return filteredPalettes.filter(p => !favorites.includes(p.name));
-  }, [filteredPalettes, favorites]);
-
-  if (!isOpen) return null;
+  const activePalette = useMemo(() => {
+    return PALETTES.find((p: PaletteDescriptor) => p.name === activePaletteName);
+  }, [activePaletteName]);
 
   return createPortal(
-    <div className="palette-modal-overlay" onClick={onClose}>
-      <div className="palette-modal" onClick={e => e.stopPropagation()}>
-        
-        <div className="modal-header">
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div 
+          className="palette-modal-overlay" 
+          onClick={onClose}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+        >
+          <motion.div 
+            className="palette-modal" 
+            onClick={e => e.stopPropagation()}
+            initial={{ y: 50, opacity: 0, scale: 0.95 }}
+            animate={{ y: 0, opacity: 1, scale: 1 }}
+            exit={{ y: 50, opacity: 0, scale: 0.95 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+          >
+            <div className="modal-header">
           <div className="header-title-group">
             <h2>Liquid Gradient</h2>
             <p className="header-subtitle">Pick a vibe or create your own</p>
@@ -118,87 +146,125 @@ export default function PaletteModal({ isOpen, onClose, onSelect }: PaletteModal
         </div>
 
         <div className="modal-categories">
-          {CATEGORIES.map(({ id, label, Icon }) => (
-            <button 
+          {CATEGORIES.map(({ id, label, Icon }, i) => (
+            <motion.button 
               key={id}
               className={`category-chip ${activeCategory === id ? 'active' : ''}`}
               onClick={() => setActiveCategory(id)}
+              initial={{ x: -20, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              transition={{ delay: i * 0.03 }}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
             >
               <Icon size={14} weight={activeCategory === id ? 'fill' : 'bold'} />
               {label}
-            </button>
+            </motion.button>
           ))}
         </div>
 
         <div className="modal-content">
-          <div className="results-info">
-            <span className="results-label">
-              {searchQuery ? 'SEARCH RESULTS' : 'LIBRARY'}
-            </span>
-            <span className="results-count">{filteredPalettes.length} total</span>
-          </div>
-
-          <div className="palette-grid">
-            {/* Favorites first if not searching or if explicitly found */}
-            {favoritePalettes.map(p => (
-              <div 
-                key={p.name} 
-                className="palette-card"
-                onClick={() => handleSelect(p.colors)}
+          <AnimatePresence mode="popLayout">
+            {activePalette && (
+              <motion.div 
+                key="active-bar"
+                className="active-palette-section"
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
               >
-                <div className="card-preview" style={{ background: `linear-gradient(135deg, ${p.colors.join(', ')})` }}>
-                  <button 
-                    className="fav-btn active"
-                    onClick={(e) => toggleFavorite(e, p.name)}
-                  >
-                    <Heart size={18} weight="fill" />
-                  </button>
-                </div>
-                <div className="card-info">
-                  <span className="card-name">{p.name}</span>
-                  <div className="card-dots">
-                    {p.colors.slice(0, 4).map((c, i) => (
-                      <div key={i} className="color-dot" style={{ background: c }} />
-                    ))}
-                    {p.colors.length > 4 && <span className="dot-plus">+{p.colors.length - 4}</span>}
+                <span className="results-label">ACTIVE SELECTION</span>
+                <div 
+                  className="active-palette-row"
+                  style={{ background: `linear-gradient(to right, ${activePalette.colors.join(', ')})` }}
+                >
+                  <div className="active-info">
+                    <span className="active-name">{activePalette.name}</span>
+                    <div className="active-dots">
+                      {activePalette.colors.map((c: string, i: number) => (
+                        <div key={i} className="color-dot" style={{ background: c }} />
+                      ))}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-
-            {nonFavoritePalettes.map(p => (
-              <div 
-                key={p.name} 
-                className="palette-card"
-                onClick={() => handleSelect(p.colors)}
-              >
-                <div className="card-preview" style={{ background: `linear-gradient(135deg, ${p.colors.join(', ')})` }}>
-                  <button 
-                    className="fav-btn"
-                    onClick={(e) => toggleFavorite(e, p.name)}
-                  >
-                    <Heart size={18} weight="bold" />
-                  </button>
-                </div>
-                <div className="card-info">
-                  <span className="card-name">{p.name}</span>
-                  <div className="card-dots">
-                    {p.colors.slice(0, 4).map((c, i) => (
-                      <div key={i} className="color-dot" style={{ background: c }} />
-                    ))}
-                    {p.colors.length > 4 && <span className="dot-plus">+{p.colors.length - 4}</span>}
-                  </div>
-                </div>
-              </div>
-            ))}
-            
-            {filteredPalettes.length === 0 && (
-              <div className="empty-state">No palettes found matching your criteria.</div>
+              </motion.div>
             )}
-          </div>
+
+            <div className="results-info">
+              <span className="results-label">
+                {searchQuery ? 'SEARCH RESULTS' : 'LIBRARY'}
+              </span>
+              <span className="results-count">{filteredPalettes.length} total</span>
+            </div>
+
+            <motion.div 
+              className="palette-grid"
+              layout
+            >
+              <AnimatePresence mode="popLayout">
+                {filteredPalettes.length > 0 ? (
+                  filteredPalettes.map((p: PaletteDescriptor, i: number) => (
+                    <motion.div 
+                      key={p.name} 
+                      layout
+                      layoutId={`card-${p.name}`}
+                      className={`palette-card ${activePaletteName === p.name ? 'active' : ''}`}
+                      onClick={() => handleSelect(p)}
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.8 }}
+                      transition={{ 
+                        type: 'spring', 
+                        damping: 15, 
+                        stiffness: 150,
+                        delay: Math.min(i * 0.01, 0.2) 
+                      }}
+                      whileHover={{ y: -5, scale: 1.02 }}
+                    >
+                      <div className="card-preview" style={{ background: `linear-gradient(135deg, ${p.colors.join(', ')})` }}>
+                        <button 
+                          className={`fav-btn ${favorites.includes(p.name) ? 'active' : ''}`}
+                          onClick={(e) => toggleFavorite(e, p.name)}
+                        >
+                          <Heart size={18} weight={favorites.includes(p.name) ? 'fill' : 'bold'} />
+                        </button>
+                      </div>
+                      <div className="card-info">
+                        <span className="card-name">{p.name}</span>
+                        <div className="card-dots">
+                          {p.colors.slice(0, 4).map((c: string, i: number) => (
+                            <div key={i} className="color-dot" style={{ background: c }} />
+                          ))}
+                          {p.colors.length > 4 && <span className="dot-plus">+{p.colors.length - 4}</span>}
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))
+                ) : searchQuery && (
+                  <motion.div 
+                    key="empty"
+                    className="no-results-state"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                  >
+                    <Tray size={48} weight="thin" />
+                    <h3>No palettes found</h3>
+                    <p>Try searching for a different color or vibe.</p>
+                    <button className="reset-search-btn" onClick={() => { setSearchQuery(''); setActiveCategory('All'); }}>
+                      <ArrowsClockwise size={14} />
+                      View all palettes
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
+          </AnimatePresence>
         </div>
-      </div>
-    </div>,
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>,
     document.body
   );
 }
