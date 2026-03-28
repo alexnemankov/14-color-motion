@@ -13,6 +13,7 @@ import {
   Trash
 } from '@phosphor-icons/react';
 import { GradientParams, ColorRgb, AnimationType } from '../App';
+import { PALETTES } from '../data/palettes';
 
 interface PanelProps {
   params: GradientParams;
@@ -29,7 +30,7 @@ interface PanelProps {
 }
 
 const hexToRgb = (hex: string): ColorRgb => {
-  hex = hex.replace('#', '');
+  if (hex.startsWith('#')) hex = hex.slice(1);
   const n = parseInt(hex, 16);
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 };
@@ -52,7 +53,6 @@ const ColorRow = ({
   const [localHex, setLocalHex] = useState(`#${rgbToHex(rgb[0], rgb[1], rgb[2])}`);
   const fullHexStr = `#${rgbToHex(rgb[0], rgb[1], rgb[2])}`;
   
-  // Sync if prop changes externally (like from color picker)
   useEffect(() => {
     setLocalHex(`#${rgbToHex(rgb[0], rgb[1], rgb[2])}`);
   }, [rgb[0], rgb[1], rgb[2]]);
@@ -74,17 +74,12 @@ const ColorRow = ({
         maxLength={7} 
         onChange={e => {
           let val = e.target.value;
-          // Ensure it starts with #
           if (val && !val.startsWith('#')) val = '#' + val;
           if (!val) val = '#';
-          
           setLocalHex(val.toUpperCase());
-          
-          if (/^#[0-9a-fA-F]{6}$/.test(val)) {
-            update(val);
-          }
+          if (/^#[0-9a-fA-F]{6}$/.test(val)) update(val);
         }}
-        onBlur={() => setLocalHex(`#${rgbToHex(rgb[0], rgb[1], rgb[2])}`)} // reset on blur if invalid
+        onBlur={() => setLocalHex(`#${rgbToHex(rgb[0], rgb[1], rgb[2])}`)}
       />
       {showRemove && (
         <button className="btn-remove" onClick={remove} title="Remove Color">
@@ -161,7 +156,7 @@ export default function Panel({
     geometry: {
       seed: 'Twist/Rot', speed: 'Draw Speed', scale: 'Size', amplitude: 'Morph Amp', frequency: 'Radius Offset', definition: 'Complexity', blend: 'Smoothness'
     }
-  }[animationType];
+  }[animationType] || { seed: 'Seed', speed: 'Speed', scale: 'Scale', amplitude: 'Amplitude', frequency: 'Frequency', definition: 'Definition', blend: 'Blend' };
 
   return (
     <>
@@ -184,6 +179,25 @@ export default function Panel({
         <button className={`mode-btn ${animationType === 'geometry' ? 'active' : ''}`} onClick={() => setAnimationType('geometry')} title="Spirograph">
           <Pentagon size={16} weight={animationType === 'geometry' ? 'fill' : 'bold'} />
         </button>
+      </div>
+
+      <div className="presets-section">
+        <div className="presets-header">Presets</div>
+        <div className="presets-container">
+          {PALETTES.map((p, i) => (
+            <div 
+              key={i}
+              className="palette-swatch"
+              title={p.name}
+              style={{
+                background: `linear-gradient(135deg, ${p.colors.join(', ')})`
+              }}
+              onClick={() => {
+                setColors(p.colors.map(hexToRgb));
+              }}
+            />
+          ))}
+        </div>
       </div>
 
       <div id="color-list">

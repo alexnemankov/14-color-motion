@@ -200,6 +200,58 @@ canvas {
   letter-spacing: 0.06em;
 }
 
+/* PRESETS */
+.presets-section {
+  margin-bottom: 20px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.presets-header {
+  font-size: 10px;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.presets-container {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--panel-border) transparent;
+}
+
+.presets-container::-webkit-scrollbar {
+  height: 4px;
+}
+
+.presets-container::-webkit-scrollbar-thumb {
+  background: var(--panel-border);
+  border-radius: 2px;
+}
+
+.palette-swatch {
+  flex: 0 0 40px;
+  height: 24px;
+  border-radius: 4px;
+  border: 1px solid var(--panel-border);
+  cursor: pointer;
+  transition: transform 0.2s, border-color 0.2s;
+}
+
+.palette-swatch:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent);
+}
+
+.palette-swatch.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 8px rgba(0, 163, 255, 0.3);
+}
+
 /* PARAMS */
 .param-row {
   display: flex;
