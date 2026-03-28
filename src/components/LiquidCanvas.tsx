@@ -20,7 +20,6 @@ uniform float uScale;
 uniform float uAmplitude;
 uniform float uFrequency;
 uniform float uDefinition;
-uniform float uBands;
 uniform float uSeed;
 uniform vec3  uColors[8];
 uniform int   uColorCount;
@@ -100,12 +99,10 @@ void main(){
 
   float f = fbm(p * uFrequency + warp*r + vec3(t*0.03), int(uDefinition));
 
-  // Band quantization
-  float banded = floor(f * uBands + 0.5) / uBands;
-  float blended = mix(f, banded, 0.5);
-
-  // stretch value gracefully, ensuring extreme colors are reached
-  float colorT = smoothstep(-0.5, 0.5, blended);
+  // Pure fluid separation without quantization steps
+  // A steeper smoothstep (-0.25 to 0.25) creates the narrow bridge colors
+  // and high-contrast boundaries the user requested (like chromatography).
+  float colorT = smoothstep(-0.25, 0.25, f);
   vec3 col = paletteColor(colorT);
 
   // subtle vignette
@@ -172,7 +169,7 @@ export default function LiquidCanvas({ params, colors, paused }: LiquidCanvasPro
     gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
 
     const U: Record<string, WebGLUniformLocation | null> = {};
-    const uniforms = ['uRes','uTime','uScale','uAmplitude','uFrequency','uDefinition','uBands','uSeed','uColors','uColorCount'];
+    const uniforms = ['uRes','uTime','uScale','uAmplitude','uFrequency','uDefinition','uSeed','uColors','uColorCount'];
     uniforms.forEach(n => {
       U[n] = gl.getUniformLocation(prog, n);
     });
@@ -206,7 +203,6 @@ export default function LiquidCanvas({ params, colors, paused }: LiquidCanvasPro
       gl.uniform1f(U.uAmplitude,  currentState.params.amplitude);
       gl.uniform1f(U.uFrequency,  currentState.params.frequency);
       gl.uniform1f(U.uDefinition, currentState.params.definition);
-      gl.uniform1f(U.uBands,      currentState.params.bands);
       gl.uniform1f(U.uSeed,       currentState.params.seed);
 
       const flat: number[] = [];
