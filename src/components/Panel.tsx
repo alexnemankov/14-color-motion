@@ -10,10 +10,11 @@ import {
   CornersOut,
   EyeSlash,
   Plus,
-  Trash
+  Trash,
+  Palette
 } from '@phosphor-icons/react';
 import { GradientParams, ColorRgb, AnimationType } from '../App';
-import { PALETTES } from '../data/palettes';
+import PaletteModal from './PaletteModal';
 
 interface PanelProps {
   params: GradientParams;
@@ -104,6 +105,8 @@ export default function Panel({
   hideUI
 }: PanelProps) {
   
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
   const updateParam = (name: keyof GradientParams, value: number) => {
     setParams(prev => ({ ...prev, [name]: isNaN(value) ? 0 : value }));
   };
@@ -182,23 +185,22 @@ export default function Panel({
       </div>
 
       <div className="presets-section">
-        <div className="presets-header">Presets</div>
-        <div className="presets-container">
-          {PALETTES.map((p, i) => (
-            <div 
-              key={i}
-              className="palette-swatch"
-              title={p.name}
-              style={{
-                background: `linear-gradient(135deg, ${p.colors.join(', ')})`
-              }}
-              onClick={() => {
-                setColors(p.colors.map(hexToRgb));
-              }}
-            />
-          ))}
-        </div>
+        <button className="open-library-btn" onClick={() => setIsModalOpen(true)}>
+          <Palette size={16} weight="bold" />
+          <div className="library-btn-text">
+            <span>Palette Library</span>
+            <small>60+ Curated Presets</small>
+          </div>
+        </button>
       </div>
+
+      <PaletteModal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)}
+        onSelect={(newColors) => {
+          setColors(newColors.map(hexToRgb));
+        }}
+      />
 
       <div id="color-list">
         {colors.map((rgb, i) => (
