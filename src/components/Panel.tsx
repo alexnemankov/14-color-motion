@@ -34,12 +34,12 @@ const ColorRow = ({
   remove: () => void,
   showRemove: boolean
 }) => {
-  const [localHex, setLocalHex] = useState(rgbToHex(rgb[0], rgb[1], rgb[2]));
+  const [localHex, setLocalHex] = useState(`#${rgbToHex(rgb[0], rgb[1], rgb[2])}`);
   const fullHexStr = `#${rgbToHex(rgb[0], rgb[1], rgb[2])}`;
   
   // Sync if prop changes externally (like from color picker)
   useEffect(() => {
-    setLocalHex(rgbToHex(rgb[0], rgb[1], rgb[2]));
+    setLocalHex(`#${rgbToHex(rgb[0], rgb[1], rgb[2])}`);
   }, [rgb[0], rgb[1], rgb[2]]);
 
   return (
@@ -56,14 +56,20 @@ const ColorRow = ({
         className="color-hex" 
         type="text" 
         value={localHex} 
-        maxLength={6} 
+        maxLength={7} 
         onChange={e => {
-          setLocalHex(e.target.value);
-          if (/^[0-9a-fA-F]{6}$/.test(e.target.value)) {
-            update(`#${e.target.value}`);
+          let val = e.target.value;
+          // Ensure it starts with #
+          if (val && !val.startsWith('#')) val = '#' + val;
+          if (!val) val = '#';
+          
+          setLocalHex(val.toUpperCase());
+          
+          if (/^#[0-9a-fA-F]{6}$/.test(val)) {
+            update(val);
           }
         }}
-        onBlur={() => setLocalHex(rgbToHex(rgb[0], rgb[1], rgb[2]))} // reset on blur if invalid
+        onBlur={() => setLocalHex(`#${rgbToHex(rgb[0], rgb[1], rgb[2])}`)} // reset on blur if invalid
       />
       {showRemove && <button className="btn-remove" onClick={remove} title="Remove">×</button>}
     </div>
