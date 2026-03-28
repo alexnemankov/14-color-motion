@@ -2,9 +2,12 @@ import { useState, useEffect } from 'react';
 import LiquidCanvas from './components/LiquidCanvas';
 import WavesCanvas from './components/WavesCanvas';
 import VoronoiCanvas from './components/VoronoiCanvas';
+import TuringCanvas from './components/TuringCanvas';
+import ParticlesCanvas from './components/ParticlesCanvas';
+import GeometryCanvas from './components/GeometryCanvas';
 import Panel from './components/Panel';
 
-export type AnimationType = 'liquid' | 'waves' | 'voronoi';
+export type AnimationType = 'liquid' | 'waves' | 'voronoi' | 'turing' | 'particles' | 'geometry';
 
 export interface GradientParams {
   seed: number;
@@ -76,6 +79,9 @@ function App() {
       {animationType === 'liquid' && <LiquidCanvas params={params} colors={colors} paused={paused} />}
       {animationType === 'waves' && <WavesCanvas params={params} colors={colors} paused={paused} />}
       {animationType === 'voronoi' && <VoronoiCanvas params={params} colors={colors} paused={paused} />}
+      {animationType === 'turing' && <TuringCanvas params={params} colors={colors} paused={paused} />}
+      {animationType === 'particles' && <ParticlesCanvas params={params} colors={colors} paused={paused} />}
+      {animationType === 'geometry' && <GeometryCanvas params={params} colors={colors} paused={paused} />}
       
       <div id="panel" className={uiVisible ? '' : 'hidden'}>
         <div className="panel-header">

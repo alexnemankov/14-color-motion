@@ -134,15 +134,27 @@ export default function Panel({
     },
     voronoi: {
       seed: 'Seed', speed: 'Global Speed', scale: 'Zoom', amplitude: 'Drift Rate', frequency: 'Cell Density', definition: 'Morph', blend: 'Contrast'
+    },
+    turing: {
+      seed: 'Reset Sim', speed: 'Sim Speed', scale: 'Zoom', amplitude: 'Feed Factor', frequency: 'Kill Factor', definition: 'Diffusion', blend: 'Contrast'
+    },
+    particles: {
+      seed: 'Reseed', speed: 'Velocity', scale: 'Zoom', amplitude: 'Link Dist', frequency: 'Wander Freq', definition: 'Count', blend: 'Opacity'
+    },
+    geometry: {
+      seed: 'Twist/Rot', speed: 'Draw Speed', scale: 'Size', amplitude: 'Morph Amp', frequency: 'Radius Offset', definition: 'Complexity', blend: 'Smoothness'
     }
   }[animationType];
 
   return (
     <>
       <div className="mode-switcher">
-        <button className={`mode-btn ${animationType === 'liquid' ? 'active' : ''}`} onClick={() => setAnimationType('liquid')}>Fluid</button>
-        <button className={`mode-btn ${animationType === 'waves' ? 'active' : ''}`} onClick={() => setAnimationType('waves')}>Waves</button>
-        <button className={`mode-btn ${animationType === 'voronoi' ? 'active' : ''}`} onClick={() => setAnimationType('voronoi')}>Voronoi</button>
+        <button className={`mode-btn ${animationType === 'liquid' ? 'active' : ''}`} onClick={() => setAnimationType('liquid')} title="Fluid FBM">FLUID</button>
+        <button className={`mode-btn ${animationType === 'waves' ? 'active' : ''}`} onClick={() => setAnimationType('waves')} title="Interference Waves">WAVES</button>
+        <button className={`mode-btn ${animationType === 'voronoi' ? 'active' : ''}`} onClick={() => setAnimationType('voronoi')} title="Cellular Voronoi">CELLS</button>
+        <button className={`mode-btn ${animationType === 'turing' ? 'active' : ''}`} onClick={() => setAnimationType('turing')} title="Reaction-Diffusion">TURING</button>
+        <button className={`mode-btn ${animationType === 'particles' ? 'active' : ''}`} onClick={() => setAnimationType('particles')} title="Particle Web">NODES</button>
+        <button className={`mode-btn ${animationType === 'geometry' ? 'active' : ''}`} onClick={() => setAnimationType('geometry')} title="Spirograph">MATH</button>
       </div>
 
       <div id="color-list">
