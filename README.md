@@ -1,10 +1,11 @@
-# 🌊 Liquid Gradient & Generative Playground
+# Liquid Gradient & Generative Playground
 
 A high-performance, interactive generative art engine built with React, TypeScript, and modern web technologies. Create, manipulate, and explore infinite fluid dynamics and mathematical geometries.
 
-## ✨ Features
 
-### 🎨 The Palette Library
+## Features
+
+### The Palette Library
 Our flagship feature for color exploration:
 - **60+ Curated Presets**: From "Neon Sunset" to "Boreal Forest," explore professional-grade color schemes.
 - **Categorization**: Filter by vibe (Neon, Nature, Dark, Pastel, Historical, Vibrant, Monochrome, Warm, Cool).
@@ -13,7 +14,7 @@ Our flagship feature for color exploration:
 - **Surprise Me**: A one-click randomization feature with a playful particle burst (Confetti).
 - **Favorites**: Save your most-loved palettes to local storage.
 
-### 🧬 Generative Modes
+### Generative Modes
 Explore six distinct mathematical and physical simulation models:
 1. **Fluid FBM**: Classic distorted mesh noise for a "liquid" feel.
 2. **Interference Waves**: Overlapping sine waves creating complex interference patterns.
@@ -22,7 +23,7 @@ Explore six distinct mathematical and physical simulation models:
 5. **Particle Web**: A 2D physics-based node network with interactive link distances.
 6. **Spirograph**: Mathematical geometric curves (hypotrochoids) with dynamic complexity.
 
-### 🎛️ Parametric Control Suite
+### Parametric Control Suite
 Fine-tune every aspect of the simulation in real-time:
 - **Seed**: Change the procedural origin for infinite variations.
 - **Speed**: Adjust flow velocity or simulation frequency.
@@ -32,7 +33,7 @@ Fine-tune every aspect of the simulation in real-time:
 - **Definition**: Adjust complexity (octaves, sources, or link link-counts).
 - **Blend**: A global contrast and diffusion control for organic or "hard-edge" looks.
 
-### 🎭 UX & Interaction
+### UX & Interaction
 - **Framer Motion Integration**: Smooth, spring-based physics for all UI transitions.
 - **Immersive Mode**: Fullscreen support and "Hide UI" (H) for distraction-free viewing.
 - **Keyboard Shortcuts**:
@@ -42,7 +43,7 @@ Fine-tune every aspect of the simulation in real-time:
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 - **Core**: [React 18](https://reactjs.org/) + [TypeScript](https://www.typescriptlang.org/)
 - **Build Tool**: [Vite](https://vitejs.dev/)
@@ -53,7 +54,7 @@ Fine-tune every aspect of the simulation in real-time:
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Installation
 ```bash
@@ -72,5 +73,5 @@ npm run build
 
 ---
 
-## 📜 License
-MIT License. Created with ❤️ by the Liquid Gradient team.
+## License
+MIT License. Created with by the Liquid Gradient team.
