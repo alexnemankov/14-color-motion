@@ -5,9 +5,10 @@ import VoronoiCanvas from './components/VoronoiCanvas';
 import TuringCanvas from './components/TuringCanvas';
 import ParticlesCanvas from './components/ParticlesCanvas';
 import GeometryCanvas from './components/GeometryCanvas';
+import BlobsCanvas from './components/BlobsCanvas';
 import Panel from './components/Panel';
 
-export type AnimationType = 'liquid' | 'waves' | 'voronoi' | 'turing' | 'particles' | 'geometry';
+export type AnimationType = 'liquid' | 'waves' | 'voronoi' | 'turing' | 'particles' | 'geometry' | 'blobs';
 
 export interface GradientParams {
   seed: number;
@@ -82,6 +83,7 @@ function App() {
       {animationType === 'turing' && <TuringCanvas params={params} colors={colors} paused={paused} />}
       {animationType === 'particles' && <ParticlesCanvas params={params} colors={colors} paused={paused} />}
       {animationType === 'geometry' && <GeometryCanvas params={params} colors={colors} paused={paused} />}
+      {animationType === 'blobs' && <BlobsCanvas params={params} colors={colors} paused={paused} />}
       
       <div id="panel" className={uiVisible ? '' : 'hidden'}>
         <div className="panel-header">

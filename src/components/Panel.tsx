@@ -6,6 +6,7 @@ import {
   Atom, 
   ShareNetwork, 
   Pentagon,
+  Circle,
   PlayPause,
   CornersOut,
   EyeSlash,
@@ -158,6 +159,9 @@ export default function Panel({
     },
     geometry: {
       seed: 'Twist/Rot', speed: 'Draw Speed', scale: 'Size', amplitude: 'Morph Amp', frequency: 'Radius Offset', definition: 'Complexity', blend: 'Smoothness'
+    },
+    blobs: {
+      seed: 'Flux Seed', speed: 'Flow Speed', scale: 'Blob InvScale', amplitude: 'Wander Amp', frequency: 'Blob Count', definition: 'Sharpness', blend: 'Color Blend'
     }
   }[animationType] || { seed: 'Seed', speed: 'Speed', scale: 'Scale', amplitude: 'Amplitude', frequency: 'Frequency', definition: 'Definition', blend: 'Blend' };
 
@@ -181,6 +185,9 @@ export default function Panel({
         </button>
         <button className={`mode-btn ${animationType === 'geometry' ? 'active' : ''}`} onClick={() => setAnimationType('geometry')} title="Spirograph">
           <Pentagon size={16} weight={animationType === 'geometry' ? 'fill' : 'bold'} />
+        </button>
+        <button className={`mode-btn ${animationType === 'blobs' ? 'active' : ''}`} onClick={() => setAnimationType('blobs')} title="Molten Blobs">
+          <Circle size={16} weight={animationType === 'blobs' ? 'fill' : 'bold'} />
         </button>
       </div>
 
