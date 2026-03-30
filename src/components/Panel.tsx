@@ -454,6 +454,11 @@ export default function Panel({
             <span>{canLoopSafeExport ? `Loop-safe export records a ${loopSafeDurationSeconds}s boomerang clip.` : 'Loop-safe export is available for liquid, waves, voronoi, and blobs.'}</span>
           </div>
         </div>
+        {exportStatus.phase === 'idle' && (
+          <p className="workspace-empty">
+            Export still PNGs or short WebM clips when the current scene is ready to keep.
+          </p>
+        )}
         {exportStatus.phase !== 'idle' && (
           <div className={`export-status export-status-${exportStatus.phase}`}>
             <div className="export-status-header">
@@ -498,7 +503,7 @@ export default function Panel({
             ))}
           </div>
         ) : (
-          <p className="saved-empty">No saved presets yet.</p>
+          <p className="saved-empty">No saved presets yet. Save the current scene to start building your library.</p>
         )}
       </div>
 

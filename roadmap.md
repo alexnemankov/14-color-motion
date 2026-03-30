@@ -26,6 +26,7 @@ The roadmap is no longer greenfield. The app already includes:
 
 - Scene save, load, delete, session restore, share-link generation, and PNG export
 - In-app toast feedback for workflow actions
+- In-app preset naming dialog instead of browser `prompt()`
 - Reset actions for mode, palette, and full scene
 - Reorganized panel sections with mode-specific descriptions
 - Responsive panel/mobile modal improvements
@@ -52,7 +53,7 @@ What remains is to deepen the workflow, improve content browsing, and expand out
 
 Goal: reduce friction and make the current experience feel complete.
 
-Status: mostly complete
+Status: complete
 
 ### Priorities
 
@@ -60,10 +61,10 @@ Status: mostly complete
   - Improve control clarity with stronger grouping and section hierarchy
   - Add mode-specific helper text so controls are easier to understand
   - Replace browser-style alerts with in-app feedback states
+  - Replace remaining browser-default preset naming with in-app UI
+  - Improve save/export empty states and confirmation messaging
   - Strengthen mobile behavior and general accessibility baseline
 - Remaining:
-  - Improve empty states and confirmation states for save/share/export
-  - Replace remaining browser-default interactions such as preset naming `prompt()`
   - Continue mobile polish where the panel is still dense on smaller screens
 
 ### Features
@@ -72,12 +73,12 @@ Status: mostly complete
   - Reorganize panel into clearer sections
   - Add short explanatory text for mode-specific controls
   - Add in-app toast notifications
+  - Add in-app preset naming dialog
   - Add reset actions for current mode, palette, and full scene
   - Improve mobile control layout
   - Complete keyboard and focus-state polish baseline
+  - Improve saved/export empty-state copy
 - Remaining:
-  - Improve empty states and success messaging in saved/export flows
-  - Replace `prompt()`-based preset naming with inline or modal UI
   - Refine mobile panel hierarchy further if needed
 
 ### Outcome
@@ -281,14 +282,13 @@ Focus:
 
 Recommended next order from the current state:
 
-1. Replace preset naming `prompt()` with proper UI
-2. Add A/B compare workflow
-3. Add saved preset sorting, filtering, or search
-4. Add richer palette library grouping and browse flows
-5. Consider GIF export or richer recording presets
-6. Refine shared-scene presentation in the UI
-7. Add presentation mode
-8. Add pointer/touch interactivity
+1. Add A/B compare workflow
+2. Add saved preset sorting, filtering, or search
+3. Add richer palette library grouping and browse flows
+4. Consider GIF export or richer recording presets
+5. Refine shared-scene presentation in the UI where it adds value
+6. Add presentation mode
+7. Add pointer/touch interactivity
 
 ## Success Criteria
 

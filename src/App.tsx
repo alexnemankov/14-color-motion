@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import LiquidCanvas from './components/LiquidCanvas';
 import WavesCanvas from './components/WavesCanvas';
 import VoronoiCanvas from './components/VoronoiCanvas';
@@ -320,6 +320,8 @@ function App() {
   const [activeSceneName, setActiveSceneName] = useState<string | null>(sharedSceneName);
   const [loopSafePreview, setLoopSafePreview] = useState<{ durationSeconds: number; startedAt: number } | null>(null);
   const [externalRenderTime, setExternalRenderTime] = useState<number | null>(null);
+  const [isSavePresetOpen, setIsSavePresetOpen] = useState(false);
+  const [savePresetName, setSavePresetName] = useState('');
   const [exportStatus, setExportStatus] = useState<ExportStatusState>({
     phase: 'idle',
     label: 'Ready',
@@ -334,6 +336,7 @@ function App() {
   const loopPreviewFrameRef = useRef<number | null>(null);
   const exportProgressFrameRef = useRef<number | null>(null);
   const exportResetTimeoutRef = useRef<number | null>(null);
+  const savePresetInputRef = useRef<HTMLInputElement | null>(null);
 
   const currentScene: SceneState = {
     animationType,
@@ -357,6 +360,16 @@ function App() {
     showToast('Shared scene loaded', sharedSceneName);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!isSavePresetOpen) return;
+    const focusTimer = window.setTimeout(() => {
+      savePresetInputRef.current?.focus();
+      savePresetInputRef.current?.select();
+    }, 0);
+
+    return () => window.clearTimeout(focusTimer);
+  }, [isSavePresetOpen]);
 
   useEffect(() => {
     renderColorsRef.current = renderColors;
@@ -472,6 +485,12 @@ function App() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (isSavePresetOpen && e.key === 'Escape') {
+        e.preventDefault();
+        closeSavePresetDialog();
+        return;
+      }
+
       const target = e.target as HTMLElement | null;
       const isEditableTarget = !!target && (
         target.tagName === 'INPUT'
@@ -493,7 +512,7 @@ function App() {
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [isSavePresetOpen]);
 
   useEffect(() => {
     try {
@@ -568,21 +587,35 @@ function App() {
   };
 
   const handleSavePreset = () => {
-    const suggestedName = `${animationType} ${new Date().toLocaleDateString()}`;
-    const name = window.prompt('Preset name', suggestedName)?.trim();
+    const suggestedName = activeSceneName ?? `${animationTypeLabel(animationType)} ${new Date().toLocaleDateString()}`;
+    setSavePresetName(suggestedName);
+    setIsSavePresetOpen(true);
+  };
+
+  const closeSavePresetDialog = () => {
+    setIsSavePresetOpen(false);
+    setSavePresetName('');
+  };
+
+  const submitSavePreset = (event?: FormEvent<HTMLFormElement>) => {
+    event?.preventDefault();
+    const name = savePresetName.trim();
     if (!name) return;
 
+    const duplicateCount = savedPresets.filter(preset => preset.name.toLowerCase() === name.toLowerCase()).length;
+    const finalName = duplicateCount > 0 ? `${name} ${duplicateCount + 1}` : name;
     setSavedPresets(prev => [
       {
         ...currentScene,
         id: `${Date.now()}`,
-        name,
+        name: finalName,
         createdAt: new Date().toISOString(),
       },
       ...prev,
     ]);
-    setActiveSceneName(name);
-    showToast('Preset saved', name);
+    setActiveSceneName(finalName);
+    closeSavePresetDialog();
+    showToast('Preset saved', finalName);
   };
 
   const handleLoadPreset = (preset: SavedPreset) => {
@@ -970,6 +1003,50 @@ function App() {
         <div key={toast.id} className="app-toast" role="status" aria-live="polite">
           <strong>{toast.title}</strong>
           {toast.message && <p>{toast.message}</p>}
+        </div>
+      )}
+
+      {isSavePresetOpen && (
+        <div className="dialog-overlay" role="presentation" onClick={closeSavePresetDialog}>
+          <div
+            className="dialog-card"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="save-preset-title"
+            onClick={event => event.stopPropagation()}
+          >
+            <div className="dialog-header">
+              <span className="section-label">Save Preset</span>
+              <button className="dialog-close" onClick={closeSavePresetDialog} aria-label="Close save preset dialog">
+                +
+              </button>
+            </div>
+            <form className="dialog-form" onSubmit={submitSavePreset}>
+              <div className="dialog-copy">
+                <strong id="save-preset-title">Name This Scene</strong>
+                <p>Save the current look into your preset library with a reusable title.</p>
+              </div>
+              <label className="dialog-field">
+                <span>Preset name</span>
+                <input
+                  ref={savePresetInputRef}
+                  type="text"
+                  value={savePresetName}
+                  onChange={event => setSavePresetName(event.target.value)}
+                  maxLength={80}
+                  placeholder="Scene name"
+                />
+              </label>
+              <div className="dialog-actions">
+                <button type="button" className="workspace-btn" onClick={closeSavePresetDialog}>
+                  Cancel
+                </button>
+                <button type="submit" className="workspace-btn" disabled={!savePresetName.trim()}>
+                  Save Preset
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
