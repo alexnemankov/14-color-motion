@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ArrowCounterClockwise,
   Atom,
@@ -20,7 +20,7 @@ import {
   Trash,
   Waves
 } from '@phosphor-icons/react';
-import { AnimationType, ColorRgb, GradientParams, SavedPreset, WorkflowLocks } from '../App';
+import { AnimationType, ColorRgb, GradientParams, RecentScene, SavedPreset, WorkflowLocks } from '../App';
 import PaletteModal from './PaletteModal';
 
 interface PanelProps {
@@ -36,8 +36,10 @@ interface PanelProps {
   toggleFullscreen: () => void;
   hideUI: () => void;
   savedPresets: SavedPreset[];
+  recentScenes: RecentScene[];
   savePreset: () => void;
   loadPreset: (preset: SavedPreset) => void;
+  loadRecentScene: (scene: RecentScene) => void;
   deletePreset: (id: string) => void;
   shareScene: () => void;
   exportImage: (scale?: number) => void;
@@ -163,6 +165,62 @@ const ColorRow = ({
   );
 };
 
+const InlineSelect = <T extends string>({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: T;
+  options: Array<{ value: T; label: string }>;
+  onChange: (value: T) => void;
+}) => {
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const handlePointerDown = () => setOpen(false);
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => document.removeEventListener('pointerdown', handlePointerDown);
+  }, [open]);
+
+  const activeOption = options.find(option => option.value === value) ?? options[0];
+
+  return (
+    <div className={`inline-select ${open ? 'open' : ''}`} onPointerDown={event => event.stopPropagation()}>
+      <span>{label}</span>
+      <button
+        type="button"
+        className="inline-select-trigger"
+        onClick={() => setOpen(current => !current)}
+        aria-expanded={open}
+      >
+        {activeOption.label}
+        <CaretDown size={12} weight="bold" />
+      </button>
+      {open && (
+        <div className="inline-select-menu">
+          {options.map(option => (
+            <button
+              key={option.value}
+              type="button"
+              className={`inline-select-option ${option.value === value ? 'active' : ''}`}
+              onClick={() => {
+                onChange(option.value);
+                setOpen(false);
+              }}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 export default function Panel({
   params,
   setParams,
@@ -176,8 +234,10 @@ export default function Panel({
   toggleFullscreen,
   hideUI,
   savedPresets,
+  recentScenes,
   savePreset,
   loadPreset,
+  loadRecentScene,
   deletePreset,
   shareScene,
   exportImage,
@@ -205,6 +265,9 @@ export default function Panel({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [workflowExpanded, setWorkflowExpanded] = useState(false);
   const [exportExpanded, setExportExpanded] = useState(false);
+  const [savedSearch, setSavedSearch] = useState('');
+  const [savedSort, setSavedSort] = useState<'newest' | 'oldest' | 'name'>('newest');
+  const [savedMode, setSavedMode] = useState<'all' | AnimationType>('all');
 
   const formatPresetDate = (value: string) => {
     try {
@@ -220,6 +283,28 @@ export default function Panel({
   const updateParam = (name: keyof GradientParams, value: number) => {
     setParams(prev => ({ ...prev, [name]: Number.isNaN(value) ? 0 : value }));
   };
+
+  const formatAnimationType = (type: AnimationType) => MODE_DETAILS[type].name;
+
+  const filteredSavedPresets = useMemo(() => {
+    const normalizedSearch = savedSearch.trim().toLowerCase();
+
+    return [...savedPresets]
+      .filter(preset => {
+        const matchesSearch = !normalizedSearch || preset.name.toLowerCase().includes(normalizedSearch);
+        const matchesMode = savedMode === 'all' || preset.animationType === savedMode;
+        return matchesSearch && matchesMode;
+      })
+      .sort((left, right) => {
+        if (savedSort === 'name') {
+          return left.name.localeCompare(right.name);
+        }
+
+        const leftTime = new Date(left.createdAt).getTime();
+        const rightTime = new Date(right.createdAt).getTime();
+        return savedSort === 'oldest' ? leftTime - rightTime : rightTime - leftTime;
+      });
+  }, [savedMode, savedSearch, savedSort, savedPresets]);
 
   const labels = {
     liquid: {
@@ -483,27 +568,98 @@ export default function Panel({
       </div>
 
       <div className="saved-section panel-section">
-        <span className="section-label">Saved Presets</span>
+        <div className="section-heading">
+          <span className="section-label">Saved Library</span>
+          {savedPresets.length > 0 && (
+            <span className="section-count">{filteredSavedPresets.length} shown</span>
+          )}
+        </div>
         {savedPresets.length > 0 ? (
-          <div className="saved-list">
-            {savedPresets.slice(0, 6).map(preset => (
-              <div key={preset.id} className="saved-item">
-                <button className="saved-load-btn" onClick={() => loadPreset(preset)} title={preset.name}>
-                  <div className="saved-preview" style={{ background: `linear-gradient(90deg, ${preset.colors.map(color => `rgb(${color.join(',')})`).join(', ')})` }} />
-                  <span>{preset.name}</span>
-                  <div className="saved-meta">
-                    <small>{preset.animationType}</small>
-                    <small>{formatPresetDate(preset.createdAt)}</small>
+          <>
+            <div className="saved-tools">
+              <input
+                className="saved-search"
+                type="text"
+                value={savedSearch}
+                onChange={event => setSavedSearch(event.target.value)}
+                placeholder="Search saved scenes..."
+              />
+              <div className="saved-select-row">
+                <InlineSelect
+                  label="Mode"
+                  value={savedMode}
+                  onChange={setSavedMode}
+                  options={[
+                    { value: 'all', label: 'All modes' },
+                    ...Object.keys(MODE_DETAILS).map(type => ({
+                      value: type as AnimationType,
+                      label: MODE_DETAILS[type as AnimationType].name,
+                    })),
+                  ]}
+                />
+                <InlineSelect
+                  label="Sort"
+                  value={savedSort}
+                  onChange={setSavedSort}
+                  options={[
+                    { value: 'newest', label: 'Newest' },
+                    { value: 'oldest', label: 'Oldest' },
+                    { value: 'name', label: 'Name' },
+                  ]}
+                />
+              </div>
+            </div>
+            {filteredSavedPresets.length > 0 ? (
+              <div className="saved-list">
+                {filteredSavedPresets.map(preset => (
+                  <div key={preset.id} className="saved-item">
+                    <button className="saved-load-btn" onClick={() => loadPreset(preset)} title={preset.name}>
+                      <div className="saved-preview" style={{ background: `linear-gradient(90deg, ${preset.colors.map(color => `rgb(${color.join(',')})`).join(', ')})` }} />
+                      <span>{preset.name}</span>
+                      <div className="saved-meta">
+                        <small>{formatAnimationType(preset.animationType)}</small>
+                        <small>{formatPresetDate(preset.createdAt)}</small>
+                      </div>
+                    </button>
+                    <button className="saved-delete-btn" onClick={() => deletePreset(preset.id)} title="Delete preset" aria-label={`Delete preset ${preset.name}`}>
+                      <Trash size={12} weight="bold" />
+                    </button>
                   </div>
-                </button>
-                <button className="saved-delete-btn" onClick={() => deletePreset(preset.id)} title="Delete preset" aria-label={`Delete preset ${preset.name}`}>
-                  <Trash size={12} weight="bold" />
+                ))}
+              </div>
+            ) : (
+              <p className="saved-empty">No saved presets match the current search or mode filter.</p>
+            )}
+          </>
+        ) : (
+          <p className="saved-empty">No saved presets yet. Save the current scene to start building your library.</p>
+        )}
+      </div>
+
+      <div className="saved-section panel-section">
+        <div className="section-heading">
+          <span className="section-label">Recent Scenes</span>
+          {recentScenes.length > 0 && (
+            <span className="section-count">{Math.min(recentScenes.length, 4)} recent</span>
+          )}
+        </div>
+        {recentScenes.length > 0 ? (
+          <div className="saved-list">
+            {recentScenes.slice(0, 4).map(scene => (
+              <div key={scene.id} className="saved-item">
+                <button className="saved-load-btn" onClick={() => loadRecentScene(scene)} title={scene.name}>
+                  <div className="saved-preview" style={{ background: `linear-gradient(90deg, ${scene.colors.map(color => `rgb(${color.join(',')})`).join(', ')})` }} />
+                  <span>{scene.name}</span>
+                  <div className="saved-meta">
+                    <small>{scene.source}</small>
+                    <small>{formatPresetDate(scene.seenAt)}</small>
+                  </div>
                 </button>
               </div>
             ))}
           </div>
         ) : (
-          <p className="saved-empty">No saved presets yet. Save the current scene to start building your library.</p>
+          <p className="saved-empty">Recent scenes will appear here after you load, save, or share a scene.</p>
         )}
       </div>
 

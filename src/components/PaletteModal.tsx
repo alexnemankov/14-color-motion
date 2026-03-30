@@ -186,7 +186,7 @@ export default function PaletteModal({ isOpen, onClose, onSelect }: PaletteModal
           >
             <div className="modal-header">
               <div className="header-title-group">
-                <h2>Liquid Gradient</h2>
+                <h2>Color Motion Lab</h2>
                 <p className="header-subtitle">Pick a vibe or create your own</p>
               </div>
               <div className="modal-actions">

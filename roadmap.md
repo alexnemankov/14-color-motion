@@ -36,7 +36,9 @@ The roadmap is no longer greenfield. The app already includes:
 - Scene history with undo and redo
 - Scene randomization with workflow locks for mode, palette, seed, and motion
 - Palette library search, category filters, favorites, recent palettes, and surprise selection
-- Saved preset preview strips, mode badges, and compact saved dates
+- Saved preset preview strips, mode badges, compact saved dates, search, sorting, and mode filtering
+- Recent scenes shelf for quick returns to recently used looks
+- Broader product identity in the UI under the `Color Motion Lab` label
 - Animated palette interpolation between scene changes
 - Higher-resolution PNG export alongside baseline still export
 - WebM loop export for short 5s and 10s clips
@@ -120,17 +122,18 @@ Users can explore aggressively without losing good results.
 
 Goal: strengthen content systems and give the product a clearer identity.
 
-Status: partially started
+Status: complete
 
 ### Priorities
 
 - Completed:
   - Make palette exploration feel more intentional at the library level
   - Make saved content easier to browse at a basic level
-- Remaining:
-  - Extend saved content browsing beyond the current compact list
-  - Extend palette browsing beyond the current filters, favorites, and recents
+  - Extend saved content browsing beyond the original compact list
+  - Extend palette browsing beyond a flat grid
   - Clarify what the product is beyond "liquid gradient"
+- Remaining:
+  - Continue optional branding refinement if the product name or voice changes further
 
 ### Features
 
@@ -144,16 +147,13 @@ Status: partially started
     - preview thumbnails
     - mode badges
     - dates
-- Remaining:
-  - Improve saved preset library with:
     - sorting
     - filtering
     - search
-  - Expand palette browsing with:
-    - richer light/dark/vibrant browsing flows
-    - better library sorting or grouping
   - Add recent scenes
-  - Revisit product naming and top-level branding
+  - Revisit product naming and top-level branding in the shipped UI
+- Remaining:
+  - Consider deeper palette grouping or editorial collections if the library grows
 
 ### Outcome
 

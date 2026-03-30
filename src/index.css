@@ -546,6 +546,14 @@ canvas {
   text-transform: uppercase;
 }
 
+.section-count {
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
 .workspace-actions {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -692,6 +700,99 @@ canvas {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.saved-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.saved-search {
+  min-height: 32px;
+  width: 100%;
+  border: 1px solid var(--panel-border);
+  background: rgba(255,255,255,0.03);
+  color: var(--text);
+  padding: 0 10px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+}
+
+.saved-search::placeholder {
+  color: var(--text-dim);
+}
+
+.saved-select-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.inline-select {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  position: relative;
+}
+
+.inline-select span {
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.inline-select-trigger,
+.inline-select-option {
+  width: 100%;
+  min-height: 32px;
+  border: 1px solid var(--panel-border);
+  background: rgba(255,255,255,0.03);
+  color: var(--text);
+  padding: 0 10px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-align: left;
+  cursor: pointer;
+}
+
+.inline-select-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.inline-select.open .inline-select-trigger,
+.inline-select-trigger:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.inline-select-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+  border: 1px solid rgba(242, 98, 47, 0.24);
+  background: rgba(17,17,17,0.98);
+  box-shadow: 0 12px 28px rgba(0,0,0,0.38);
+}
+
+.inline-select-option:hover,
+.inline-select-option.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(242, 98, 47, 0.08);
 }
 
 .saved-item {

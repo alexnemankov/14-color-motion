@@ -34,6 +34,13 @@ export interface SavedPreset extends SceneState {
   createdAt: string;
 }
 
+export interface RecentScene extends SceneState {
+  id: string;
+  name: string;
+  seenAt: string;
+  source: 'preset' | 'shared' | 'live';
+}
+
 export interface RendererStatus {
   title: string;
   message: string;
@@ -78,12 +85,15 @@ const DEFAULT_PARAMS: GradientParams = {
 
 const SESSION_STORAGE_KEY = 'color-motion-session';
 const PRESETS_STORAGE_KEY = 'color-motion-presets';
+const RECENT_SCENES_STORAGE_KEY = 'color-motion-recent-scenes';
 const SHARE_PARAM_KEY = 'scene';
 const SHARE_NAME_PARAM_KEY = 'name';
 const VALID_ANIMATION_TYPES: AnimationType[] = ['liquid', 'waves', 'voronoi', 'turing', 'particles', 'blobs'];
 const HISTORY_LIMIT = 40;
 const PALETTE_TRANSITION_MS = 480;
 const LOOP_SAFE_DURATION_SECONDS = 6;
+const RECENT_SCENES_LIMIT = 8;
+const APP_TITLE = 'Color Motion Lab';
 
 function cloneScene(scene: SceneState): SceneState {
   return {
@@ -287,6 +297,38 @@ function readSavedPresets(): SavedPreset[] {
   }
 }
 
+function readRecentScenes(): RecentScene[] {
+  try {
+    const raw = localStorage.getItem(RECENT_SCENES_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed
+      .map((item): RecentScene | null => {
+        const scene = normalizeSceneState(item);
+        if (!scene || typeof item.id !== 'string' || typeof item.name !== 'string' || typeof item.seenAt !== 'string') {
+          return null;
+        }
+
+        const source = item.source === 'preset' || item.source === 'shared' || item.source === 'live'
+          ? item.source
+          : 'live';
+
+        return {
+          ...scene,
+          id: item.id,
+          name: item.name,
+          seenAt: item.seenAt,
+          source,
+        };
+      })
+      .filter((item): item is RecentScene => item !== null);
+  } catch {
+    return [];
+  }
+}
+
 function App() {
   const sharedSceneName = readSharedSceneName();
   const initialScene = readSharedScene() ?? readSessionScene() ?? {
@@ -304,6 +346,7 @@ function App() {
   const [fullscreen, setFullscreen] = useState(false);
   const [hintVisible, setHintVisible] = useState(true);
   const [savedPresets, setSavedPresets] = useState<SavedPreset[]>(readSavedPresets);
+  const [recentScenes, setRecentScenes] = useState<RecentScene[]>(readRecentScenes);
   const [rendererStatus, setRendererStatus] = useState<RendererStatus | null>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
   const [viewMode, setViewMode] = useState<'compact' | 'advanced'>('compact');
@@ -357,6 +400,7 @@ function App() {
 
   useEffect(() => {
     if (!sharedSceneName) return;
+    recordRecentScene(initialScene, sharedSceneName, 'shared');
     showToast('Shared scene loaded', sharedSceneName);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -531,6 +575,14 @@ function App() {
   }, [savedPresets]);
 
   useEffect(() => {
+    try {
+      localStorage.setItem(RECENT_SCENES_STORAGE_KEY, JSON.stringify(recentScenes));
+    } catch {
+      // Ignore storage failures and keep the live session usable.
+    }
+  }, [recentScenes]);
+
+  useEffect(() => {
     const previousScene = previousSceneRef.current;
     if (sceneKey(previousScene) === sceneKey(currentScene)) {
       return;
@@ -586,6 +638,24 @@ function App() {
     return `${animationTypeLabel(scene.animationType)} Scene`;
   };
 
+  const recordRecentScene = (scene: SceneState, name: string, source: RecentScene['source']) => {
+    const sceneSignature = sceneKey(scene);
+    setRecentScenes(prev => {
+      const nextEntry: RecentScene = {
+        ...cloneScene(scene),
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        name,
+        source,
+        seenAt: new Date().toISOString(),
+      };
+
+      return [
+        nextEntry,
+        ...prev.filter(entry => sceneKey(entry) !== sceneSignature).slice(0, RECENT_SCENES_LIMIT - 1),
+      ];
+    });
+  };
+
   const handleSavePreset = () => {
     const suggestedName = activeSceneName ?? `${animationTypeLabel(animationType)} ${new Date().toLocaleDateString()}`;
     setSavePresetName(suggestedName);
@@ -614,6 +684,7 @@ function App() {
       ...prev,
     ]);
     setActiveSceneName(finalName);
+    recordRecentScene(currentScene, finalName, 'preset');
     closeSavePresetDialog();
     showToast('Preset saved', finalName);
   };
@@ -621,7 +692,15 @@ function App() {
   const handleLoadPreset = (preset: SavedPreset) => {
     applyScene(preset);
     setActiveSceneName(preset.name);
+    recordRecentScene(preset, preset.name, 'preset');
     showToast('Preset loaded', preset.name);
+  };
+
+  const handleLoadRecentScene = (scene: RecentScene) => {
+    applyScene(scene);
+    setActiveSceneName(scene.name);
+    recordRecentScene(scene, scene.name, scene.source);
+    showToast('Recent scene loaded', scene.name);
   };
 
   const handleDeletePreset = (id: string) => {
@@ -640,6 +719,7 @@ function App() {
 
     try {
       await navigator.clipboard.writeText(url.toString());
+      recordRecentScene(currentScene, activeSceneName ?? getSceneName(currentScene), 'shared');
       showToast('Share link copied', activeSceneName ?? getSceneName(currentScene));
     } catch {
       window.prompt('Copy this share link', url.toString());
@@ -1052,7 +1132,7 @@ function App() {
 
       <div id="panel" className={uiVisible ? '' : 'hidden'}>
         <div className="panel-header">
-          <span className="panel-title">Liquid Gradient</span>
+          <span className="panel-title">{APP_TITLE}</span>
         </div>
 
         <Panel
@@ -1068,8 +1148,10 @@ function App() {
           toggleFullscreen={toggleFullscreen}
           hideUI={() => setUiVisible(false)}
           savedPresets={savedPresets}
+          recentScenes={recentScenes}
           savePreset={handleSavePreset}
           loadPreset={handleLoadPreset}
+          loadRecentScene={handleLoadRecentScene}
           deletePreset={handleDeletePreset}
           shareScene={handleShareScene}
           exportImage={handleExportImage}
