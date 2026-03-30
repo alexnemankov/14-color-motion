@@ -1,77 +1,108 @@
-# Liquid Gradient & Generative Playground
+# Color Motion Lab
 
-A high-performance, interactive generative art engine built with React, TypeScript, and modern web technologies. Create, manipulate, and explore infinite fluid dynamics and mathematical geometries.
+Color Motion Lab is a browser-based generative art playground built with React, TypeScript, Vite, Canvas 2D, and WebGL. It combines curated palette exploration with multiple motion/rendering systems so users can build, save, export, and share animated color scenes.
 
+## What It Does
 
-## Features
+- Explore six visual modes:
+  - Fluid FBM
+  - Interference Waves
+  - Cellular Voronoi
+  - Reaction-Diffusion
+  - Particle Web
+  - Molten Blobs
+- Edit a shared parameter set in real time:
+  - seed
+  - speed
+  - scale
+  - amplitude
+  - frequency
+  - definition
+  - blend
+- Browse a curated palette library with:
+  - search
+  - category filters
+  - favorites
+  - recent palettes
+  - surprise/random selection
+- Save scenes locally and revisit them through:
+  - preset search
+  - mode filtering
+  - sort controls
+  - recent scenes
+- Share and export scenes through:
+  - shareable URLs with scene metadata
+  - PNG export
+  - higher-resolution PNG export
+  - WebM recording
+  - loop-safe WebM export for supported renderers
 
-### The Palette Library
-Our flagship feature for color exploration:
-- **60+ Curated Presets**: From "Neon Sunset" to "Boreal Forest," explore professional-grade color schemes.
-- **Categorization**: Filter by vibe (Neon, Nature, Dark, Pastel, Historical, Vibrant, Monochrome, Warm, Cool).
-- **Intelligent Search**: Real-time filtering with a sleek, interactive "No Results" state.
-- **Active Selection**: A persistent, smooth-transitioning bar showing your current workspace colors.
-- **Surprise Me**: A one-click randomization feature with a playful particle burst (Confetti).
-- **Favorites**: Save your most-loved palettes to local storage.
+## Workflow Features
 
-### Generative Modes
-Explore six distinct mathematical and physical simulation models:
-1. **Fluid FBM**: Classic distorted mesh noise for a "liquid" feel.
-2. **Interference Waves**: Overlapping sine waves creating complex interference patterns.
-3. **Cellular Voronoi**: Procedural cellular structures with smooth morphing.
-4. **Reaction-Diffusion**: A Turing-pattern biological simulation (Gray-Scott model).
-5. **Particle Web**: A 2D physics-based node network with interactive link distances.
-6. **Molten Blobs**: High-performance WebGL-based fluid gradients with organic folding and tectonic color regions.
+- Compact and advanced control density modes
+- Undo and redo scene history
+- Randomization for full scenes, palettes, parameters, and mode
+- Workflow locks for mode, palette, seed, and motion
+- In-app preset naming and toast feedback
+- Export status/progress UI
+- Fullscreen and hide-UI shortcuts
 
-### Parametric Control Suite
-Fine-tune every aspect of the simulation in real-time:
-- **Seed**: Change the procedural origin for infinite variations.
-- **Speed**: Adjust flow velocity or simulation frequency.
-- **Scale**: Zoom in/out of the mathematical noise or geometry.
-- **Amplitude**: Control the intensity of displacements and warping.
-- **Frequency**: Change the density of waves or link link-strengths.
-- **Definition**: Adjust complexity (octaves, sources, or link link-counts).
-- **Blend**: A global contrast and diffusion control for organic or "hard-edge" looks.
+## Keyboard Shortcuts
 
-### UX & Interaction
-- **Framer Motion Integration**: Smooth, spring-based physics for all UI transitions.
-- **Immersive Mode**: Fullscreen support and "Hide UI" (H) for distraction-free viewing.
-- **Keyboard Shortcuts**:
-  - `Space`: Pause/Resume animation.
-  - `H`: Toggle UI visibility.
-  - `F`: Toggle Fullscreen.
+- `Space`: pause/resume animation
+- `H`: toggle panel visibility
+- `F`: toggle fullscreen
 
----
+Hotkeys are disabled while typing in editable inputs.
 
 ## Tech Stack
 
-- **Core**: [React 18](https://reactjs.org/) + [TypeScript](https://www.typescriptlang.org/)
-- **Build Tool**: [Vite](https://vitejs.dev/)
-- **Animation**: [Framer Motion](https://www.framer.com/motion/)
-- **Icons**: [Phosphor Icons](https://phosphoricons.com/)
-- **Generative**: [HTML5 Canvas 2D](https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API) & custom Fragment Shaders.
-- **Feedback**: [Canvas Confetti](https://www.npmjs.com/package/canvas-confetti)
+- React 18
+- TypeScript
+- Vite
+- Framer Motion
+- Phosphor Icons
+- Canvas Confetti
+- Canvas 2D, WebGL, and WebGL2 rendering
 
----
+## Development
 
-## Getting Started
+Install dependencies:
 
-### Installation
 ```bash
 npm install
 ```
 
-### Development
+Start the dev server:
+
 ```bash
 npm run dev
 ```
 
-### Build
+Build for production:
+
 ```bash
 npm run build
 ```
 
----
+Preview the production build:
+
+```bash
+npm run preview
+```
+
+Deploy to GitHub Pages:
+
+```bash
+npm run deploy
+```
+
+## Project Notes
+
+- Scene state, presets, palette favorites, recent palettes, and recent scenes are stored in local storage.
+- Some renderers support loop-safe export timing; simulation-heavy modes do not.
+- The UI is designed around a floating control panel on desktop and a bottom-sheet panel on smaller screens.
 
 ## License
-MIT License. Created with by the Liquid Gradient team.
+
+MIT

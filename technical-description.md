@@ -1,87 +1,271 @@
-# Color Motion: Technical Documentation
+# Color Motion Lab: Technical Description
 
-This document provides a comprehensive technical overview of the "Color Motion" generative art project, designed to serve as a guide for either recreating or independently understanding the codebase.
+This document describes the current technical state of the project and is meant to help future contributors understand how the app is structured, what it already supports, and where the main integration points live.
 
-## 1. Project Architecture & Tech Stack
+## 1. Product Shape
 
-The project is built as a single-page frontend application utilizing modern web standards and minimal dependencies.
+Color Motion Lab is a single-page generative art application. It combines:
 
-**Core Technologies:**
-*   **Framework:** React 18
-*   **Language:** TypeScript
-*   **Build Tool:** Vite
-*   **Rendering:** Native HTML `<canvas>` API (vanilla 2D context)
-*   **Styling:** Pure CSS (CSS Variables) with zero styling frameworks
-*   **Icons:** `@phosphor-icons/react` and `lucide-react`
-*   **Animations:** `framer-motion` (for modal transitions)
-*   **Deployment:** GitHub Pages (via `gh-pages`)
+- a fullscreen rendering surface
+- a floating control panel
+- a fullscreen palette library modal
+- local scene/preset persistence
+- still and video export
+- multiple rendering backends under one shared parameter model
 
-## 2. Directory Structure
+The root `App.tsx` owns the scene state and routes that state into both the active renderer and the UI controls.
+
+## 2. Stack
+
+- Framework: React 18
+- Language: TypeScript
+- Build tool: Vite
+- Styling: plain CSS with CSS variables
+- UI animation: Framer Motion
+- Icons: `@phosphor-icons/react`
+- Extra visual feedback: `canvas-confetti`
+- Deployment: GitHub Pages via `gh-pages`
+
+Rendering uses a mix of:
+
+- Canvas 2D
+- WebGL
+- WebGL2
+
+depending on the active visual mode.
+
+## 3. Directory Structure
 
 ```text
-/src
-├── index.css                // Global styles, theme variables, and UI component styling
-├── App.tsx                  // Root component, global state manager, and layout wrapper
-├── main.tsx                 // React DOM entry point
-├── components/              // All UI and Rendering components
-│   ├── LiquidCanvas.tsx     // Generative Art Module: Organic liquid noise
-│   ├── WavesCanvas.tsx      // Generative Art Module: Sine wave interference
-│   ├── VoronoiCanvas.tsx    // Generative Art Module: Cell growth logic
-│   ├── TuringCanvas.tsx     // Generative Art Module: Reaction-diffusion patterns
-│   ├── ParticlesCanvas.tsx  // Generative Art Module: Physics-based particles
-│   ├── BlobsCanvas.tsx      // Generative Art Module: Molten Blobs fluid simulation
-│   ├── Panel.tsx            // The floating UI control panel (sliders/buttons)
-│   └── PaletteModal.tsx     // The fullscreen palette library modal
-└── data/
-    └── palettes.ts          // Curated list of 60+ pre-defined gradient palettes
+src/
+  App.tsx                    Root state, scene orchestration, export/share logic
+  main.tsx                   React entry point
+  index.css                  Global styles and component styling
+  components/
+    Panel.tsx                Floating control panel and workflow UI
+    PaletteModal.tsx         Fullscreen palette browser
+    LiquidCanvas.tsx         Fluid FBM renderer
+    WavesCanvas.tsx          Interference wave renderer
+    VoronoiCanvas.tsx        Cellular/Voronoi renderer
+    TuringCanvas.tsx         Reaction-diffusion renderer
+    ParticlesCanvas.tsx      Particle network renderer
+    BlobsCanvas.tsx          Blob-based gradient renderer
+  data/
+    palettes.ts              Curated palette library and tag definitions
 ```
 
-## 3. Core State Management
+## 4. Core State Model
 
-State is managed via React Context/Props originating at the root `<App />` level. The primary state pieces are passed simultaneously to both the active "Canvas" module (which renders them) and the "Panel" module (which mutates them).
+`App.tsx` is the main coordinator. It stores the active scene plus workflow, export, and persistence state.
 
-### Key State Objects (`App.tsx`):
-1.  **`params: GradientParams`**: The mathematical coefficients driving the art generation.
-    *   *Includes:* `seed` (math random offset), `speed` (time delta multiplier), `scale` (zoom factor), `amplitude` (intensity), `frequency` (density), `definition` (sharpness), `blend` (color mixing ratio).
-2.  **`colors: ColorRgb[]`**: An array of `[R, G, B]` arrays defining the current generative palette to mix between.
-3.  **`animationType: AnimationType`**: String enum controlling which specific internal Canvas component mounts (e.g., `'liquid'`, `'waves'`).
-4.  **UI State**: `uiVisible` (hidden UI "zen" mode), `paused` (animation loop pause), `fullscreen` (browser fullscreen API).
+### Scene State
 
-## 4. UI/UX Design System (`index.css`)
+`SceneState`
 
-The interface follows a strict "Dark Minimalist Editorial" design philosophy designed to fade into the background while remaining highly functional.
+- `animationType`
+- `params`
+- `colors`
 
-*   **Typography:**
-    *   Display/Headers: `Space Grotesk` (geometric, architectural vibe)
-    *   Labels/Data: `JetBrains Mono` (technical, monospaced readability)
-*   **Color Theme System:**
-    *   Backgrounds: Deep blacks (`#000000`, `#0C0C0C`, `#111111`)
-    *   Text: Bright whites (`#FFFFFF`, `rgba(255,255,255,0.6)`)
-    *   Accent: High-contrast orange (`#f2622f`), globally applied to active states, sliders, and primary buttons.
-*   **Key CSS Techniques:**
-    *   CSS Variables are heavily relied upon at the `:root` level for theme adherence.
-    *   Glassmorphism has been explicitly rejected in favor of solid matte backgrounds with sharp flat borders (`border: 1px solid var(--panel-border)`).
-    *   Custom `input[type="range"]` styling creates the signature "technical tracking" look (e.g., repeating `|` characters in an absolute `::before` pseudo-element underlying a custom 2px thumb).
+`GradientParams`
 
-## 5. Rendering Implementations
+- `seed`
+- `speed`
+- `scale`
+- `amplitude`
+- `frequency`
+- `definition`
+- `blend`
 
-All visual generation occurs inside the `components/*Canvas.tsx` files. 
+These parameters are shared across all renderers. Each renderer interprets them differently, but the UI remains consistent.
 
-### Common Canvas Lifecycle:
-1.  **Mounting:** A generic HTML `<canvas>` element spans the entire browser viewport (fixed `top: 0`, `left: 0`, `z-index: -1`).
-2.  **Initialization:** A `ref` attaches the context (`ctx.getContext('2d')`).
-3.  **Animation Loop:** An internal `requestAnimationFrame` (RAF) loop constantly cycles. A `time` variable increments on each frame, multiplied by `props.params.speed`.
-4.  **Generative Logic:** Within the RAF loop, specific logic executes.
-    *   *(e.g., For `LiquidCanvas`, mathematical noise functions (like Simplex/Perlin, usually implemented as sin/cos maps) calculate pixel offsets, looping over the available `props.colors` based on the X/Y coordinates and time.)*
-5.  **Resize Handling:** A `ResizeObserver` or `window.addEventListener('resize')` ensures the canvas resolution continuously scales to the client's screen size without stretching.
+### Persistence State
 
-## 6. Setup & Build Instructions
+The app stores the following in local storage:
 
-To recreate or run the environment, standard Node/Vite procedures apply:
+- current session scene
+- saved presets
+- recent scenes
+- palette favorites
+- recent palettes
 
-1.  **Installation**: Run `npm install` (resolving React, Vite, Framer Motion, and Phosphor Icons).
-2.  **Running Locally**: Run `npm run dev`. The Vite server will launch instantaneously at `http://localhost:5173`.
-3.  **Building for Production**: 
-    *   `npm run build` runs TypeScript validation `tsc` followed by `vite build` to package the optimized static site into `/dist`.
-4.  **Deployment**: 
-    *   `npm run deploy` pushes the `/dist` output automatically to the project's active GitHub Pages branch.
+### Workflow State
+
+The app also tracks:
+
+- compact vs advanced panel density
+- undo/redo history
+- workflow locks for mode/palette/seed/motion
+- active scene name
+- toast notifications
+- save-dialog visibility
+
+### Export State
+
+Export/recording is managed through:
+
+- `renderScale`
+- `isRecording`
+- loop-safe preview timing
+- external render time overrides for supported renderers
+- structured export status (`idle`, `preparing`, `capturing`, `recording`, `encoding`, `complete`, `error`)
+
+## 5. UI Architecture
+
+### Floating Panel
+
+`Panel.tsx` is responsible for:
+
+- mode switching
+- palette editing
+- param controls
+- workflow tools
+- export controls
+- saved preset browsing
+- recent scene browsing
+
+The panel includes richer saved-library browsing:
+
+- preset search
+- mode filtering
+- sort controls
+- recent scenes
+
+### Palette Library
+
+`PaletteModal.tsx` provides:
+
+- search
+- category browsing
+- favorites
+- recent palettes
+- surprise/random selection
+- active palette preview
+
+The modal uses Framer Motion for shell-level transitions, while the palette list itself is intentionally lightweight to avoid heavy layout animation cost during search and filtering.
+
+### Responsive Behavior
+
+Desktop uses a right-side floating panel. Smaller screens switch to a bottom-sheet style panel, while the palette library becomes a mobile-friendly fullscreen view.
+
+## 6. Renderer Model
+
+Each renderer is its own component. `App.tsx` mounts exactly one at a time based on `animationType`.
+
+Current renderer set:
+
+- `LiquidCanvas`
+- `WavesCanvas`
+- `VoronoiCanvas`
+- `TuringCanvas`
+- `ParticlesCanvas`
+- `BlobsCanvas`
+
+Shared renderer conventions include:
+
+- full-viewport canvas rendering
+- resize handling
+- pause support
+- shared parameter inputs
+- shared color palette input
+- renderer status reporting back to `App.tsx`
+- even-dimension sizing during export/recording to reduce codec artifacts
+
+Some renderers also support `externalTime`, which is used for deterministic export timing and loop-safe video recording.
+
+## 7. Export and Sharing
+
+The current output system supports:
+
+- standard PNG export
+- higher-resolution PNG export
+- WebM recording
+- loop-safe WebM export for supported renderers
+- shareable URLs with encoded scene state and scene name
+
+The panel exposes export presets through a dedicated dropdown, and the app displays inline export progress/status instead of relying only on toasts.
+
+Loop-safe export is only available for renderers that can be driven predictably by external time:
+
+- liquid
+- waves
+- voronoi
+- blobs
+
+Simulation-heavy modes are intentionally excluded.
+
+## 8. Workflow Features
+
+The app already supports a deeper workflow layer than a simple shader demo:
+
+- save/load/delete presets
+- in-app preset naming
+- undo/redo scene history
+- randomization by scene, mode, palette, and params
+- workflow locks
+- recent scenes
+- keyboard shortcuts
+
+Current keyboard shortcuts:
+
+- `Space`: pause/resume
+- `H`: toggle UI
+- `F`: fullscreen
+
+Global hotkeys ignore editable inputs so typing in search or text fields does not trigger panel actions.
+
+## 9. Styling System
+
+`index.css` defines the full visual system.
+
+Key design characteristics:
+
+- matte dark surfaces
+- orange accent color
+- `Space Grotesk` for display text
+- `JetBrains Mono` for controls and technical labels
+- strong border-based structure rather than soft glassmorphism
+
+The CSS file also owns:
+
+- panel layout
+- modal layout
+- custom range slider styling
+- toast/dialog styling
+- export progress styling
+- palette card and category-chip styling
+
+## 10. Build and Deployment
+
+Development:
+
+```bash
+npm run dev
+```
+
+Production build:
+
+```bash
+npm run build
+```
+
+Preview:
+
+```bash
+npm run preview
+```
+
+GitHub Pages deploy:
+
+```bash
+npm run deploy
+```
+
+## 11. Known Future Work Areas
+
+The current roadmap is focused on a few remaining areas:
+
+- A/B compare workflow
+- richer output formats such as GIF if justified
+- presentation mode
+- broader pointer/touch interaction across more renderers
+- performance modes
