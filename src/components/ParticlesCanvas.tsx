@@ -6,6 +6,7 @@ interface CanvasProps {
   colors: ColorRgb[];
   paused: boolean;
   onStatusChange?: (status: RendererStatus | null) => void;
+  renderScale?: number;
 }
 
 interface Particle {
@@ -70,7 +71,7 @@ function sfc32(a: number, b: number, c: number, d: number) {
     }
 }
 
-export default function ParticlesCanvas({ params, colors, paused, onStatusChange }: CanvasProps) {
+export default function ParticlesCanvas({ params, colors, paused, onStatusChange, renderScale = 1 }: CanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const state = useRef({
@@ -104,8 +105,9 @@ export default function ParticlesCanvas({ params, colors, paused, onStatusChange
     onStatusChange?.(null);
 
     const resize = () => {
-      canvas.width = window.innerWidth * window.devicePixelRatio;
-      canvas.height = window.innerHeight * window.devicePixelRatio;
+      const pixelScale = window.devicePixelRatio * renderScale;
+      canvas.width = window.innerWidth * pixelScale;
+      canvas.height = window.innerHeight * pixelScale;
       state.current.width = canvas.width;
       state.current.height = canvas.height;
     };
@@ -232,7 +234,7 @@ export default function ParticlesCanvas({ params, colors, paused, onStatusChange
       window.removeEventListener('resize', resize);
       cancelAnimationFrame(animationFrameId);
     };
-  }, [onStatusChange]);
+  }, [onStatusChange, renderScale]);
 
   return <canvas ref={canvasRef} id="c" />;
 }

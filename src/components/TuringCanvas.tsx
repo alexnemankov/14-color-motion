@@ -6,6 +6,7 @@ interface CanvasProps {
   colors: ColorRgb[];
   paused: boolean;
   onStatusChange?: (status: RendererStatus | null) => void;
+  renderScale?: number;
 }
 
 const vsSource = `
@@ -153,7 +154,7 @@ function createProgram(gl: WebGL2RenderingContext, vs: string, fs: string) {
   return prog;
 }
 
-export default function TuringCanvas({ params, colors, paused, onStatusChange }: CanvasProps) {
+export default function TuringCanvas({ params, colors, paused, onStatusChange, renderScale = 1 }: CanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const state = useRef({ params, colors, paused, lastSeed: params.seed });
   const glRef = useRef<{
@@ -222,9 +223,8 @@ export default function TuringCanvas({ params, colors, paused, onStatusChange }:
     };
 
     // Calculate resolution (sim resolution is fixed or scaled down for performance)
-    const dpr = window.devicePixelRatio;
-    const simW = Math.max(1, Math.floor(window.innerWidth / 2));
-    const simH = Math.max(1, Math.floor(window.innerHeight / 2));
+    const simW = Math.max(1, Math.floor((window.innerWidth * renderScale) / 2));
+    const simH = Math.max(1, Math.floor((window.innerHeight * renderScale) / 2));
 
     const objA = createFBOAndTexture(simW, simH);
     const objB = createFBOAndTexture(simW, simH);
@@ -263,8 +263,9 @@ export default function TuringCanvas({ params, colors, paused, onStatusChange }:
     state.current.lastSeed = params.seed;
 
     const resize = () => {
-      canvas.width = window.innerWidth * dpr;
-      canvas.height = window.innerHeight * dpr;
+      const pixelScale = window.devicePixelRatio * renderScale;
+      canvas.width = window.innerWidth * pixelScale;
+      canvas.height = window.innerHeight * pixelScale;
     };
     window.addEventListener('resize', resize);
     resize();
@@ -360,7 +361,7 @@ export default function TuringCanvas({ params, colors, paused, onStatusChange }:
       gl.deleteTexture(objB.tex);
       gl.deleteFramebuffer(objB.fbo);
     };
-  }, [onStatusChange]);
+  }, [onStatusChange, renderScale]);
 
   return <canvas ref={canvasRef} id="c" />;
 }

@@ -6,6 +6,7 @@ interface CanvasProps {
   colors: ColorRgb[];
   paused: boolean;
   onStatusChange?: (status: RendererStatus | null) => void;
+  renderScale?: number;
 }
 
 const vsSource = `
@@ -122,7 +123,7 @@ function createShader(gl: WebGLRenderingContext | WebGL2RenderingContext, type: 
   return s;
 }
 
-const BlobsCanvas: React.FC<CanvasProps> = ({ params, colors, paused, onStatusChange }) => {
+const BlobsCanvas: React.FC<CanvasProps> = ({ params, colors, paused, onStatusChange, renderScale = 1 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const state = useRef({
@@ -183,8 +184,9 @@ const BlobsCanvas: React.FC<CanvasProps> = ({ params, colors, paused, onStatusCh
     });
 
     const resize = () => {
-      canvas.width  = window.innerWidth  * window.devicePixelRatio;
-      canvas.height = window.innerHeight * window.devicePixelRatio;
+      const pixelScale = window.devicePixelRatio * renderScale;
+      canvas.width  = window.innerWidth  * pixelScale;
+      canvas.height = window.innerHeight * pixelScale;
       gl.viewport(0, 0, canvas.width, canvas.height);
     };
     window.addEventListener('resize', resize);
@@ -230,7 +232,7 @@ const BlobsCanvas: React.FC<CanvasProps> = ({ params, colors, paused, onStatusCh
       window.removeEventListener('resize', resize);
       cancelAnimationFrame(animationFrameId);
     };
-  }, [onStatusChange]);
+  }, [onStatusChange, renderScale]);
 
   return <canvas ref={canvasRef} id="c" />;
 };

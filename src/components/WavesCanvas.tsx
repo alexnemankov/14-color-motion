@@ -6,6 +6,7 @@ interface CanvasProps {
   colors: ColorRgb[];
   paused: boolean;
   onStatusChange?: (status: RendererStatus | null) => void;
+  renderScale?: number;
 }
 
 const vsSource = `
@@ -106,7 +107,7 @@ function createShader(gl: WebGLRenderingContext | WebGL2RenderingContext, type: 
   return s;
 }
 
-export default function WavesCanvas({ params, colors, paused, onStatusChange }: CanvasProps) {
+export default function WavesCanvas({ params, colors, paused, onStatusChange, renderScale = 1 }: CanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const state = useRef({
@@ -167,8 +168,9 @@ export default function WavesCanvas({ params, colors, paused, onStatusChange }: 
     });
 
     const resize = () => {
-      canvas.width  = window.innerWidth  * window.devicePixelRatio;
-      canvas.height = window.innerHeight * window.devicePixelRatio;
+      const pixelScale = window.devicePixelRatio * renderScale;
+      canvas.width  = window.innerWidth  * pixelScale;
+      canvas.height = window.innerHeight * pixelScale;
       gl.viewport(0, 0, canvas.width, canvas.height);
     };
     window.addEventListener('resize', resize);
@@ -214,7 +216,7 @@ export default function WavesCanvas({ params, colors, paused, onStatusChange }: 
       window.removeEventListener('resize', resize);
       cancelAnimationFrame(animationFrameId);
     };
-  }, [onStatusChange]);
+  }, [onStatusChange, renderScale]);
 
   return <canvas ref={canvasRef} id="c" />;
 }

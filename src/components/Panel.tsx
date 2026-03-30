@@ -1,19 +1,26 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Drop, 
-  Waves, 
-  Hexagon, 
-  Atom, 
-  ShareNetwork, 
-  Gradient,
-  PlayPause,
+import React, { useEffect, useState } from 'react';
+import {
+  ArrowCounterClockwise,
+  Atom,
+  CaretDown,
+  CaretRight,
+  ClockCounterClockwise,
   CornersOut,
+  Drop,
   EyeSlash,
+  Gradient,
+  Hexagon,
+  Lock,
+  LockOpen,
+  Palette,
+  PlayPause,
   Plus,
+  ShareNetwork,
+  Shuffle,
   Trash,
-  Palette
+  Waves
 } from '@phosphor-icons/react';
-import { GradientParams, ColorRgb, AnimationType, SavedPreset } from '../App';
+import { AnimationType, ColorRgb, GradientParams, SavedPreset, WorkflowLocks } from '../App';
 import PaletteModal from './PaletteModal';
 
 interface PanelProps {
@@ -33,7 +40,24 @@ interface PanelProps {
   loadPreset: (preset: SavedPreset) => void;
   deletePreset: (id: string) => void;
   shareScene: () => void;
-  exportImage: () => void;
+  exportImage: (scale?: number) => void;
+  recordVideo: (durationSeconds: number) => void;
+  isRecording: boolean;
+  resetMode: () => void;
+  resetPalette: () => void;
+  resetScene: () => void;
+  viewMode: 'compact' | 'advanced';
+  setViewMode: React.Dispatch<React.SetStateAction<'compact' | 'advanced'>>;
+  canUndo: boolean;
+  canRedo: boolean;
+  undo: () => void;
+  redo: () => void;
+  randomizeMode: () => void;
+  randomizePalette: () => void;
+  randomizeParams: () => void;
+  randomizeScene: () => void;
+  workflowLocks: WorkflowLocks;
+  toggleWorkflowLock: (key: keyof WorkflowLocks) => void;
 }
 
 const hexToRgb = (hex: string): ColorRgb => {
@@ -46,45 +70,79 @@ const rgbToHex = (r: number, g: number, b: number): string => {
   return [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('').toUpperCase();
 };
 
-const ColorRow = ({ 
-  rgb, 
-  update, 
+const LOCK_LABELS: Record<keyof WorkflowLocks, string> = {
+  mode: 'Lock mode',
+  palette: 'Lock palette',
+  seed: 'Lock seed',
+  motion: 'Lock motion',
+};
+
+const MODE_DETAILS: Record<AnimationType, { name: string; description: string }> = {
+  liquid: {
+    name: 'Fluid FBM',
+    description: 'Organic flow with soft warped noise.'
+  },
+  waves: {
+    name: 'Interference Waves',
+    description: 'Layered wave bands with shifting interference.'
+  },
+  voronoi: {
+    name: 'Cellular Voronoi',
+    description: 'Drifting cells that break into crisp structures.'
+  },
+  turing: {
+    name: 'Reaction-Diffusion',
+    description: 'Living spots and stripes from reaction-diffusion.'
+  },
+  particles: {
+    name: 'Particle Web',
+    description: 'Moving nodes that form a reactive network.'
+  },
+  blobs: {
+    name: 'Molten Blobs',
+    description: 'Soft overlapping masses with molten depth.'
+  }
+};
+
+const ColorRow = ({
+  rgb,
+  update,
   remove,
   showRemove
-}: { 
-  rgb: ColorRgb, 
-  update: (hex: string) => void, 
-  remove: () => void,
-  showRemove: boolean
+}: {
+  rgb: ColorRgb;
+  update: (hex: string) => void;
+  remove: () => void;
+  showRemove: boolean;
 }) => {
   const [localHex, setLocalHex] = useState(`#${rgbToHex(rgb[0], rgb[1], rgb[2])}`);
   const fullHexStr = `#${rgbToHex(rgb[0], rgb[1], rgb[2])}`;
-  
+
   useEffect(() => {
     setLocalHex(`#${rgbToHex(rgb[0], rgb[1], rgb[2])}`);
-  }, [rgb[0], rgb[1], rgb[2]]);
+  }, [rgb]);
 
   return (
     <div className="color-row">
       <div className="color-swatch" style={{ background: fullHexStr }}>
-        <input 
-          type="color" 
-          value={fullHexStr} 
-          onChange={e => update(e.target.value)} 
-          className="color-picker" 
+        <input
+          type="color"
+          value={fullHexStr}
+          onChange={e => update(e.target.value)}
+          className="color-picker"
         />
       </div>
-      <input 
-        className="color-hex" 
-        type="text" 
-        value={localHex} 
-        maxLength={7} 
+      <input
+        className="color-hex"
+        type="text"
+        value={localHex}
+        maxLength={7}
         onChange={e => {
-          let val = e.target.value;
-          if (val && !val.startsWith('#')) val = '#' + val;
-          if (!val) val = '#';
-          setLocalHex(val.toUpperCase());
-          if (/^#[0-9a-fA-F]{6}$/.test(val)) update(val);
+          let value = e.target.value;
+          if (value && !value.startsWith('#')) value = `#${value}`;
+          if (!value) value = '#';
+          setLocalHex(value.toUpperCase());
+          if (/^#[0-9a-fA-F]{6}$/.test(value)) update(value);
         }}
         onBlur={() => setLocalHex(`#${rgbToHex(rgb[0], rgb[1], rgb[2])}`)}
       />
@@ -114,42 +172,41 @@ export default function Panel({
   loadPreset,
   deletePreset,
   shareScene,
-  exportImage
+  exportImage,
+  recordVideo,
+  isRecording,
+  resetMode,
+  resetPalette,
+  resetScene,
+  viewMode,
+  setViewMode,
+  canUndo,
+  canRedo,
+  undo,
+  redo,
+  randomizeMode,
+  randomizePalette,
+  randomizeParams,
+  randomizeScene,
+  workflowLocks,
+  toggleWorkflowLock
 }: PanelProps) {
-  
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [workflowExpanded, setWorkflowExpanded] = useState(false);
+
+  const formatPresetDate = (value: string) => {
+    try {
+      return new Intl.DateTimeFormat(undefined, {
+        month: 'short',
+        day: 'numeric',
+      }).format(new Date(value));
+    } catch {
+      return '';
+    }
+  };
 
   const updateParam = (name: keyof GradientParams, value: number) => {
-    setParams(prev => ({ ...prev, [name]: isNaN(value) ? 0 : value }));
-  };
-
-  const stepParam = (name: keyof GradientParams, delta: number) => {
-    setParams(prev => {
-      const nv = Math.round((prev[name] + delta) * 1000) / 1000;
-      return { ...prev, [name]: nv };
-    });
-  };
-
-  const updateColor = (index: number, hex: string) => {
-    if (/^#[0-9a-fA-F]{6}$/.test(hex)) {
-      setColors(prev => {
-        const newColors = [...prev];
-        newColors[index] = hexToRgb(hex);
-        return newColors;
-      });
-    }
-  };
-
-  const removeColor = (index: number) => {
-    if (colors.length > 2) {
-      setColors(prev => prev.filter((_, i) => i !== index));
-    }
-  };
-
-  const addColor = () => {
-    if (colors.length < 8) {
-      setColors(prev => [...prev, [Math.random()*255|0, Math.random()*255|0, Math.random()*255|0] as ColorRgb]);
-    }
+    setParams(prev => ({ ...prev, [name]: Number.isNaN(value) ? 0 : value }));
   };
 
   const labels = {
@@ -171,32 +228,110 @@ export default function Panel({
     blobs: {
       seed: 'Flux Seed', speed: 'Flow Speed', scale: 'Blob InvScale', amplitude: 'Wander Amp', frequency: 'Blob Count', definition: 'Sharpness', blend: 'Color Blend'
     }
-  }[animationType] || { seed: 'Seed', speed: 'Speed', scale: 'Scale', amplitude: 'Amplitude', frequency: 'Frequency', definition: 'Definition', blend: 'Blend' };
+  }[animationType];
+
+  const renderParamRow = (
+    key: keyof GradientParams,
+    min: number,
+    max: number,
+    step: number
+  ) => (
+    <div className="param-row">
+      <span className="param-label">{labels[key]}</span>
+      <input className="param-input" type="number" value={params[key]} step={step} onChange={e => updateParam(key, +e.target.value)} />
+      <input className="param-slider" type="range" min={min} max={max} step={step} value={params[key]} onChange={e => updateParam(key, +e.target.value)} />
+    </div>
+  );
 
   return (
     <>
-      <div className="mode-switcher">
-        <button className={`mode-btn ${animationType === 'liquid' ? 'active' : ''}`} onClick={() => setAnimationType('liquid')} title="Fluid FBM" aria-label="Switch to Fluid FBM mode">
-          <Drop size={16} weight={animationType === 'liquid' ? 'fill' : 'bold'} />
-        </button>
-        <button className={`mode-btn ${animationType === 'waves' ? 'active' : ''}`} onClick={() => setAnimationType('waves')} title="Interference Waves" aria-label="Switch to Interference Waves mode">
-          <Waves size={16} weight={animationType === 'waves' ? 'fill' : 'bold'} />
-        </button>
-        <button className={`mode-btn ${animationType === 'voronoi' ? 'active' : ''}`} onClick={() => setAnimationType('voronoi')} title="Cellular Voronoi" aria-label="Switch to Cellular Voronoi mode">
-          <Hexagon size={16} weight={animationType === 'voronoi' ? 'fill' : 'bold'} />
-        </button>
-        <button className={`mode-btn ${animationType === 'turing' ? 'active' : ''}`} onClick={() => setAnimationType('turing')} title="Reaction-Diffusion" aria-label="Switch to Reaction-Diffusion mode">
-          <Atom size={16} weight={animationType === 'turing' ? 'fill' : 'bold'} />
-        </button>
-        <button className={`mode-btn ${animationType === 'particles' ? 'active' : ''}`} onClick={() => setAnimationType('particles')} title="Particle Web" aria-label="Switch to Particle Web mode">
-          <ShareNetwork size={16} weight={animationType === 'particles' ? 'fill' : 'bold'} />
-        </button>
-        <button className={`mode-btn ${animationType === 'blobs' ? 'active' : ''}`} onClick={() => setAnimationType('blobs')} title="Molten Blobs" aria-label="Switch to Molten Blobs mode">
-          <Gradient size={16} weight={animationType === 'blobs' ? 'fill' : 'bold'} />
-        </button>
+      <div className="panel-section">
+        <div className="section-heading">
+          <span className="section-label">Workflow</span>
+          <button
+            className={`section-toggle ${workflowExpanded ? 'active' : ''}`}
+            onClick={() => setWorkflowExpanded(expanded => !expanded)}
+            aria-expanded={workflowExpanded}
+            aria-controls="workflow-tools"
+          >
+            {workflowExpanded ? <CaretDown size={12} weight="bold" /> : <CaretRight size={12} weight="bold" />}
+            Tools
+          </button>
+        </div>
+        <div className="view-toggle" role="tablist" aria-label="Control density">
+          <button className={`view-toggle-btn ${viewMode === 'compact' ? 'active' : ''}`} onClick={() => setViewMode('compact')}>
+            Compact
+          </button>
+          <button className={`view-toggle-btn ${viewMode === 'advanced' ? 'active' : ''}`} onClick={() => setViewMode('advanced')}>
+            Advanced
+          </button>
+        </div>
+        <div id="workflow-tools" className={`workflow-details ${workflowExpanded ? 'expanded' : ''}`}>
+          <div className="workflow-actions">
+            <button className="workflow-btn" onClick={undo} disabled={!canUndo}>
+              <ClockCounterClockwise size={14} weight="bold" />
+              Undo
+            </button>
+            <button className="workflow-btn" onClick={redo} disabled={!canRedo}>
+              <ArrowCounterClockwise size={14} weight="bold" />
+              Redo
+            </button>
+            <button className="workflow-btn workflow-btn-accent" onClick={randomizeScene}>
+              <Shuffle size={14} weight="bold" />
+              Shuffle
+            </button>
+          </div>
+          <div className="workflow-actions compact-grid">
+            <button className="workflow-btn" onClick={randomizeMode}>Mode</button>
+            <button className="workflow-btn" onClick={randomizePalette}>Palette</button>
+            <button className="workflow-btn" onClick={randomizeParams}>Params</button>
+          </div>
+          <div className="lock-grid">
+            {(Object.keys(LOCK_LABELS) as Array<keyof WorkflowLocks>).map(key => {
+              const locked = workflowLocks[key];
+              return (
+                <button key={key} className={`lock-chip ${locked ? 'active' : ''}`} onClick={() => toggleWorkflowLock(key)}>
+                  {locked ? <Lock size={12} weight="bold" /> : <LockOpen size={12} weight="bold" />}
+                  {LOCK_LABELS[key]}
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
-      <div className="presets-section">
+      <div className="panel-section">
+        <span className="section-label">Mode</span>
+        <div className="mode-card">
+          <div className="mode-switcher">
+            <button className={`mode-btn ${animationType === 'liquid' ? 'active' : ''}`} onClick={() => setAnimationType('liquid')} title="Fluid FBM" aria-label="Switch to Fluid FBM mode">
+              <Drop size={16} weight={animationType === 'liquid' ? 'fill' : 'bold'} />
+            </button>
+            <button className={`mode-btn ${animationType === 'waves' ? 'active' : ''}`} onClick={() => setAnimationType('waves')} title="Interference Waves" aria-label="Switch to Interference Waves mode">
+              <Waves size={16} weight={animationType === 'waves' ? 'fill' : 'bold'} />
+            </button>
+            <button className={`mode-btn ${animationType === 'voronoi' ? 'active' : ''}`} onClick={() => setAnimationType('voronoi')} title="Cellular Voronoi" aria-label="Switch to Cellular Voronoi mode">
+              <Hexagon size={16} weight={animationType === 'voronoi' ? 'fill' : 'bold'} />
+            </button>
+            <button className={`mode-btn ${animationType === 'turing' ? 'active' : ''}`} onClick={() => setAnimationType('turing')} title="Reaction-Diffusion" aria-label="Switch to Reaction-Diffusion mode">
+              <Atom size={16} weight={animationType === 'turing' ? 'fill' : 'bold'} />
+            </button>
+            <button className={`mode-btn ${animationType === 'particles' ? 'active' : ''}`} onClick={() => setAnimationType('particles')} title="Particle Web" aria-label="Switch to Particle Web mode">
+              <ShareNetwork size={16} weight={animationType === 'particles' ? 'fill' : 'bold'} />
+            </button>
+            <button className={`mode-btn ${animationType === 'blobs' ? 'active' : ''}`} onClick={() => setAnimationType('blobs')} title="Molten Blobs" aria-label="Switch to Molten Blobs mode">
+              <Gradient size={16} weight={animationType === 'blobs' ? 'fill' : 'bold'} />
+            </button>
+          </div>
+          <div className="mode-summary">
+            <strong>{MODE_DETAILS[animationType].name}</strong>
+            <p>{MODE_DETAILS[animationType].description}</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="panel-section">
+        <span className="section-label">Palette</span>
         <button className="open-library-btn" onClick={() => setIsModalOpen(true)}>
           <Palette size={16} weight="bold" />
           <div className="library-btn-text">
@@ -204,103 +339,107 @@ export default function Panel({
             <small>60+ Curated Presets</small>
           </div>
         </button>
+
+        <div id="color-list">
+          {colors.map((rgb, index) => (
+            <ColorRow
+              key={index}
+              rgb={rgb}
+              update={hex => {
+                setColors(prev => {
+                  const next = [...prev];
+                  next[index] = hexToRgb(hex);
+                  return next;
+                });
+              }}
+              remove={() => {
+                if (colors.length > 2) {
+                  setColors(prev => prev.filter((_, itemIndex) => itemIndex !== index));
+                }
+              }}
+              showRemove={colors.length > 2}
+            />
+          ))}
+        </div>
+
+        <div className="add-color-row">
+          <button className="add-color-btn" onClick={() => {
+            if (colors.length < 8) {
+              setColors(prev => [...prev, [Math.random() * 255 | 0, Math.random() * 255 | 0, Math.random() * 255 | 0] as ColorRgb]);
+            }
+          }} title="Add Color" aria-label="Add color">
+            <Plus size={16} weight="bold" />
+          </button>
+          <span className="add-color-label">Add color...</span>
+        </div>
       </div>
 
-      <PaletteModal 
-        isOpen={isModalOpen} 
+      <PaletteModal
+        isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        onSelect={(newColors) => {
-          setColors(newColors.map(hexToRgb));
-        }}
+        onSelect={newColors => setColors(newColors.map(hexToRgb))}
       />
 
-      <div id="color-list">
-        {colors.map((rgb, i) => (
-          <ColorRow 
-            key={i} 
-            rgb={rgb} 
-            update={(hex) => updateColor(i, hex)} 
-            remove={() => removeColor(i)} 
-            showRemove={colors.length > 2}
-          />
-        ))}
+      <div className="panel-section">
+        <span className="section-label">Motion</span>
+        <div className="section-copy">Tune time, zoom, and movement feel for the active renderer.</div>
+        {viewMode === 'advanced' && renderParamRow('seed', 0, 9999, 1)}
+        {renderParamRow('speed', 0, 10, 0.1)}
+        {renderParamRow('scale', 0.01, 2, 0.01)}
+        {viewMode === 'advanced' && renderParamRow('amplitude', 0, 2, 0.01)}
       </div>
 
-      <div className="add-color-row">
-        <button className="add-color-btn" onClick={addColor} title="Add Color" aria-label="Add color">
-          <Plus size={16} weight="bold" />
-        </button>
-        <span className="add-color-label">Add color...</span>
-      </div>
-
-      <div className="param-row">
-        <span className="param-label">{labels.seed}</span>
-        <input className="param-input" type="number" value={params.seed} onChange={e => updateParam('seed', +e.target.value)} />
-        <input className="param-slider" type="range" min="0" max="9999" step="1" value={params.seed} onChange={e => updateParam('seed', +e.target.value)} />
-      </div>
-
-      <div className="param-row">
-        <span className="param-label">{labels.speed}</span>
-        <input className="param-input" type="number" value={params.speed} step="0.1" onChange={e => updateParam('speed', +e.target.value)} />
-        <div className="stepper">
-          <button onClick={() => stepParam('speed', 0.1)}>▲</button>
-          <button onClick={() => stepParam('speed', -0.1)}>▼</button>
+      {viewMode === 'advanced' && (
+        <div className="panel-section">
+          <span className="section-label">Structure</span>
+          <div className="section-copy">Adjust density, complexity, and edge behavior of the current visual system.</div>
+          {renderParamRow('frequency', 0.01, 4, 0.01)}
+          {renderParamRow('definition', 1, 12, 1)}
+          {renderParamRow('blend', 0, 1, 0.01)}
         </div>
-        <input className="param-slider" type="range" min="0" max="10" step="0.1" value={params.speed} onChange={e => updateParam('speed', +e.target.value)} />
-      </div>
+      )}
 
-      <div className="param-row">
-        <span className="param-label">{labels.scale}</span>
-        <input className="param-input" type="number" value={params.scale} step="0.01" onChange={e => updateParam('scale', +e.target.value)} />
-        <input className="param-slider" type="range" min="0.01" max="2" step="0.01" value={params.scale} onChange={e => updateParam('scale', +e.target.value)} />
-      </div>
-
-      <div className="param-row">
-        <span className="param-label">{labels.amplitude}</span>
-        <input className="param-input" type="number" value={params.amplitude} step="0.01" onChange={e => updateParam('amplitude', +e.target.value)} />
-        <input className="param-slider" type="range" min="0" max="2" step="0.01" value={params.amplitude} onChange={e => updateParam('amplitude', +e.target.value)} />
-      </div>
-
-      <div className="param-row">
-        <span className="param-label">{labels.frequency}</span>
-        <input className="param-input" type="number" value={params.frequency} step="0.01" onChange={e => updateParam('frequency', +e.target.value)} />
-        <input className="param-slider" type="range" min="0.01" max="4" step="0.01" value={params.frequency} onChange={e => updateParam('frequency', +e.target.value)} />
-      </div>
-
-      <div className="param-row">
-        <span className="param-label">{labels.definition}</span>
-        <input className="param-input" type="number" value={params.definition} step="1" onChange={e => updateParam('definition', +e.target.value)} />
-        <div className="stepper">
-          <button onClick={() => stepParam('definition', 1)}>▲</button>
-          <button onClick={() => stepParam('definition', -1)}>▼</button>
-        </div>
-        <input className="param-slider" type="range" min="1" max="12" step="1" value={params.definition} onChange={e => updateParam('definition', +e.target.value)} />
-      </div>
-
-      <div className="param-row">
-        <span className="param-label">{labels.blend}</span>
-        <input className="param-input" type="number" value={params.blend} step="0.01" onChange={e => updateParam('blend', +e.target.value)} />
-        <input className="param-slider" type="range" min="0" max="1" step="0.01" value={params.blend} onChange={e => updateParam('blend', +e.target.value)} />
-      </div>
-
-      <div className="workspace-section">
+      <div className="workspace-section panel-section">
         <span className="section-label">Workspace</span>
+        <div className="section-copy">Save, share, or export the current scene without leaving the canvas.</div>
         <div className="workspace-actions">
           <button className="workspace-btn" onClick={savePreset}>Save</button>
           <button className="workspace-btn" onClick={shareScene}>Share</button>
-          <button className="workspace-btn" onClick={exportImage}>PNG</button>
+          <button className="workspace-btn" onClick={() => exportImage(1)}>PNG</button>
+        </div>
+        <div className="workspace-actions workspace-actions-secondary">
+          <button className="workspace-btn workspace-btn-wide" onClick={() => exportImage(2)}>2x PNG</button>
+          <button className="workspace-btn workspace-btn-wide" onClick={() => recordVideo(5)} disabled={isRecording}>
+            {isRecording ? 'Recording' : '5s WebM'}
+          </button>
+          <button className="workspace-btn workspace-btn-wide" onClick={() => recordVideo(10)} disabled={isRecording}>
+            {isRecording ? 'Recording' : '10s WebM'}
+          </button>
         </div>
       </div>
 
-      <div className="saved-section">
+      <div className="workspace-section panel-section">
+        <span className="section-label">Reset</span>
+        <div className="reset-actions">
+          <button className="workspace-btn" onClick={resetMode}>Mode</button>
+          <button className="workspace-btn" onClick={resetPalette}>Palette</button>
+          <button className="workspace-btn" onClick={resetScene}>All</button>
+        </div>
+      </div>
+
+      <div className="saved-section panel-section">
         <span className="section-label">Saved Presets</span>
         {savedPresets.length > 0 ? (
           <div className="saved-list">
             {savedPresets.slice(0, 6).map(preset => (
               <div key={preset.id} className="saved-item">
                 <button className="saved-load-btn" onClick={() => loadPreset(preset)} title={preset.name}>
+                  <div className="saved-preview" style={{ background: `linear-gradient(90deg, ${preset.colors.map(color => `rgb(${color.join(',')})`).join(', ')})` }} />
                   <span>{preset.name}</span>
-                  <small>{preset.animationType}</small>
+                  <div className="saved-meta">
+                    <small>{preset.animationType}</small>
+                    <small>{formatPresetDate(preset.createdAt)}</small>
+                  </div>
                 </button>
                 <button className="saved-delete-btn" onClick={() => deletePreset(preset.id)} title="Delete preset" aria-label={`Delete preset ${preset.name}`}>
                   <Trash size={12} weight="bold" />
@@ -314,16 +453,16 @@ export default function Panel({
       </div>
 
       <div className="bottom-controls">
-        <button 
-          className={`ctrl-btn ${paused ? 'active' : ''}`} 
+        <button
+          className={`ctrl-btn ${paused ? 'active' : ''}`}
           onClick={() => setPaused(!paused)}
           title={paused ? 'Resume' : 'Pause'}
         >
           <PlayPause size={14} weight="bold" />
           {paused ? 'PLAY' : 'PAUSE'}
         </button>
-        <button 
-          className={`ctrl-btn ${fullscreen ? 'active' : ''}`} 
+        <button
+          className={`ctrl-btn ${fullscreen ? 'active' : ''}`}
           onClick={toggleFullscreen}
           title="Fullscreen"
         >

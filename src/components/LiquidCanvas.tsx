@@ -6,6 +6,7 @@ interface LiquidCanvasProps {
   colors: ColorRgb[];
   paused: boolean;
   onStatusChange?: (status: RendererStatus | null) => void;
+  renderScale?: number;
 }
 
 const vsSource = `
@@ -126,7 +127,7 @@ function createShader(gl: WebGLRenderingContext | WebGL2RenderingContext, type: 
   return s;
 }
 
-export default function LiquidCanvas({ params, colors, paused, onStatusChange }: LiquidCanvasProps) {
+export default function LiquidCanvas({ params, colors, paused, onStatusChange, renderScale = 1 }: LiquidCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   // Mutable state for the animation loop
@@ -189,8 +190,9 @@ export default function LiquidCanvas({ params, colors, paused, onStatusChange }:
     });
 
     const resize = () => {
-      canvas.width  = window.innerWidth  * window.devicePixelRatio;
-      canvas.height = window.innerHeight * window.devicePixelRatio;
+      const pixelScale = window.devicePixelRatio * renderScale;
+      canvas.width  = window.innerWidth  * pixelScale;
+      canvas.height = window.innerHeight * pixelScale;
       gl.viewport(0, 0, canvas.width, canvas.height);
     };
     window.addEventListener('resize', resize);
@@ -236,7 +238,7 @@ export default function LiquidCanvas({ params, colors, paused, onStatusChange }:
       window.removeEventListener('resize', resize);
       cancelAnimationFrame(animationFrameId);
     };
-  }, [onStatusChange]);
+  }, [onStatusChange, renderScale]);
 
   return <canvas ref={canvasRef} id="c" />;
 }

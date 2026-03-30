@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import LiquidCanvas from './components/LiquidCanvas';
 import WavesCanvas from './components/WavesCanvas';
 import VoronoiCanvas from './components/VoronoiCanvas';
@@ -6,6 +6,7 @@ import TuringCanvas from './components/TuringCanvas';
 import ParticlesCanvas from './components/ParticlesCanvas';
 import BlobsCanvas from './components/BlobsCanvas';
 import Panel from './components/Panel';
+import { PALETTES } from './data/palettes';
 
 export type AnimationType = 'liquid' | 'waves' | 'voronoi' | 'turing' | 'particles' | 'blobs';
 
@@ -38,6 +39,19 @@ export interface RendererStatus {
   message: string;
 }
 
+interface ToastState {
+  id: number;
+  title: string;
+  message?: string;
+}
+
+export interface WorkflowLocks {
+  mode: boolean;
+  palette: boolean;
+  seed: boolean;
+  motion: boolean;
+}
+
 const DEFAULT_COLORS: ColorRgb[] = [
   [10, 0, 20],
   [107, 0, 194],
@@ -58,7 +72,114 @@ const DEFAULT_PARAMS: GradientParams = {
 const SESSION_STORAGE_KEY = 'color-motion-session';
 const PRESETS_STORAGE_KEY = 'color-motion-presets';
 const SHARE_PARAM_KEY = 'scene';
+const SHARE_NAME_PARAM_KEY = 'name';
 const VALID_ANIMATION_TYPES: AnimationType[] = ['liquid', 'waves', 'voronoi', 'turing', 'particles', 'blobs'];
+const HISTORY_LIMIT = 40;
+const PALETTE_TRANSITION_MS = 480;
+
+function cloneScene(scene: SceneState): SceneState {
+  return {
+    animationType: scene.animationType,
+    params: { ...scene.params },
+    colors: scene.colors.map(color => [...color] as ColorRgb),
+  };
+}
+
+function sceneKey(scene: SceneState): string {
+  return JSON.stringify(scene);
+}
+
+function randomBetween(min: number, max: number, precision = 2) {
+  const factor = 10 ** precision;
+  return Math.round((min + Math.random() * (max - min)) * factor) / factor;
+}
+
+function randomInt(min: number, max: number) {
+  return Math.floor(min + Math.random() * (max - min + 1));
+}
+
+function randomAnimationType(): AnimationType {
+  return VALID_ANIMATION_TYPES[randomInt(0, VALID_ANIMATION_TYPES.length - 1)];
+}
+
+function randomPaletteColors(): ColorRgb[] {
+  const palette = PALETTES[randomInt(0, PALETTES.length - 1)];
+  return palette.colors.map(color => {
+    const value = parseInt(color.slice(1), 16);
+    return [(value >> 16) & 255, (value >> 8) & 255, value & 255] as ColorRgb;
+  });
+}
+
+function randomParams(base: GradientParams, locks: Pick<WorkflowLocks, 'seed' | 'motion'>): GradientParams {
+  return {
+    seed: locks.seed ? base.seed : randomInt(0, 9999),
+    speed: locks.motion ? base.speed : randomBetween(0.2, 2.4),
+    scale: locks.motion ? base.scale : randomBetween(0.2, 1.4),
+    amplitude: locks.motion ? base.amplitude : randomBetween(0.2, 1.6),
+    frequency: locks.motion ? base.frequency : randomBetween(0.3, 2.6),
+    definition: locks.motion ? base.definition : randomInt(1, 8),
+    blend: locks.motion ? base.blend : randomBetween(0.15, 1, 2),
+  };
+}
+
+function clampChannel(value: number) {
+  return Math.max(0, Math.min(255, Math.round(value)));
+}
+
+function palettesEqual(a: ColorRgb[], b: ColorRgb[]) {
+  return sceneKey({ animationType: 'liquid', params: DEFAULT_PARAMS, colors: a }) === sceneKey({ animationType: 'liquid', params: DEFAULT_PARAMS, colors: b });
+}
+
+function samplePaletteColor(palette: ColorRgb[], t: number): ColorRgb {
+  if (palette.length === 0) return [0, 0, 0];
+  if (palette.length === 1) return [...palette[0]] as ColorRgb;
+
+  const clamped = Math.max(0, Math.min(1, t));
+  const segment = clamped * (palette.length - 1);
+  const index = Math.floor(segment);
+  const localT = segment - index;
+  const from = palette[Math.min(index, palette.length - 1)];
+  const to = palette[Math.min(index + 1, palette.length - 1)];
+
+  return [
+    clampChannel(from[0] + (to[0] - from[0]) * localT),
+    clampChannel(from[1] + (to[1] - from[1]) * localT),
+    clampChannel(from[2] + (to[2] - from[2]) * localT),
+  ];
+}
+
+function resamplePalette(palette: ColorRgb[], count: number): ColorRgb[] {
+  if (count <= 0) return [];
+  if (count === 1) return [samplePaletteColor(palette, 0.5)];
+
+  return Array.from({ length: count }, (_, index) => samplePaletteColor(palette, index / (count - 1)));
+}
+
+function animationTypeLabel(type: AnimationType) {
+  return {
+    liquid: 'Liquid',
+    waves: 'Waves',
+    voronoi: 'Voronoi',
+    turing: 'Turing',
+    particles: 'Particles',
+    blobs: 'Blobs',
+  }[type];
+}
+
+function interpolatePalettes(from: ColorRgb[], to: ColorRgb[], t: number): ColorRgb[] {
+  const count = Math.max(2, to.length);
+  const start = resamplePalette(from, count);
+  const end = resamplePalette(to, count);
+
+  return end.map((targetColor, index) => {
+    const sourceColor = start[index] ?? start[start.length - 1] ?? [0, 0, 0];
+    return [
+      clampChannel(sourceColor[0] + (targetColor[0] - sourceColor[0]) * t),
+      clampChannel(sourceColor[1] + (targetColor[1] - sourceColor[1]) * t),
+      clampChannel(sourceColor[2] + (targetColor[2] - sourceColor[2]) * t),
+    ] as ColorRgb;
+  });
+}
 
 function isColorRgb(value: unknown): value is ColorRgb {
   return Array.isArray(value)
@@ -106,6 +227,18 @@ function readSharedScene(): SceneState | null {
   }
 }
 
+function readSharedSceneName(): string | null {
+  try {
+    const url = new URL(window.location.href);
+    const raw = url.searchParams.get(SHARE_NAME_PARAM_KEY);
+    if (!raw) return null;
+    const name = decodeURIComponent(raw).trim();
+    return name ? name.slice(0, 80) : null;
+  } catch {
+    return null;
+  }
+}
+
 function readSessionScene(): SceneState | null {
   try {
     const raw = localStorage.getItem(SESSION_STORAGE_KEY);
@@ -143,6 +276,7 @@ function readSavedPresets(): SavedPreset[] {
 }
 
 function App() {
+  const sharedSceneName = readSharedSceneName();
   const initialScene = readSharedScene() ?? readSessionScene() ?? {
     animationType: 'liquid' as AnimationType,
     params: DEFAULT_PARAMS,
@@ -151,6 +285,7 @@ function App() {
 
   const [params, setParams] = useState<GradientParams>(initialScene.params);
   const [colors, setColors] = useState<ColorRgb[]>(initialScene.colors);
+  const [renderColors, setRenderColors] = useState<ColorRgb[]>(initialScene.colors);
   const [animationType, setAnimationType] = useState<AnimationType>(initialScene.animationType);
   const [uiVisible, setUiVisible] = useState(true);
   const [paused, setPaused] = useState(false);
@@ -158,6 +293,25 @@ function App() {
   const [hintVisible, setHintVisible] = useState(true);
   const [savedPresets, setSavedPresets] = useState<SavedPreset[]>(readSavedPresets);
   const [rendererStatus, setRendererStatus] = useState<RendererStatus | null>(null);
+  const [toast, setToast] = useState<ToastState | null>(null);
+  const [viewMode, setViewMode] = useState<'compact' | 'advanced'>('compact');
+  const [workflowLocks, setWorkflowLocks] = useState<WorkflowLocks>({
+    mode: false,
+    palette: false,
+    seed: false,
+    motion: false,
+  });
+  const [pastScenes, setPastScenes] = useState<SceneState[]>([]);
+  const [futureScenes, setFutureScenes] = useState<SceneState[]>([]);
+  const [renderScale, setRenderScale] = useState(1);
+  const [isRecording, setIsRecording] = useState(false);
+  const [activeSceneName, setActiveSceneName] = useState<string | null>(sharedSceneName);
+  const previousSceneRef = useRef<SceneState>(cloneScene(initialScene));
+  const suppressHistoryRef = useRef(false);
+  const renderColorsRef = useRef<ColorRgb[]>(initialScene.colors);
+  const paletteTransitionFrameRef = useRef<number | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordingTimeoutRef = useRef<number | null>(null);
 
   const currentScene: SceneState = {
     animationType,
@@ -168,6 +322,75 @@ function App() {
   useEffect(() => {
     const timer = setTimeout(() => setHintVisible(false), 4000);
     return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = window.setTimeout(() => setToast(null), 2400);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
+
+  useEffect(() => {
+    if (!sharedSceneName) return;
+    showToast('Shared scene loaded', sharedSceneName);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    renderColorsRef.current = renderColors;
+  }, [renderColors]);
+
+  useEffect(() => {
+    if (palettesEqual(renderColorsRef.current, colors)) {
+      setRenderColors(colors);
+      renderColorsRef.current = colors;
+      return;
+    }
+
+    if (paletteTransitionFrameRef.current !== null) {
+      cancelAnimationFrame(paletteTransitionFrameRef.current);
+    }
+
+    const startPalette = renderColorsRef.current;
+    const startedAt = performance.now();
+
+    const animate = (now: number) => {
+      const progress = Math.min(1, (now - startedAt) / PALETTE_TRANSITION_MS);
+      const nextPalette = interpolatePalettes(startPalette, colors, progress);
+      renderColorsRef.current = nextPalette;
+      setRenderColors(nextPalette);
+
+      if (progress < 1) {
+        paletteTransitionFrameRef.current = requestAnimationFrame(animate);
+      } else {
+        renderColorsRef.current = colors;
+        setRenderColors(colors);
+        paletteTransitionFrameRef.current = null;
+      }
+    };
+
+    paletteTransitionFrameRef.current = requestAnimationFrame(animate);
+
+    return () => {
+      if (paletteTransitionFrameRef.current !== null) {
+        cancelAnimationFrame(paletteTransitionFrameRef.current);
+        paletteTransitionFrameRef.current = null;
+      }
+    };
+  }, [colors]);
+
+  useEffect(() => {
+    return () => {
+      if (paletteTransitionFrameRef.current !== null) {
+        cancelAnimationFrame(paletteTransitionFrameRef.current);
+      }
+      if (recordingTimeoutRef.current !== null) {
+        window.clearTimeout(recordingTimeoutRef.current);
+      }
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
+    };
   }, []);
 
   const toggleFullscreen = () => {
@@ -221,10 +444,45 @@ function App() {
     }
   }, [savedPresets]);
 
+  useEffect(() => {
+    const previousScene = previousSceneRef.current;
+    if (sceneKey(previousScene) === sceneKey(currentScene)) {
+      return;
+    }
+
+    if (suppressHistoryRef.current) {
+      suppressHistoryRef.current = false;
+      previousSceneRef.current = cloneScene(currentScene);
+      return;
+    }
+
+    setPastScenes(prev => [...prev.slice(-(HISTORY_LIMIT - 1)), cloneScene(previousScene)]);
+    setFutureScenes([]);
+    previousSceneRef.current = cloneScene(currentScene);
+  }, [currentScene]);
+
   const applyScene = (scene: SceneState) => {
+    suppressHistoryRef.current = true;
     setAnimationType(scene.animationType);
     setParams(scene.params);
     setColors(scene.colors);
+  };
+
+  const showToast = (title: string, message?: string) => {
+    setToast({
+      id: Date.now(),
+      title,
+      message,
+    });
+  };
+
+  const getSceneName = (scene: SceneState) => {
+    const matchingPreset = savedPresets.find(preset => sceneKey(cloneScene(preset)) === sceneKey(scene));
+    if (matchingPreset) {
+      return matchingPreset.name;
+    }
+
+    return `${animationTypeLabel(scene.animationType)} Scene`;
   };
 
   const handleSavePreset = () => {
@@ -241,63 +499,271 @@ function App() {
       },
       ...prev,
     ]);
+    setActiveSceneName(name);
+    showToast('Preset saved', name);
   };
 
   const handleLoadPreset = (preset: SavedPreset) => {
     applyScene(preset);
+    setActiveSceneName(preset.name);
+    showToast('Preset loaded', preset.name);
   };
 
   const handleDeletePreset = (id: string) => {
+    const deletedPreset = savedPresets.find(preset => preset.id === id);
     setSavedPresets(prev => prev.filter(preset => preset.id !== id));
+    if (deletedPreset && deletedPreset.name === activeSceneName) {
+      setActiveSceneName(null);
+    }
+    showToast('Preset deleted', deletedPreset?.name);
   };
 
   const handleShareScene = async () => {
     const url = new URL(window.location.href);
     url.searchParams.set(SHARE_PARAM_KEY, encodeURIComponent(JSON.stringify(currentScene)));
+    url.searchParams.set(SHARE_NAME_PARAM_KEY, encodeURIComponent(activeSceneName ?? getSceneName(currentScene)));
 
     try {
       await navigator.clipboard.writeText(url.toString());
-      window.alert('Share link copied to clipboard.');
+      showToast('Share link copied', activeSceneName ?? getSceneName(currentScene));
     } catch {
       window.prompt('Copy this share link', url.toString());
     }
   };
 
-  const handleExportImage = () => {
+  const captureCanvasBlob = (canvas: HTMLCanvasElement) => new Promise<Blob | null>(resolve => {
+    canvas.toBlob(resolve);
+  });
+
+  const waitForPaint = async (frames = 2) => {
+    for (let i = 0; i < frames; i += 1) {
+      await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+    }
+  };
+
+  const handleExportImage = async (scale = 1) => {
     const canvas = document.getElementById('c') as HTMLCanvasElement | null;
     if (!canvas) {
-      window.alert('No active canvas found to export.');
+      showToast('Export failed', 'No active canvas found to export.');
       return;
     }
 
-    canvas.toBlob(blob => {
+    try {
+      if (scale > 1) {
+        setRenderScale(scale);
+        await waitForPaint(3);
+      }
+
+      const exportCanvas = (document.getElementById('c') as HTMLCanvasElement | null) ?? canvas;
+      const blob = await captureCanvasBlob(exportCanvas);
       if (!blob) {
-        window.alert('Image export failed.');
+        showToast('Export failed', 'Image export failed.');
         return;
       }
 
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `color-motion-${animationType}-${Date.now()}.png`;
+      link.download = `color-motion-${animationType}-${scale}x-${Date.now()}.png`;
       link.click();
       URL.revokeObjectURL(url);
-    });
+      showToast(scale > 1 ? `${scale}x PNG exported` : 'PNG exported');
+    } finally {
+      if (scale > 1) {
+        setRenderScale(1);
+      }
+    }
+  };
+
+  const downloadBlob = (blob: Blob, filename: string) => {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleRecordVideo = async (durationSeconds: number) => {
+    if (isRecording) {
+      showToast('Recording in progress');
+      return;
+    }
+
+    const canvas = document.getElementById('c') as HTMLCanvasElement | null;
+    if (!canvas || typeof canvas.captureStream !== 'function' || typeof MediaRecorder === 'undefined') {
+      showToast('Recording unavailable', 'This browser cannot record canvas output.');
+      return;
+    }
+
+    const preferredTypes = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+    const mimeType = preferredTypes.find(type => MediaRecorder.isTypeSupported(type)) ?? '';
+
+    try {
+      setIsRecording(true);
+      await waitForPaint(2);
+
+      const stream = canvas.captureStream(60);
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      const chunks: Blob[] = [];
+      mediaRecorderRef.current = recorder;
+
+      recorder.ondataavailable = event => {
+        if (event.data.size > 0) {
+          chunks.push(event.data);
+        }
+      };
+
+      recorder.onerror = () => {
+        setIsRecording(false);
+        stream.getTracks().forEach(track => track.stop());
+        showToast('Recording failed', 'The browser stopped the video export.');
+      };
+
+      recorder.onstop = () => {
+        stream.getTracks().forEach(track => track.stop());
+        mediaRecorderRef.current = null;
+        if (recordingTimeoutRef.current !== null) {
+          window.clearTimeout(recordingTimeoutRef.current);
+          recordingTimeoutRef.current = null;
+        }
+
+        if (chunks.length > 0) {
+          downloadBlob(
+            new Blob(chunks, { type: mimeType || 'video/webm' }),
+            `color-motion-${animationType}-${durationSeconds}s-${Date.now()}.webm`
+          );
+          showToast('WebM exported', `${durationSeconds}s clip ready`);
+        } else {
+          showToast('Recording failed', 'No video frames were captured.');
+        }
+
+        setIsRecording(false);
+      };
+
+      recorder.start();
+      recordingTimeoutRef.current = window.setTimeout(() => {
+        if (recorder.state !== 'inactive') {
+          recorder.stop();
+        }
+      }, durationSeconds * 1000);
+      showToast('Recording started', `${durationSeconds}s WebM clip`);
+    } catch {
+      setIsRecording(false);
+      showToast('Recording failed', 'Unable to start video export.');
+    }
+  };
+
+  const handleResetMode = () => {
+    setParams(DEFAULT_PARAMS);
+    setPaused(false);
+    setActiveSceneName(null);
+    showToast('Mode reset', `Reset ${animationType} controls`);
+  };
+
+  const handleResetPalette = () => {
+    setColors(DEFAULT_COLORS);
+    setActiveSceneName(null);
+    showToast('Palette reset');
+  };
+
+  const handleResetScene = () => {
+    setAnimationType('liquid');
+    setParams(DEFAULT_PARAMS);
+    setColors(DEFAULT_COLORS);
+    setPaused(false);
+    setActiveSceneName(null);
+    showToast('Scene reset', 'Restored the default scene');
+  };
+
+  const handleUndo = () => {
+    const previousScene = pastScenes[pastScenes.length - 1];
+    if (!previousScene) return;
+
+    setPastScenes(prev => prev.slice(0, -1));
+    setFutureScenes(prev => [cloneScene(currentScene), ...prev]);
+    applyScene(previousScene);
+    showToast('Undid last change');
+  };
+
+  const handleRedo = () => {
+    const nextScene = futureScenes[0];
+    if (!nextScene) return;
+
+    setFutureScenes(prev => prev.slice(1));
+    setPastScenes(prev => [...prev.slice(-(HISTORY_LIMIT - 1)), cloneScene(currentScene)]);
+    applyScene(nextScene);
+    showToast('Redid change');
+  };
+
+  const toggleWorkflowLock = (key: keyof WorkflowLocks) => {
+    setWorkflowLocks(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const handleRandomizeMode = () => {
+    if (workflowLocks.mode) {
+      showToast('Mode lock enabled', 'Unlock mode to randomize it.');
+      return;
+    }
+
+    const nextMode = randomAnimationType();
+    setAnimationType(nextMode);
+    showToast('Mode randomized');
+  };
+
+  const handleRandomizePalette = () => {
+    if (workflowLocks.palette) {
+      showToast('Palette lock enabled', 'Unlock palette to randomize it.');
+      return;
+    }
+
+    setColors(randomPaletteColors());
+    showToast('Palette randomized');
+  };
+
+  const handleRandomizeParams = () => {
+    if (workflowLocks.motion && workflowLocks.seed) {
+      showToast('Parameter locks enabled', 'Unlock seed or motion controls to randomize them.');
+      return;
+    }
+
+    setParams(prev => randomParams(prev, workflowLocks));
+    showToast('Parameters randomized');
+  };
+
+  const handleRandomizeScene = () => {
+    if (!workflowLocks.mode) {
+      setAnimationType(randomAnimationType());
+    }
+    if (!workflowLocks.palette) {
+      setColors(randomPaletteColors());
+    }
+    if (!(workflowLocks.motion && workflowLocks.seed)) {
+      setParams(prev => randomParams(prev, workflowLocks));
+    }
+    showToast('Scene randomized');
   };
 
   return (
     <>
-      {animationType === 'liquid' && <LiquidCanvas params={params} colors={colors} paused={paused} onStatusChange={setRendererStatus} />}
-      {animationType === 'waves' && <WavesCanvas params={params} colors={colors} paused={paused} onStatusChange={setRendererStatus} />}
-      {animationType === 'voronoi' && <VoronoiCanvas params={params} colors={colors} paused={paused} onStatusChange={setRendererStatus} />}
-      {animationType === 'turing' && <TuringCanvas params={params} colors={colors} paused={paused} onStatusChange={setRendererStatus} />}
-      {animationType === 'particles' && <ParticlesCanvas params={params} colors={colors} paused={paused} onStatusChange={setRendererStatus} />}
-      {animationType === 'blobs' && <BlobsCanvas params={params} colors={colors} paused={paused} onStatusChange={setRendererStatus} />}
+      {animationType === 'liquid' && <LiquidCanvas params={params} colors={renderColors} paused={paused} onStatusChange={setRendererStatus} renderScale={renderScale} />}
+      {animationType === 'waves' && <WavesCanvas params={params} colors={renderColors} paused={paused} onStatusChange={setRendererStatus} renderScale={renderScale} />}
+      {animationType === 'voronoi' && <VoronoiCanvas params={params} colors={renderColors} paused={paused} onStatusChange={setRendererStatus} renderScale={renderScale} />}
+      {animationType === 'turing' && <TuringCanvas params={params} colors={renderColors} paused={paused} onStatusChange={setRendererStatus} renderScale={renderScale} />}
+      {animationType === 'particles' && <ParticlesCanvas params={params} colors={renderColors} paused={paused} onStatusChange={setRendererStatus} renderScale={renderScale} />}
+      {animationType === 'blobs' && <BlobsCanvas params={params} colors={renderColors} paused={paused} onStatusChange={setRendererStatus} renderScale={renderScale} />}
 
       {rendererStatus && (
         <div className="renderer-status" role="status" aria-live="polite">
           <strong>{rendererStatus.title}</strong>
           <p>{rendererStatus.message}</p>
+        </div>
+      )}
+
+      {toast && (
+        <div key={toast.id} className="app-toast" role="status" aria-live="polite">
+          <strong>{toast.title}</strong>
+          {toast.message && <p>{toast.message}</p>}
         </div>
       )}
 
@@ -324,6 +790,23 @@ function App() {
           deletePreset={handleDeletePreset}
           shareScene={handleShareScene}
           exportImage={handleExportImage}
+          recordVideo={handleRecordVideo}
+          isRecording={isRecording}
+          resetMode={handleResetMode}
+          resetPalette={handleResetPalette}
+          resetScene={handleResetScene}
+          viewMode={viewMode}
+          setViewMode={setViewMode}
+          canUndo={pastScenes.length > 0}
+          canRedo={futureScenes.length > 0}
+          undo={handleUndo}
+          redo={handleRedo}
+          randomizeMode={handleRandomizeMode}
+          randomizePalette={handleRandomizePalette}
+          randomizeParams={handleRandomizeParams}
+          randomizeScene={handleRandomizeScene}
+          workflowLocks={workflowLocks}
+          toggleWorkflowLock={toggleWorkflowLock}
         />
       </div>
 

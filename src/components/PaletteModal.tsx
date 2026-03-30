@@ -14,8 +14,16 @@ interface PaletteModalProps {
   onSelect: (colors: string[]) => void;
 }
 
-const CATEGORIES: { id: 'All' | PaletteTag; label: string; Icon: any }[] = [
+type LibraryCategory = 'All' | 'Favorites' | 'Recent' | PaletteTag;
+
+const FAVORITES_STORAGE_KEY = 'liquid-favorites';
+const RECENT_PALETTES_STORAGE_KEY = 'liquid-recent-palettes';
+const RECENT_LIMIT = 8;
+
+const CATEGORIES: { id: LibraryCategory; label: string; Icon: any }[] = [
   { id: 'All', label: 'All', Icon: Sparkle },
+  { id: 'Favorites', label: 'Favorites', Icon: Heart },
+  { id: 'Recent', label: 'Recent', Icon: ArrowsClockwise },
   { id: 'Neon', label: 'Neon', Icon: Lightning },
   { id: 'Nature', label: 'Nature', Icon: Leaf },
   { id: 'Dark', label: 'Dark', Icon: Moon },
@@ -30,14 +38,15 @@ const CATEGORIES: { id: 'All' | PaletteTag; label: string; Icon: any }[] = [
 
 export default function PaletteModal({ isOpen, onClose, onSelect }: PaletteModalProps) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeCategory, setActiveCategory] = useState<'All' | PaletteTag>('All');
+  const [activeCategory, setActiveCategory] = useState<LibraryCategory>('All');
   const [activePaletteName, setActivePaletteName] = useState<string | null>(null);
   const [favorites, setFavorites] = useState<string[]>([]);
+  const [recentPaletteNames, setRecentPaletteNames] = useState<string[]>([]);
   
   // Load favorites from local storage
   useEffect(() => {
     try {
-      const saved = localStorage.getItem('liquid-favorites');
+      const saved = localStorage.getItem(FAVORITES_STORAGE_KEY);
       if (saved) {
         setFavorites(JSON.parse(saved));
       }
@@ -48,8 +57,26 @@ export default function PaletteModal({ isOpen, onClose, onSelect }: PaletteModal
 
   // Save favorites to local storage
   useEffect(() => {
-    localStorage.setItem('liquid-favorites', JSON.stringify(favorites));
+    localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(favorites));
   }, [favorites]);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(RECENT_PALETTES_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          setRecentPaletteNames(parsed.filter((name): name is string => typeof name === 'string'));
+        }
+      }
+    } catch (e) {
+      console.error('Failed to parse recent palettes', e);
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem(RECENT_PALETTES_STORAGE_KEY, JSON.stringify(recentPaletteNames));
+  }, [recentPaletteNames]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -71,8 +98,13 @@ export default function PaletteModal({ isOpen, onClose, onSelect }: PaletteModal
     );
   };
 
+  const pushRecentPalette = (name: string) => {
+    setRecentPaletteNames(prev => [name, ...prev.filter(entry => entry !== name)].slice(0, RECENT_LIMIT));
+  };
+
   const handleSelect = (p: PaletteDescriptor) => {
     setActivePaletteName(p.name);
+    pushRecentPalette(p.name);
     onSelect(p.colors);
     setTimeout(onClose, 250);
   };
@@ -88,6 +120,7 @@ export default function PaletteModal({ isOpen, onClose, onSelect }: PaletteModal
     });
 
     setActivePaletteName(random.name);
+    pushRecentPalette(random.name);
     onSelect(random.colors);
     
     // Auto-close immediately
@@ -95,12 +128,30 @@ export default function PaletteModal({ isOpen, onClose, onSelect }: PaletteModal
   };
 
   const filteredPalettes = useMemo(() => {
-    return PALETTES.filter((p: PaletteDescriptor) => {
+    const recentIndex = new Map(recentPaletteNames.map((name, index) => [name, index]));
+
+    return PALETTES
+      .filter((p: PaletteDescriptor) => {
       const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesCategory = activeCategory === 'All' || p.tags.includes(activeCategory as PaletteTag);
+      const matchesCategory =
+        activeCategory === 'All'
+        || (activeCategory === 'Favorites' && favorites.includes(p.name))
+        || (activeCategory === 'Recent' && recentIndex.has(p.name))
+        || (activeCategory !== 'Favorites' && activeCategory !== 'Recent' && p.tags.includes(activeCategory as PaletteTag));
       return matchesSearch && matchesCategory;
-    });
-  }, [searchQuery, activeCategory]);
+      })
+      .sort((a, b) => {
+        if (activeCategory === 'Recent') {
+          return (recentIndex.get(a.name) ?? Number.MAX_SAFE_INTEGER) - (recentIndex.get(b.name) ?? Number.MAX_SAFE_INTEGER);
+        }
+
+        if (activeCategory === 'Favorites') {
+          return a.name.localeCompare(b.name);
+        }
+
+        return 0;
+      });
+  }, [searchQuery, activeCategory, favorites, recentPaletteNames]);
 
   const activePalette = useMemo(() => {
     return PALETTES.find((p: PaletteDescriptor) => p.name === activePaletteName);
@@ -208,14 +259,15 @@ export default function PaletteModal({ isOpen, onClose, onSelect }: PaletteModal
               </motion.div>
             )}
 
-            <div className="results-info">
+            <div key="results-info" className="results-info">
               <span className="results-label">
-                {searchQuery ? 'SEARCH RESULTS' : 'LIBRARY'}
+                {searchQuery ? 'Search results' : activeCategory}
               </span>
               <span className="results-count">{filteredPalettes.length} total</span>
             </div>
 
             <motion.div 
+              key="palette-grid"
               className="palette-grid"
               layout
             >
@@ -259,7 +311,7 @@ export default function PaletteModal({ isOpen, onClose, onSelect }: PaletteModal
                       </div>
                     </motion.div>
                   ))
-                ) : searchQuery && (
+                ) : (
                   <motion.div 
                     key="empty"
                     className="no-results-state"
@@ -269,10 +321,16 @@ export default function PaletteModal({ isOpen, onClose, onSelect }: PaletteModal
                   >
                     <Tray size={48} weight="thin" />
                     <h3>No palettes found</h3>
-                    <p>Try searching for a different color or vibe.</p>
+                    <p>
+                      {activeCategory === 'Favorites'
+                        ? 'Start saving favorites to build your own palette shelf.'
+                        : activeCategory === 'Recent'
+                          ? 'Pick a few palettes and they will appear here for quick return visits.'
+                          : 'Try searching for a different color or vibe.'}
+                    </p>
                     <button className="reset-search-btn" onClick={() => { setSearchQuery(''); setActiveCategory('All'); }}>
                       <ArrowsClockwise size={14} />
-                      View all palettes
+                      Reset library view
                     </button>
                   </motion.div>
                 )}
