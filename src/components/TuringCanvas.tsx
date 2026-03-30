@@ -178,7 +178,7 @@ export default function TuringCanvas({ params, colors, paused }: CanvasProps) {
     const canvas = canvasRef.current;
     if (!canvas) return;
     // We MUST use WebGL2 for native floating point texture support (RGBA16F/RGBA32F)
-    const gl = canvas.getContext('webgl2', { antialias: false });
+    const gl = canvas.getContext('webgl2', { antialias: false, preserveDrawingBuffer: true });
     if (!gl) {
       console.error("WebGL2 is required for Turing Reaction-Diffusion.");
       return;

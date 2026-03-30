@@ -142,7 +142,10 @@ const BlobsCanvas: React.FC<CanvasProps> = ({ params, colors, paused }) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const gl = (canvas.getContext('webgl2') || canvas.getContext('webgl')) as WebGLRenderingContext | WebGL2RenderingContext | null;
+    const gl = (
+      canvas.getContext('webgl2', { preserveDrawingBuffer: true })
+      || canvas.getContext('webgl', { preserveDrawingBuffer: true })
+    ) as WebGLRenderingContext | WebGL2RenderingContext | null;
     if (!gl) return;
 
     const vShader = createShader(gl, gl.VERTEX_SHADER, vsSource);

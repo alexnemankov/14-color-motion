@@ -13,7 +13,7 @@ import {
   Trash,
   Palette
 } from '@phosphor-icons/react';
-import { GradientParams, ColorRgb, AnimationType } from '../App';
+import { GradientParams, ColorRgb, AnimationType, SavedPreset } from '../App';
 import PaletteModal from './PaletteModal';
 
 interface PanelProps {
@@ -28,6 +28,12 @@ interface PanelProps {
   fullscreen: boolean;
   toggleFullscreen: () => void;
   hideUI: () => void;
+  savedPresets: SavedPreset[];
+  savePreset: () => void;
+  loadPreset: (preset: SavedPreset) => void;
+  deletePreset: (id: string) => void;
+  shareScene: () => void;
+  exportImage: () => void;
 }
 
 const hexToRgb = (hex: string): ColorRgb => {
@@ -102,7 +108,13 @@ export default function Panel({
   setAnimationType,
   fullscreen,
   toggleFullscreen,
-  hideUI
+  hideUI,
+  savedPresets,
+  savePreset,
+  loadPreset,
+  deletePreset,
+  shareScene,
+  exportImage
 }: PanelProps) {
   
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -269,6 +281,36 @@ export default function Panel({
         <span className="param-label">{labels.blend}</span>
         <input className="param-input" type="number" value={params.blend} step="0.01" onChange={e => updateParam('blend', +e.target.value)} />
         <input className="param-slider" type="range" min="0" max="1" step="0.01" value={params.blend} onChange={e => updateParam('blend', +e.target.value)} />
+      </div>
+
+      <div className="workspace-section">
+        <span className="section-label">Workspace</span>
+        <div className="workspace-actions">
+          <button className="workspace-btn" onClick={savePreset}>Save</button>
+          <button className="workspace-btn" onClick={shareScene}>Share</button>
+          <button className="workspace-btn" onClick={exportImage}>PNG</button>
+        </div>
+      </div>
+
+      <div className="saved-section">
+        <span className="section-label">Saved Presets</span>
+        {savedPresets.length > 0 ? (
+          <div className="saved-list">
+            {savedPresets.slice(0, 6).map(preset => (
+              <div key={preset.id} className="saved-item">
+                <button className="saved-load-btn" onClick={() => loadPreset(preset)} title={preset.name}>
+                  <span>{preset.name}</span>
+                  <small>{preset.animationType}</small>
+                </button>
+                <button className="saved-delete-btn" onClick={() => deletePreset(preset.id)} title="Delete preset">
+                  <Trash size={12} weight="bold" />
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="saved-empty">No saved presets yet.</p>
+        )}
       </div>
 
       <div className="bottom-controls">
