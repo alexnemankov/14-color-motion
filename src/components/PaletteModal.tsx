@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { CSSProperties, useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
@@ -157,11 +157,15 @@ export default function PaletteModal({ isOpen, onClose, onSelect }: PaletteModal
     return PALETTES.find((p: PaletteDescriptor) => p.name === activePaletteName);
   }, [activePaletteName]);
 
+  const getGradientStyle = (colors: string[]): CSSProperties => ({
+    ['--palette-gradient' as any]: `linear-gradient(135deg, ${colors.join(', ')})`,
+  } as CSSProperties);
+
   return createPortal(
     <AnimatePresence>
       {isOpen && (
-        <motion.div 
-          className="palette-modal-overlay" 
+        <motion.div
+          className="palette-modal-overlay"
           onClick={onClose}
           role="presentation"
           initial={{ opacity: 0 }}
@@ -169,8 +173,8 @@ export default function PaletteModal({ isOpen, onClose, onSelect }: PaletteModal
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
         >
-          <motion.div 
-            className="palette-modal" 
+          <motion.div
+            className="palette-modal"
             onClick={e => e.stopPropagation()}
             role="dialog"
             aria-modal="true"
@@ -181,131 +185,133 @@ export default function PaletteModal({ isOpen, onClose, onSelect }: PaletteModal
             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
           >
             <div className="modal-header">
-          <div className="header-title-group">
-            <h2>Liquid Gradient</h2>
-            <p className="header-subtitle">Pick a vibe or create your own</p>
-          </div>
-          <div className="modal-actions">
-            <button className="surprise-btn" onClick={handleSurprise} title="Surprise Me" aria-label="Surprise me with a random palette">
-              <Sparkle size={16} weight="bold" />
-              Surprise Me
-            </button>
-            <button className="close-btn" onClick={onClose} aria-label="Close palette library">
-              <X size={20} weight="bold" />
-            </button>
-          </div>
-        </div>
+              <div className="header-title-group">
+                <h2>Liquid Gradient</h2>
+                <p className="header-subtitle">Pick a vibe or create your own</p>
+              </div>
+              <div className="modal-actions">
+                <button className="surprise-btn" onClick={handleSurprise} title="Surprise Me" aria-label="Surprise me with a random palette">
+                  <Sparkle size={16} weight="bold" />
+                  Surprise Me
+                </button>
+                <button className="close-btn" onClick={onClose} aria-label="Close palette library">
+                  <X size={20} weight="bold" />
+                </button>
+              </div>
+            </div>
 
-        <div className="modal-search-wrapper">
-          <div className="modal-search">
-            <MagnifyingGlass size={18} className="search-icon" />
-            <input 
-              type="text" 
-              placeholder="Search 60+ palettes..." 
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              autoFocus
-            />
-            {searchQuery && (
-              <button className="search-clear" onClick={() => setSearchQuery('')} aria-label="Clear palette search">
-                <X size={14} weight="bold" />
-              </button>
-            )}
-          </div>
-        </div>
+            <div className="modal-search-wrapper">
+              <div className="modal-search">
+                <MagnifyingGlass size={18} className="search-icon" />
+                <input
+                  type="text"
+                  placeholder="Search 60+ palettes..."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  autoFocus
+                />
+                {searchQuery && (
+                  <button className="search-clear" onClick={() => setSearchQuery('')} aria-label="Clear palette search">
+                    <X size={14} weight="bold" />
+                  </button>
+                )}
+              </div>
+            </div>
 
-        <div className="modal-categories">
-          {CATEGORIES.map(({ id, label, Icon }) => (
-            <button
-              key={id}
-              className={`category-chip ${activeCategory === id ? 'active' : ''}`}
-              onClick={() => setActiveCategory(id)}
-            >
-              <Icon size={14} weight={activeCategory === id ? 'fill' : 'bold'} />
-              {label}
-            </button>
-          ))}
-        </div>
-
-        <div className="modal-content">
-          {activePalette && (
-            <motion.div
-              className="active-palette-section"
-              initial={{ opacity: 0, y: -8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.18 }}
-            >
-                <span className="results-label">ACTIVE SELECTION</span>
-                <div 
-                  className="active-palette-row"
-                  style={{ background: `linear-gradient(to right, ${activePalette.colors.join(', ')})` }}
+            <div className="modal-categories">
+              {CATEGORIES.map(({ id, label, Icon }) => (
+                <button
+                  key={id}
+                  className={`category-chip ${activeCategory === id ? 'active' : ''}`}
+                  onClick={() => setActiveCategory(id)}
                 >
-                  <div className="active-info">
-                    <span className="active-name">{activePalette.name}</span>
-                    <div className="active-dots">
-                      {activePalette.colors.map((c: string, i: number) => (
-                        <div key={i} className="color-dot" style={{ background: c }} />
-                      ))}
+                  <Icon size={14} weight={activeCategory === id ? 'fill' : 'bold'} />
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            <div className="modal-content">
+              {activePalette && (
+                <motion.div
+                  className="active-palette-section"
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.18 }}
+                >
+                  <span className="results-label">ACTIVE SELECTION</span>
+                  <div
+                    className="active-palette-row"
+                    style={getGradientStyle(activePalette.colors)}
+                  >
+                    <div className="active-info">
+                      <span className="active-name">{activePalette.name}</span>
+                      <div className="active-dots">
+                        {activePalette.colors.map((color, index) => (
+                          <div key={index} className="color-dot" style={{ background: color }} />
+                        ))}
+                      </div>
                     </div>
                   </div>
-                </div>
-            </motion.div>
-          )}
+                </motion.div>
+              )}
 
-          <div className="results-info">
-            <span className="results-label">
-              {searchQuery ? 'Search results' : activeCategory}
-            </span>
-            <span className="results-count">{filteredPalettes.length} total</span>
-          </div>
+              <div className="results-info">
+                <span className="results-label">
+                  {searchQuery ? 'Search results' : activeCategory}
+                </span>
+                <span className="results-count">{filteredPalettes.length} total</span>
+              </div>
 
-          <div className="palette-grid">
-            {filteredPalettes.length > 0 ? (
-              filteredPalettes.map((p: PaletteDescriptor) => (
-                <div
-                  key={p.name}
-                  className={`palette-card ${activePaletteName === p.name ? 'active' : ''}`}
-                  onClick={() => handleSelect(p)}
-                >
-                      <div className="card-preview" style={{ background: `linear-gradient(135deg, ${p.colors.join(', ')})` }}>
-                        <button 
-                          className={`fav-btn ${favorites.includes(p.name) ? 'active' : ''}`}
-                          onClick={(e) => toggleFavorite(e, p.name)}
-                          aria-label={favorites.includes(p.name) ? `Remove ${p.name} from favorites` : `Add ${p.name} to favorites`}
+              <div className="palette-grid">
+                {filteredPalettes.length > 0 ? (
+                  filteredPalettes.map((palette: PaletteDescriptor) => (
+                    <div
+                      key={palette.name}
+                      className={`palette-card ${activePaletteName === palette.name ? 'active' : ''}`}
+                      onClick={() => handleSelect(palette)}
+                    >
+                      <div className="card-preview" style={getGradientStyle(palette.colors)}>
+                        <button
+                          className={`fav-btn ${favorites.includes(palette.name) ? 'active' : ''}`}
+                          onClick={event => toggleFavorite(event, palette.name)}
+                          aria-label={favorites.includes(palette.name) ? `Remove ${palette.name} from favorites` : `Add ${palette.name} to favorites`}
                         >
-                          <Heart size={18} weight={favorites.includes(p.name) ? 'fill' : 'bold'} />
+                          <Heart size={18} weight={favorites.includes(palette.name) ? 'fill' : 'bold'} />
                         </button>
                       </div>
                       <div className="card-info">
-                        <span className="card-name">{p.name}</span>
+                        <div className="card-heading">
+                          <span className="card-name">{palette.name}</span>
+                        </div>
                         <div className="card-dots">
-                          {p.colors.slice(0, 4).map((c: string, i: number) => (
-                            <div key={i} className="color-dot" style={{ background: c }} />
+                          {palette.colors.slice(0, 4).map((color, index) => (
+                            <div key={index} className="color-dot" style={{ background: color }} />
                           ))}
-                          {p.colors.length > 4 && <span className="dot-plus">+{p.colors.length - 4}</span>}
+                          {palette.colors.length > 4 && <span className="dot-plus">+{palette.colors.length - 4}</span>}
                         </div>
                       </div>
-                </div>
-              ))
-            ) : (
-              <div className="no-results-state">
-                <Tray size={48} weight="thin" />
-                <h3>No palettes found</h3>
-                <p>
-                  {activeCategory === 'Favorites'
-                    ? 'Start saving favorites to build your own palette shelf.'
-                    : activeCategory === 'Recent'
-                      ? 'Pick a few palettes and they will appear here for quick return visits.'
-                      : 'Try searching for a different color or vibe.'}
-                </p>
-                <button className="reset-search-btn" onClick={() => { setSearchQuery(''); setActiveCategory('All'); }}>
-                  <ArrowsClockwise size={14} />
-                  Reset library view
-                </button>
+                    </div>
+                  ))
+                ) : (
+                  <div className="no-results-state">
+                    <Tray size={48} weight="thin" />
+                    <h3>No palettes found</h3>
+                    <p>
+                      {activeCategory === 'Favorites'
+                        ? 'Start saving favorites to build your own palette shelf.'
+                        : activeCategory === 'Recent'
+                          ? 'Pick a few palettes and they will appear here for quick return visits.'
+                          : 'Try searching for a different color or vibe.'}
+                    </p>
+                    <button className="reset-search-btn" onClick={() => { setSearchQuery(''); setActiveCategory('All'); }}>
+                      <ArrowsClockwise size={14} />
+                      Reset library view
+                    </button>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        </div>
+            </div>
           </motion.div>
         </motion.div>
       )}
