@@ -1,10 +1,11 @@
 import { useEffect, useRef } from 'react';
-import { GradientParams, ColorRgb } from '../App';
+import { GradientParams, ColorRgb, RendererStatus } from '../App';
 
 interface CanvasProps {
   params: GradientParams;
   colors: ColorRgb[];
   paused: boolean;
+  onStatusChange?: (status: RendererStatus | null) => void;
 }
 
 interface Particle {
@@ -69,7 +70,7 @@ function sfc32(a: number, b: number, c: number, d: number) {
     }
 }
 
-export default function ParticlesCanvas({ params, colors, paused }: CanvasProps) {
+export default function ParticlesCanvas({ params, colors, paused, onStatusChange }: CanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const state = useRef({
@@ -93,7 +94,14 @@ export default function ParticlesCanvas({ params, colors, paused }: CanvasProps)
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    if (!ctx) {
+      onStatusChange?.({
+        title: 'Renderer unavailable',
+        message: 'This browser could not start the 2D canvas renderer.'
+      });
+      return;
+    }
+    onStatusChange?.(null);
 
     const resize = () => {
       canvas.width = window.innerWidth * window.devicePixelRatio;
@@ -224,7 +232,7 @@ export default function ParticlesCanvas({ params, colors, paused }: CanvasProps)
       window.removeEventListener('resize', resize);
       cancelAnimationFrame(animationFrameId);
     };
-  }, []);
+  }, [onStatusChange]);
 
   return <canvas ref={canvasRef} id="c" />;
 }

@@ -22,6 +22,7 @@ const CATEGORIES: { id: 'All' | PaletteTag; label: string; Icon: any }[] = [
   { id: 'Pastel', label: 'Pastel', Icon: Sun },
   { id: 'Historical', label: 'Historical', Icon: Scroll },
   { id: 'Vibrant', label: 'Vibrant', Icon: Flame },
+  { id: 'Light', label: 'Light', Icon: Sun },
   { id: 'Monochrome', label: 'Monochrome', Icon: PaletteIcon },
   { id: 'Warm', label: 'Warm', Icon: ThermometerHot },
   { id: 'Cool', label: 'Cool', Icon: Snowflake },
@@ -49,6 +50,19 @@ export default function PaletteModal({ isOpen, onClose, onSelect }: PaletteModal
   useEffect(() => {
     localStorage.setItem('liquid-favorites', JSON.stringify(favorites));
   }, [favorites]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   const toggleFavorite = (e: React.MouseEvent, name: string) => {
     e.stopPropagation();
@@ -98,6 +112,7 @@ export default function PaletteModal({ isOpen, onClose, onSelect }: PaletteModal
         <motion.div 
           className="palette-modal-overlay" 
           onClick={onClose}
+          role="presentation"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -106,6 +121,9 @@ export default function PaletteModal({ isOpen, onClose, onSelect }: PaletteModal
           <motion.div 
             className="palette-modal" 
             onClick={e => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Palette library"
             initial={{ y: 50, opacity: 0, scale: 0.95 }}
             animate={{ y: 0, opacity: 1, scale: 1 }}
             exit={{ y: 50, opacity: 0, scale: 0.95 }}
@@ -117,11 +135,11 @@ export default function PaletteModal({ isOpen, onClose, onSelect }: PaletteModal
             <p className="header-subtitle">Pick a vibe or create your own</p>
           </div>
           <div className="modal-actions">
-            <button className="surprise-btn" onClick={handleSurprise} title="Surprise Me">
+            <button className="surprise-btn" onClick={handleSurprise} title="Surprise Me" aria-label="Surprise me with a random palette">
               <Sparkle size={16} weight="bold" />
               Surprise Me
             </button>
-            <button className="close-btn" onClick={onClose}>
+            <button className="close-btn" onClick={onClose} aria-label="Close palette library">
               <X size={20} weight="bold" />
             </button>
           </div>
@@ -138,7 +156,7 @@ export default function PaletteModal({ isOpen, onClose, onSelect }: PaletteModal
               autoFocus
             />
             {searchQuery && (
-              <button className="search-clear" onClick={() => setSearchQuery('')}>
+              <button className="search-clear" onClick={() => setSearchQuery('')} aria-label="Clear palette search">
                 <X size={14} weight="bold" />
               </button>
             )}
@@ -225,6 +243,7 @@ export default function PaletteModal({ isOpen, onClose, onSelect }: PaletteModal
                         <button 
                           className={`fav-btn ${favorites.includes(p.name) ? 'active' : ''}`}
                           onClick={(e) => toggleFavorite(e, p.name)}
+                          aria-label={favorites.includes(p.name) ? `Remove ${p.name} from favorites` : `Add ${p.name} to favorites`}
                         >
                           <Heart size={18} weight={favorites.includes(p.name) ? 'fill' : 'bold'} />
                         </button>

@@ -33,6 +33,11 @@ export interface SavedPreset extends SceneState {
   createdAt: string;
 }
 
+export interface RendererStatus {
+  title: string;
+  message: string;
+}
+
 const DEFAULT_COLORS: ColorRgb[] = [
   [10, 0, 20],
   [107, 0, 194],
@@ -152,6 +157,7 @@ function App() {
   const [fullscreen, setFullscreen] = useState(false);
   const [hintVisible, setHintVisible] = useState(true);
   const [savedPresets, setSavedPresets] = useState<SavedPreset[]>(readSavedPresets);
+  const [rendererStatus, setRendererStatus] = useState<RendererStatus | null>(null);
 
   const currentScene: SceneState = {
     animationType,
@@ -176,6 +182,18 @@ function App() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const isEditableTarget = !!target && (
+        target.tagName === 'INPUT'
+        || target.tagName === 'TEXTAREA'
+        || target.tagName === 'SELECT'
+        || target.isContentEditable
+      );
+
+      if (isEditableTarget) {
+        return;
+      }
+
       if (e.key.toLowerCase() === 'h') setUiVisible(v => !v);
       if (e.key.toLowerCase() === 'f') toggleFullscreen();
       if (e.key === ' ') {
@@ -269,23 +287,30 @@ function App() {
 
   return (
     <>
-      {animationType === 'liquid' && <LiquidCanvas params={params} colors={colors} paused={paused} />}
-      {animationType === 'waves' && <WavesCanvas params={params} colors={colors} paused={paused} />}
-      {animationType === 'voronoi' && <VoronoiCanvas params={params} colors={colors} paused={paused} />}
-      {animationType === 'turing' && <TuringCanvas params={params} colors={colors} paused={paused} />}
-      {animationType === 'particles' && <ParticlesCanvas params={params} colors={colors} paused={paused} />}
-      {animationType === 'blobs' && <BlobsCanvas params={params} colors={colors} paused={paused} />}
-      
+      {animationType === 'liquid' && <LiquidCanvas params={params} colors={colors} paused={paused} onStatusChange={setRendererStatus} />}
+      {animationType === 'waves' && <WavesCanvas params={params} colors={colors} paused={paused} onStatusChange={setRendererStatus} />}
+      {animationType === 'voronoi' && <VoronoiCanvas params={params} colors={colors} paused={paused} onStatusChange={setRendererStatus} />}
+      {animationType === 'turing' && <TuringCanvas params={params} colors={colors} paused={paused} onStatusChange={setRendererStatus} />}
+      {animationType === 'particles' && <ParticlesCanvas params={params} colors={colors} paused={paused} onStatusChange={setRendererStatus} />}
+      {animationType === 'blobs' && <BlobsCanvas params={params} colors={colors} paused={paused} onStatusChange={setRendererStatus} />}
+
+      {rendererStatus && (
+        <div className="renderer-status" role="status" aria-live="polite">
+          <strong>{rendererStatus.title}</strong>
+          <p>{rendererStatus.message}</p>
+        </div>
+      )}
+
       <div id="panel" className={uiVisible ? '' : 'hidden'}>
         <div className="panel-header">
           <span className="panel-title">Liquid Gradient</span>
         </div>
-        
-        <Panel 
-          params={params} 
-          setParams={setParams} 
-          colors={colors} 
-          setColors={setColors} 
+
+        <Panel
+          params={params}
+          setParams={setParams}
+          colors={colors}
+          setColors={setColors}
           paused={paused}
           setPaused={setPaused}
           animationType={animationType}
@@ -302,17 +327,18 @@ function App() {
         />
       </div>
 
-      <button 
-        id="toggle-ui" 
-        className={uiVisible ? 'ui-visible' : ''} 
-        onClick={() => setUiVisible(true)} 
+      <button
+        id="toggle-ui"
+        className={uiVisible ? 'ui-visible' : ''}
+        onClick={() => setUiVisible(true)}
         title="Show controls"
+        aria-label="Show controls"
       >
-        ⊞
+        +
       </button>
 
       <div id="hint" className={hintVisible ? '' : 'fade'}>
-        Press H to hide UI · F for fullscreen
+        Press H to hide UI | F for fullscreen
       </div>
     </>
   );

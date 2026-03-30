@@ -176,22 +176,22 @@ export default function Panel({
   return (
     <>
       <div className="mode-switcher">
-        <button className={`mode-btn ${animationType === 'liquid' ? 'active' : ''}`} onClick={() => setAnimationType('liquid')} title="Fluid FBM">
+        <button className={`mode-btn ${animationType === 'liquid' ? 'active' : ''}`} onClick={() => setAnimationType('liquid')} title="Fluid FBM" aria-label="Switch to Fluid FBM mode">
           <Drop size={16} weight={animationType === 'liquid' ? 'fill' : 'bold'} />
         </button>
-        <button className={`mode-btn ${animationType === 'waves' ? 'active' : ''}`} onClick={() => setAnimationType('waves')} title="Interference Waves">
+        <button className={`mode-btn ${animationType === 'waves' ? 'active' : ''}`} onClick={() => setAnimationType('waves')} title="Interference Waves" aria-label="Switch to Interference Waves mode">
           <Waves size={16} weight={animationType === 'waves' ? 'fill' : 'bold'} />
         </button>
-        <button className={`mode-btn ${animationType === 'voronoi' ? 'active' : ''}`} onClick={() => setAnimationType('voronoi')} title="Cellular Voronoi">
+        <button className={`mode-btn ${animationType === 'voronoi' ? 'active' : ''}`} onClick={() => setAnimationType('voronoi')} title="Cellular Voronoi" aria-label="Switch to Cellular Voronoi mode">
           <Hexagon size={16} weight={animationType === 'voronoi' ? 'fill' : 'bold'} />
         </button>
-        <button className={`mode-btn ${animationType === 'turing' ? 'active' : ''}`} onClick={() => setAnimationType('turing')} title="Reaction-Diffusion">
+        <button className={`mode-btn ${animationType === 'turing' ? 'active' : ''}`} onClick={() => setAnimationType('turing')} title="Reaction-Diffusion" aria-label="Switch to Reaction-Diffusion mode">
           <Atom size={16} weight={animationType === 'turing' ? 'fill' : 'bold'} />
         </button>
-        <button className={`mode-btn ${animationType === 'particles' ? 'active' : ''}`} onClick={() => setAnimationType('particles')} title="Particle Web">
+        <button className={`mode-btn ${animationType === 'particles' ? 'active' : ''}`} onClick={() => setAnimationType('particles')} title="Particle Web" aria-label="Switch to Particle Web mode">
           <ShareNetwork size={16} weight={animationType === 'particles' ? 'fill' : 'bold'} />
         </button>
-        <button className={`mode-btn ${animationType === 'blobs' ? 'active' : ''}`} onClick={() => setAnimationType('blobs')} title="Molten Blobs">
+        <button className={`mode-btn ${animationType === 'blobs' ? 'active' : ''}`} onClick={() => setAnimationType('blobs')} title="Molten Blobs" aria-label="Switch to Molten Blobs mode">
           <Gradient size={16} weight={animationType === 'blobs' ? 'fill' : 'bold'} />
         </button>
       </div>
@@ -227,7 +227,7 @@ export default function Panel({
       </div>
 
       <div className="add-color-row">
-        <button className="add-color-btn" onClick={addColor} title="Add Color">
+        <button className="add-color-btn" onClick={addColor} title="Add Color" aria-label="Add color">
           <Plus size={16} weight="bold" />
         </button>
         <span className="add-color-label">Add color...</span>
@@ -302,7 +302,7 @@ export default function Panel({
                   <span>{preset.name}</span>
                   <small>{preset.animationType}</small>
                 </button>
-                <button className="saved-delete-btn" onClick={() => deletePreset(preset.id)} title="Delete preset">
+                <button className="saved-delete-btn" onClick={() => deletePreset(preset.id)} title="Delete preset" aria-label={`Delete preset ${preset.name}`}>
                   <Trash size={12} weight="bold" />
                 </button>
               </div>

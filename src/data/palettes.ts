@@ -1,4 +1,4 @@
-export type PaletteTag = 'Neon' | 'Nature' | 'Dark' | 'Pastel' | 'Historical' | 'Vibrant' | 'Monochrome' | 'Warm' | 'Cool';
+export type PaletteTag = 'Neon' | 'Nature' | 'Dark' | 'Pastel' | 'Historical' | 'Vibrant' | 'Monochrome' | 'Warm' | 'Cool' | 'Light';
 
 export interface PaletteDescriptor {
   name: string;
@@ -46,11 +46,11 @@ export const PALETTES: PaletteDescriptor[] = [
   { name: 'Cloud Dancer Abyss', colors: ['#050814', '#1A2244', '#446699', '#99BBCC', '#F0EEE9'], tags: ['Dark', 'Cool', 'Pastel'] },
   { name: 'Sunwashed Depth', colors: ['#0A0800', '#3A2200', '#886644', '#CCAA77', '#F5E8CC'], tags: ['Warm', 'Nature', 'Pastel'] },
   { name: 'Lysergic Bloom', colors: ['#FF00CC', '#FF6600', '#FFFF00', '#00FF66', '#0066FF', '#CC00FF'], tags: ['Neon', 'Vibrant'] },
-  { name: 'Expired Film', colors: ['#220033', '#CC0066', '#FF9900', '#FFFF66', '#AAFFCC', '#EEFFFF'], tags: ['Warm', 'Light', 'Pastel'] as never[] }, // Overriding tag for this specific edge case lightly
+  { name: 'Expired Film', colors: ['#220033', '#CC0066', '#FF9900', '#FFFF66', '#AAFFCC', '#EEFFFF'], tags: ['Warm', 'Light', 'Pastel'] },
   { name: 'UV Wash', colors: ['#0A0010', '#4400CC', '#CC00FF', '#FF44DD', '#FFFFFF'], tags: ['Neon', 'Cool', 'Vibrant'] },
   { name: 'Chromatic Bleed', colors: ['#FF0000', '#FF0066', '#AA00FF', '#0000FF', '#00FFFF', '#00FF44'], tags: ['Neon', 'Vibrant'] },
   { name: 'Mushroom Spore', colors: ['#110800', '#663300', '#CC6600', '#FF99CC', '#AADDFF', '#EEFFCC'], tags: ['Nature', 'Warm', 'Pastel'] },
-  { name: 'Overexposed', colors: ['#FF3300', '#FF6600', '#FFCC00', '#FFFFFF', '#AAFFEE', '#0099FF', '#0011CC'], tags: ['Warm', 'Vibrant', 'Light'] as never[] },
+  { name: 'Overexposed', colors: ['#FF3300', '#FF6600', '#FFCC00', '#FFFFFF', '#AAFFEE', '#0099FF', '#0011CC'], tags: ['Warm', 'Vibrant', 'Light'] },
   { name: 'Synesthetic Pulse', colors: ['#000000', '#440044', '#FF00AA', '#FFFF00', '#00FFCC', '#004488', '#000000'], tags: ['Neon', 'Dark', 'Vibrant'] },
   { name: 'Candy Burn', colors: ['#FF0055', '#FF44AA', '#FF88FF', '#FFFF99', '#AAFF88', '#44FFDD'], tags: ['Neon', 'Pastel', 'Warm'] },
   { name: 'Paeonia', colors: ['#1A0008', '#660022', '#CC2255', '#FF88AA', '#FFE0EC'], tags: ['Nature', 'Warm', 'Pastel'] },

@@ -1,10 +1,11 @@
 import { useEffect, useRef } from 'react';
-import { GradientParams, ColorRgb } from '../App';
+import { GradientParams, ColorRgb, RendererStatus } from '../App';
 
 interface LiquidCanvasProps {
   params: GradientParams;
   colors: ColorRgb[];
   paused: boolean;
+  onStatusChange?: (status: RendererStatus | null) => void;
 }
 
 const vsSource = `
@@ -125,7 +126,7 @@ function createShader(gl: WebGLRenderingContext | WebGL2RenderingContext, type: 
   return s;
 }
 
-export default function LiquidCanvas({ params, colors, paused }: LiquidCanvasProps) {
+export default function LiquidCanvas({ params, colors, paused, onStatusChange }: LiquidCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   // Mutable state for the animation loop
@@ -152,7 +153,14 @@ export default function LiquidCanvas({ params, colors, paused }: LiquidCanvasPro
       canvas.getContext('webgl2', { preserveDrawingBuffer: true })
       || canvas.getContext('webgl', { preserveDrawingBuffer: true })
     ) as WebGLRenderingContext | WebGL2RenderingContext | null;
-    if (!gl) return;
+    if (!gl) {
+      onStatusChange?.({
+        title: 'Renderer unavailable',
+        message: 'This mode needs WebGL support. Try the particle mode or use a browser/device with graphics acceleration enabled.'
+      });
+      return;
+    }
+    onStatusChange?.(null);
 
     const vShader = createShader(gl, gl.VERTEX_SHADER, vsSource);
     const fShader = createShader(gl, gl.FRAGMENT_SHADER, fsSource);
@@ -228,7 +236,7 @@ export default function LiquidCanvas({ params, colors, paused }: LiquidCanvasPro
       window.removeEventListener('resize', resize);
       cancelAnimationFrame(animationFrameId);
     };
-  }, []);
+  }, [onStatusChange]);
 
   return <canvas ref={canvasRef} id="c" />;
 }

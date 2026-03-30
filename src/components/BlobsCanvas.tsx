@@ -1,10 +1,11 @@
 import React, { useEffect, useRef } from 'react';
-import { GradientParams, ColorRgb } from '../App';
+import { GradientParams, ColorRgb, RendererStatus } from '../App';
 
 interface CanvasProps {
   params: GradientParams;
   colors: ColorRgb[];
   paused: boolean;
+  onStatusChange?: (status: RendererStatus | null) => void;
 }
 
 const vsSource = `
@@ -121,7 +122,7 @@ function createShader(gl: WebGLRenderingContext | WebGL2RenderingContext, type: 
   return s;
 }
 
-const BlobsCanvas: React.FC<CanvasProps> = ({ params, colors, paused }) => {
+const BlobsCanvas: React.FC<CanvasProps> = ({ params, colors, paused, onStatusChange }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const state = useRef({
@@ -146,7 +147,14 @@ const BlobsCanvas: React.FC<CanvasProps> = ({ params, colors, paused }) => {
       canvas.getContext('webgl2', { preserveDrawingBuffer: true })
       || canvas.getContext('webgl', { preserveDrawingBuffer: true })
     ) as WebGLRenderingContext | WebGL2RenderingContext | null;
-    if (!gl) return;
+    if (!gl) {
+      onStatusChange?.({
+        title: 'Renderer unavailable',
+        message: 'This mode needs WebGL support. Try the particle mode or use a browser/device with graphics acceleration enabled.'
+      });
+      return;
+    }
+    onStatusChange?.(null);
 
     const vShader = createShader(gl, gl.VERTEX_SHADER, vsSource);
     const fShader = createShader(gl, gl.FRAGMENT_SHADER, fsSource);
@@ -222,7 +230,7 @@ const BlobsCanvas: React.FC<CanvasProps> = ({ params, colors, paused }) => {
       window.removeEventListener('resize', resize);
       cancelAnimationFrame(animationFrameId);
     };
-  }, []);
+  }, [onStatusChange]);
 
   return <canvas ref={canvasRef} id="c" />;
 };

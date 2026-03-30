@@ -1,10 +1,11 @@
 import { useEffect, useRef } from 'react';
-import { GradientParams, ColorRgb } from '../App';
+import { GradientParams, ColorRgb, RendererStatus } from '../App';
 
 interface CanvasProps {
   params: GradientParams;
   colors: ColorRgb[];
   paused: boolean;
+  onStatusChange?: (status: RendererStatus | null) => void;
 }
 
 const vsSource = `
@@ -152,7 +153,7 @@ function createProgram(gl: WebGL2RenderingContext, vs: string, fs: string) {
   return prog;
 }
 
-export default function TuringCanvas({ params, colors, paused }: CanvasProps) {
+export default function TuringCanvas({ params, colors, paused, onStatusChange }: CanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const state = useRef({ params, colors, paused, lastSeed: params.seed });
   const glRef = useRef<{
@@ -180,9 +181,13 @@ export default function TuringCanvas({ params, colors, paused }: CanvasProps) {
     // We MUST use WebGL2 for native floating point texture support (RGBA16F/RGBA32F)
     const gl = canvas.getContext('webgl2', { antialias: false, preserveDrawingBuffer: true });
     if (!gl) {
-      console.error("WebGL2 is required for Turing Reaction-Diffusion.");
+      onStatusChange?.({
+        title: 'WebGL2 required',
+        message: 'Reaction-diffusion needs WebGL2. Switch to another mode or use a browser/device with newer graphics support.'
+      });
       return;
     }
+    onStatusChange?.(null);
 
     gl.getExtension('EXT_color_buffer_float');
     gl.getExtension('OES_texture_float_linear');
@@ -355,7 +360,7 @@ export default function TuringCanvas({ params, colors, paused }: CanvasProps) {
       gl.deleteTexture(objB.tex);
       gl.deleteFramebuffer(objB.fbo);
     };
-  }, []);
+  }, [onStatusChange]);
 
   return <canvas ref={canvasRef} id="c" />;
 }
