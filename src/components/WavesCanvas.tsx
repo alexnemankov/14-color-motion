@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { GradientParams, ColorRgb, RendererStatus } from '../App';
+import { cloneParams, stepSmoothedParams } from './rendererMotion';
 
 interface CanvasProps {
   params: GradientParams;
@@ -117,15 +118,19 @@ export default function WavesCanvas({ params, colors, paused, onStatusChange, re
     animTime: 0,
     lastTimestamp: 0,
     params,
+    displayParams: cloneParams(params),
     colors,
     paused,
   });
 
   useEffect(() => {
     state.current.params = params;
-    state.current.colors = colors;
     state.current.paused = paused;
   }, [params, colors, paused]);
+
+  useEffect(() => {
+    state.current.colors = colors;
+  }, [colors]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -197,14 +202,17 @@ export default function WavesCanvas({ params, colors, paused, onStatusChange, re
         currentState.lastTimestamp = ts;
       }
 
+      currentState.displayParams = stepSmoothedParams(currentState.displayParams, currentState.params);
+      const displayParams = currentState.displayParams;
+
       gl.uniform2f(U.uRes, canvas.width, canvas.height);
       gl.uniform1f(U.uTime,       currentState.animTime);
-      gl.uniform1f(U.uScale,      currentState.params.scale);
-      gl.uniform1f(U.uAmplitude,  currentState.params.amplitude);
-      gl.uniform1f(U.uFrequency,  currentState.params.frequency);
-      gl.uniform1f(U.uDefinition, currentState.params.definition);
+      gl.uniform1f(U.uScale,      displayParams.scale);
+      gl.uniform1f(U.uAmplitude,  displayParams.amplitude);
+      gl.uniform1f(U.uFrequency,  displayParams.frequency);
+      gl.uniform1f(U.uDefinition, displayParams.definition);
       gl.uniform1f(U.uSeed,       currentState.params.seed);
-      gl.uniform1f(U.uBlend,      currentState.params.blend);
+      gl.uniform1f(U.uBlend,      displayParams.blend);
 
       const flat: number[] = [];
       currentState.colors.forEach(c => { flat.push(c[0]/255, c[1]/255, c[2]/255); });

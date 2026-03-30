@@ -31,7 +31,7 @@ interface PanelProps {
   paused: boolean;
   setPaused: React.Dispatch<React.SetStateAction<boolean>>;
   animationType: AnimationType;
-  setAnimationType: React.Dispatch<React.SetStateAction<AnimationType>>;
+  setAnimationType: (type: AnimationType) => void;
   fullscreen: boolean;
   toggleFullscreen: () => void;
   hideUI: () => void;

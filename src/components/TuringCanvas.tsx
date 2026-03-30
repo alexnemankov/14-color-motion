@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { GradientParams, ColorRgb, RendererStatus } from '../App';
+import { cloneParams, stepSmoothedParams } from './rendererMotion';
 
 interface CanvasProps {
   params: GradientParams;
@@ -158,7 +159,7 @@ function createProgram(gl: WebGL2RenderingContext, vs: string, fs: string) {
 
 export default function TuringCanvas({ params, colors, paused, onStatusChange, renderScale = 1 }: CanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const state = useRef({ params, colors, paused, lastSeed: params.seed });
+  const state = useRef({ params, displayParams: cloneParams(params), colors, paused, lastSeed: params.seed });
   const glRef = useRef<{
     gl: WebGL2RenderingContext,
     simProg: WebGLProgram,
@@ -174,9 +175,12 @@ export default function TuringCanvas({ params, colors, paused, onStatusChange, r
 
   useEffect(() => {
     state.current.params = params;
-    state.current.colors = colors;
     state.current.paused = paused;
   }, [params, colors, paused]);
+
+  useEffect(() => {
+    state.current.colors = colors;
+  }, [colors]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -280,6 +284,8 @@ export default function TuringCanvas({ params, colors, paused, onStatusChange, r
       if (!ctx) return;
       const s = state.current;
       const { params, colors, paused, lastSeed } = s;
+      s.displayParams = stepSmoothedParams(s.displayParams, params);
+      const displayParams = s.displayParams;
 
       // If seed changes, user wants to reset the simulation to see new patterns
       if (params.seed !== lastSeed) {
@@ -290,7 +296,7 @@ export default function TuringCanvas({ params, colors, paused, onStatusChange, r
       // 1. SIMULATION PASS
       if (!paused) {
         // Run multiple steps per frame string for speed based on user parameter
-        const steps = Math.floor(params.speed * 20); // 0 -> ~20 steps per frame
+        const steps = Math.max(1, Math.floor(displayParams.speed * 20)); // 0 -> ~20 steps per frame
         
         gl.useProgram(ctx.simProg);
         const simPosLoc = gl.getAttribLocation(ctx.simProg, 'aPos');
@@ -299,8 +305,8 @@ export default function TuringCanvas({ params, colors, paused, onStatusChange, r
         gl.vertexAttribPointer(simPosLoc, 2, gl.FLOAT, false, 0, 0);
         
         gl.uniform2f(gl.getUniformLocation(ctx.simProg, 'uRes'), ctx.width, ctx.height);
-        gl.uniform1f(gl.getUniformLocation(ctx.simProg, 'uFeed'), params.amplitude);
-        gl.uniform1f(gl.getUniformLocation(ctx.simProg, 'uKill'), params.frequency);
+        gl.uniform1f(gl.getUniformLocation(ctx.simProg, 'uFeed'), displayParams.amplitude);
+        gl.uniform1f(gl.getUniformLocation(ctx.simProg, 'uKill'), displayParams.frequency);
         gl.uniform1f(gl.getUniformLocation(ctx.simProg, 'uDa'), 1.0); // Da
         gl.uniform1f(gl.getUniformLocation(ctx.simProg, 'uDb'), 0.5); // Db
         gl.uniform1f(gl.getUniformLocation(ctx.simProg, 'uSeed'), params.seed);
@@ -336,7 +342,7 @@ export default function TuringCanvas({ params, colors, paused, onStatusChange, r
       gl.bindTexture(gl.TEXTURE_2D, ctx.texs[ctx.flip ? 0 : 1]); // Read from last written texture
       gl.uniform1i(gl.getUniformLocation(ctx.renderProg, 'uTex'), 0);
       gl.uniform2f(gl.getUniformLocation(ctx.renderProg, 'uRes'), canvas.width, canvas.height);
-      gl.uniform1f(gl.getUniformLocation(ctx.renderProg, 'uBlend'), params.blend);
+      gl.uniform1f(gl.getUniformLocation(ctx.renderProg, 'uBlend'), displayParams.blend);
 
       const flat: number[] = [];
       colors.forEach(c => { flat.push(c[0]/255, c[1]/255, c[2]/255); });

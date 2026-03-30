@@ -59,6 +59,11 @@ interface ExportStatusState {
   progress: number;
 }
 
+interface ModeTransitionState {
+  id: number;
+  imageUrl: string;
+}
+
 export interface WorkflowLocks {
   mode: boolean;
   palette: boolean;
@@ -365,6 +370,7 @@ function App() {
   const [externalRenderTime, setExternalRenderTime] = useState<number | null>(null);
   const [isSavePresetOpen, setIsSavePresetOpen] = useState(false);
   const [savePresetName, setSavePresetName] = useState('');
+  const [modeTransition, setModeTransition] = useState<ModeTransitionState | null>(null);
   const [exportStatus, setExportStatus] = useState<ExportStatusState>({
     phase: 'idle',
     label: 'Ready',
@@ -380,6 +386,7 @@ function App() {
   const exportProgressFrameRef = useRef<number | null>(null);
   const exportResetTimeoutRef = useRef<number | null>(null);
   const savePresetInputRef = useRef<HTMLInputElement | null>(null);
+  const modeTransitionTimeoutRef = useRef<number | null>(null);
 
   const currentScene: SceneState = {
     animationType,
@@ -474,6 +481,9 @@ function App() {
       }
       if (exportResetTimeoutRef.current !== null) {
         window.clearTimeout(exportResetTimeoutRef.current);
+      }
+      if (modeTransitionTimeoutRef.current !== null) {
+        window.clearTimeout(modeTransitionTimeoutRef.current);
       }
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
         mediaRecorderRef.current.stop();
@@ -601,10 +611,38 @@ function App() {
 
   const applyScene = (scene: SceneState) => {
     suppressHistoryRef.current = true;
-    setAnimationType(scene.animationType);
+    startModeTransition(scene.animationType);
     setParams(scene.params);
     setColors(scene.colors);
   };
+
+  function startModeTransition(nextType: AnimationType) {
+    if (nextType === animationType) return;
+
+    const activeCanvas = document.getElementById('c') as HTMLCanvasElement | null;
+    if (activeCanvas) {
+      try {
+        const imageUrl = activeCanvas.toDataURL('image/png');
+        setModeTransition({
+          id: Date.now(),
+          imageUrl,
+        });
+        if (modeTransitionTimeoutRef.current !== null) {
+          window.clearTimeout(modeTransitionTimeoutRef.current);
+        }
+        modeTransitionTimeoutRef.current = window.setTimeout(() => {
+          setModeTransition(null);
+          modeTransitionTimeoutRef.current = null;
+        }, 620);
+      } catch {
+        setModeTransition(null);
+      }
+    } else {
+      setModeTransition(null);
+    }
+
+    setAnimationType(nextType);
+  }
 
   const showToast = (title: string, message?: string) => {
     setToast({
@@ -987,7 +1025,7 @@ function App() {
   };
 
   const handleResetScene = () => {
-    setAnimationType('liquid');
+    startModeTransition('liquid');
     setParams(DEFAULT_PARAMS);
     setColors(DEFAULT_COLORS);
     setPaused(false);
@@ -1026,7 +1064,7 @@ function App() {
     }
 
     const nextMode = randomAnimationType();
-    setAnimationType(nextMode);
+    startModeTransition(nextMode);
     showToast('Mode randomized');
   };
 
@@ -1052,7 +1090,7 @@ function App() {
 
   const handleRandomizeScene = () => {
     if (!workflowLocks.mode) {
-      setAnimationType(randomAnimationType());
+      startModeTransition(randomAnimationType());
     }
     if (!workflowLocks.palette) {
       setColors(randomPaletteColors());
@@ -1071,6 +1109,15 @@ function App() {
       {animationType === 'turing' && <TuringCanvas params={params} colors={renderColors} paused={paused} onStatusChange={setRendererStatus} renderScale={renderScale} />}
       {animationType === 'particles' && <ParticlesCanvas params={params} colors={renderColors} paused={paused} onStatusChange={setRendererStatus} renderScale={renderScale} />}
       {animationType === 'blobs' && <BlobsCanvas params={params} colors={renderColors} paused={paused} onStatusChange={setRendererStatus} renderScale={renderScale} externalTime={externalRenderTime} />}
+
+      {modeTransition && (
+        <div
+          key={modeTransition.id}
+          className="renderer-transition-overlay"
+          style={{ backgroundImage: `url(${modeTransition.imageUrl})` }}
+          aria-hidden="true"
+        />
+      )}
 
       {rendererStatus && (
         <div className="renderer-status" role="status" aria-live="polite">
@@ -1143,7 +1190,7 @@ function App() {
           paused={paused}
           setPaused={setPaused}
           animationType={animationType}
-          setAnimationType={setAnimationType}
+          setAnimationType={startModeTransition}
           fullscreen={fullscreen}
           toggleFullscreen={toggleFullscreen}
           hideUI={() => setUiVisible(false)}

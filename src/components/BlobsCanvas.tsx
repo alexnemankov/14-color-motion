@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { GradientParams, ColorRgb, RendererStatus } from '../App';
+import { cloneParams, stepSmoothedParams } from './rendererMotion';
 
 interface CanvasProps {
   params: GradientParams;
@@ -133,15 +134,19 @@ const BlobsCanvas: React.FC<CanvasProps> = ({ params, colors, paused, onStatusCh
     animTime: 0,
     lastTimestamp: 0,
     params,
+    displayParams: cloneParams(params),
     colors,
     paused,
   });
 
   useEffect(() => {
     state.current.params = params;
-    state.current.colors = colors;
     state.current.paused = paused;
   }, [params, colors, paused]);
+
+  useEffect(() => {
+    state.current.colors = colors;
+  }, [colors]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -212,14 +217,17 @@ const BlobsCanvas: React.FC<CanvasProps> = ({ params, colors, paused, onStatusCh
         st.lastTimestamp = ts;
       }
 
+      st.displayParams = stepSmoothedParams(st.displayParams, st.params);
+      const displayParams = st.displayParams;
+
       gl.uniform2f(U.uRes, canvas.width, canvas.height);
       gl.uniform1f(U.uTime,       st.animTime);
-      gl.uniform1f(U.uScale,      st.params.scale);
-      gl.uniform1f(U.uAmplitude,  st.params.amplitude);
-      gl.uniform1f(U.uFrequency,  st.params.frequency);
-      gl.uniform1f(U.uDefinition, st.params.definition);
+      gl.uniform1f(U.uScale,      displayParams.scale);
+      gl.uniform1f(U.uAmplitude,  displayParams.amplitude);
+      gl.uniform1f(U.uFrequency,  displayParams.frequency);
+      gl.uniform1f(U.uDefinition, displayParams.definition);
       gl.uniform1f(U.uSeed,       st.params.seed);
-      gl.uniform1f(U.uBlend,      st.params.blend);
+      gl.uniform1f(U.uBlend,      displayParams.blend);
 
       // Map 0-255 colors to 0.0-1.0 floats logic for hardware
       const flat: number[] = [];

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { GradientParams, ColorRgb, RendererStatus } from '../App';
+import { cloneParams, stepSmoothedParams } from './rendererMotion';
 
 interface CanvasProps {
   params: GradientParams;
@@ -79,6 +80,7 @@ export default function ParticlesCanvas({ params, colors, paused, onStatusChange
   const state = useRef({
     particles: [] as Particle[],
     params,
+    displayParams: cloneParams(params),
     colors,
     paused,
     seed: -1,
@@ -90,9 +92,12 @@ export default function ParticlesCanvas({ params, colors, paused, onStatusChange
   // Sync props to ref to avoid dependency cycles in requestAnimationFrame
   useEffect(() => {
     state.current.params = params;
-    state.current.colors = colors;
     state.current.paused = paused;
   }, [params, colors, paused]);
+
+  useEffect(() => {
+    state.current.colors = colors;
+  }, [colors]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -150,9 +155,11 @@ export default function ParticlesCanvas({ params, colors, paused, onStatusChange
       
       const dt = s.paused ? 0 : (time - lastTime) / 1000;
       lastTime = time;
+      s.displayParams = stepSmoothedParams(s.displayParams, s.params);
+      const displayParams = s.displayParams;
 
       // Re-seed and re-generate particles if the user seed or particle count (definition) changes drastically
-      const targetCount = Math.floor(Math.min(500, Math.max(10, s.params.definition * 25))); // 10 to ~300 max
+      const targetCount = Math.floor(Math.min(500, Math.max(10, displayParams.definition * 25))); // 10 to ~300 max
       if (s.seed !== s.params.seed || s.particles.length === 0) {
         s.seed = s.params.seed;
         const _seed = xmur3(s.seed.toString());
@@ -178,12 +185,12 @@ export default function ParticlesCanvas({ params, colors, paused, onStatusChange
       }
 
       // Logic overrides based on params
-      const baseVel = s.params.speed * 2.0;
-      const linkDist = s.params.amplitude * 200 * s.params.scale; // Amplitude controls connection reach
+      const baseVel = displayParams.speed * 2.0;
+      const linkDist = displayParams.amplitude * 200 * displayParams.scale; // Amplitude controls connection reach
       const linkDistSq = linkDist * linkDist;
-      const turnSpeed = s.params.frequency * 0.5;
+      const turnSpeed = displayParams.frequency * 0.5;
       const pointer = s.pointer?.active ? s.pointer : null;
-      const pointerRadius = Math.max(80, s.params.amplitude * 140);
+      const pointerRadius = Math.max(80, displayParams.amplitude * 140);
       const pointerRadiusSq = pointerRadius * pointerRadius;
 
       // Update positions
@@ -192,7 +199,7 @@ export default function ParticlesCanvas({ params, colors, paused, onStatusChange
           const p = s.particles[i];
           
           // Add some wavy drift (frequency defines the wave, Scale scales space)
-          const angle = Math.sin(p.x * 0.005 * s.params.scale) + Math.cos(p.y * 0.005 * s.params.scale);
+          const angle = Math.sin(p.x * 0.005 * displayParams.scale) + Math.cos(p.y * 0.005 * displayParams.scale);
           p.vx += Math.cos(angle) * turnSpeed;
           p.vy += Math.sin(angle) * turnSpeed;
 
@@ -248,7 +255,7 @@ export default function ParticlesCanvas({ params, colors, paused, onStatusChange
             // Map the screen Y coordinate to a color 
             const avgY = (p1.y + p2.y) / 2;
             const yNormal = avgY / s.height;
-            const col = paletteColor(yNormal, s.colors, s.params.blend);
+            const col = paletteColor(yNormal, s.colors, displayParams.blend);
             
             ctx.strokeStyle = `rgba(${col[0]}, ${col[1]}, ${col[2]}, ${pct * pct})`;
             ctx.beginPath();
@@ -263,10 +270,10 @@ export default function ParticlesCanvas({ params, colors, paused, onStatusChange
       for (let i = 0; i < s.particles.length; i++) {
         const p = s.particles[i];
         const yNormal = p.y / s.height;
-        const col = paletteColor(yNormal, s.colors, s.params.blend);
+        const col = paletteColor(yNormal, s.colors, displayParams.blend);
         ctx.fillStyle = `rgb(${col[0]}, ${col[1]}, ${col[2]})`;
         ctx.beginPath();
-        ctx.arc(p.x, p.y, Math.max(1.5, 3 * s.params.scale), 0, Math.PI * 2);
+        ctx.arc(p.x, p.y, Math.max(1.5, 3 * displayParams.scale), 0, Math.PI * 2);
         ctx.fill();
       }
     };
