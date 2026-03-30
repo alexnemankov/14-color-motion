@@ -9,6 +9,8 @@ interface CanvasProps {
   renderScale?: number;
 }
 
+const toEvenSize = (value: number) => Math.max(2, Math.floor(value / 2) * 2);
+
 interface Particle {
   x: number;
   y: number;
@@ -81,7 +83,8 @@ export default function ParticlesCanvas({ params, colors, paused, onStatusChange
     paused,
     seed: -1,
     width: 0,
-    height: 0
+    height: 0,
+    pointer: null as { x: number; y: number; active: boolean } | null,
   });
 
   // Sync props to ref to avoid dependency cycles in requestAnimationFrame
@@ -106,12 +109,36 @@ export default function ParticlesCanvas({ params, colors, paused, onStatusChange
 
     const resize = () => {
       const pixelScale = window.devicePixelRatio * renderScale;
-      canvas.width = window.innerWidth * pixelScale;
-      canvas.height = window.innerHeight * pixelScale;
+      canvas.width = toEvenSize(window.innerWidth * pixelScale);
+      canvas.height = toEvenSize(window.innerHeight * pixelScale);
       state.current.width = canvas.width;
       state.current.height = canvas.height;
     };
+
+    const updatePointer = (clientX: number, clientY: number) => {
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      state.current.pointer = {
+        x: (clientX - rect.left) * scaleX,
+        y: (clientY - rect.top) * scaleY,
+        active: true,
+      };
+    };
+
+    const handlePointerMove = (event: PointerEvent) => {
+      updatePointer(event.clientX, event.clientY);
+    };
+
+    const handlePointerLeave = () => {
+      if (state.current.pointer) {
+        state.current.pointer.active = false;
+      }
+    };
+
     window.addEventListener('resize', resize);
+    canvas.addEventListener('pointermove', handlePointerMove);
+    canvas.addEventListener('pointerleave', handlePointerLeave);
     resize();
 
     let animationFrameId: number;
@@ -155,6 +182,9 @@ export default function ParticlesCanvas({ params, colors, paused, onStatusChange
       const linkDist = s.params.amplitude * 200 * s.params.scale; // Amplitude controls connection reach
       const linkDistSq = linkDist * linkDist;
       const turnSpeed = s.params.frequency * 0.5;
+      const pointer = s.pointer?.active ? s.pointer : null;
+      const pointerRadius = Math.max(80, s.params.amplitude * 140);
+      const pointerRadiusSq = pointerRadius * pointerRadius;
 
       // Update positions
       if (dt > 0) {
@@ -165,6 +195,19 @@ export default function ParticlesCanvas({ params, colors, paused, onStatusChange
           const angle = Math.sin(p.x * 0.005 * s.params.scale) + Math.cos(p.y * 0.005 * s.params.scale);
           p.vx += Math.cos(angle) * turnSpeed;
           p.vy += Math.sin(angle) * turnSpeed;
+
+          if (pointer) {
+            const dx = p.x - pointer.x;
+            const dy = p.y - pointer.y;
+            const distSq = dx * dx + dy * dy;
+
+            if (distSq < pointerRadiusSq && distSq > 0.0001) {
+              const dist = Math.sqrt(distSq);
+              const strength = (1 - dist / pointerRadius) * 180;
+              p.vx += (dx / dist) * strength;
+              p.vy += (dy / dist) * strength;
+            }
+          }
           
           // Normalize pseudo-velocity and apply global speed
           const curV = Math.sqrt(p.vx*p.vx + p.vy*p.vy);
@@ -232,6 +275,8 @@ export default function ParticlesCanvas({ params, colors, paused, onStatusChange
 
     return () => {
       window.removeEventListener('resize', resize);
+      canvas.removeEventListener('pointermove', handlePointerMove);
+      canvas.removeEventListener('pointerleave', handlePointerLeave);
       cancelAnimationFrame(animationFrameId);
     };
   }, [onStatusChange, renderScale]);

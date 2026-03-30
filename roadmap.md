@@ -41,6 +41,10 @@ The roadmap is no longer greenfield. The app already includes:
 - WebM loop export for short 5s and 10s clips
 - Share links with scene names/metadata
 - Shared scene/source presentation directly in the panel UI
+- Export presets grouped under a dedicated workspace dropdown
+- Loop-safe WebM export for supported renderers
+- Export status/progress UI for still and video output
+- Pointer interaction started in particle mode
 
 What remains is to deepen the workflow, improve content browsing, and expand output and interaction features.
 
@@ -180,6 +184,10 @@ Status: mostly complete
   - Add short loop recording
   - Add WebM export
   - Improve scene sharing with named states or shared preset metadata
+  - Add export presets instead of raw output buttons
+  - Add recording options inside the export dropdown
+  - Add loop-safe export for supported renderers
+  - Add export status and progress UI
 - Remaining:
   - Consider GIF export
   - Add more export presets or recording controls
@@ -192,21 +200,27 @@ The product becomes useful outside the current browser session.
 
 Goal: deepen the experience for advanced users.
 
-Status: not started
+Status: started
 
 ### Priorities
 
-- Make visuals respond directly to user input
+- Completed:
+  - Start making visuals respond directly to user input
+- Remaining:
+  - Expand direct manipulation beyond the current interactive renderers
 - Support long-form ambient or presentation use
 - Improve compatibility across devices
 
 ### Features
 
-- Add pointer/touch interaction by mode:
-  - particles repel/follow cursor
-  - blobs deform around touch
-  - turing injects pigment on click
-  - waves distort from pointer
+- Completed:
+  - Add pointer interaction in particle mode
+- Remaining:
+  - Add pointer/touch interaction by mode:
+    - blobs deform around touch
+    - turing injects pigment on click
+    - waves distort from pointer
+    - more deliberate touch behavior for mobile
 - Add presentation mode:
   - auto-hide UI
   - cycle saved presets

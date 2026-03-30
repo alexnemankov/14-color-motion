@@ -9,6 +9,8 @@ interface CanvasProps {
   renderScale?: number;
 }
 
+const toEvenSize = (value: number) => Math.max(2, Math.floor(value / 2) * 2);
+
 const vsSource = `
 attribute vec2 aPos;
 varying vec2 vUv;
@@ -223,8 +225,8 @@ export default function TuringCanvas({ params, colors, paused, onStatusChange, r
     };
 
     // Calculate resolution (sim resolution is fixed or scaled down for performance)
-    const simW = Math.max(1, Math.floor((window.innerWidth * renderScale) / 2));
-    const simH = Math.max(1, Math.floor((window.innerHeight * renderScale) / 2));
+    const simW = toEvenSize(Math.max(2, Math.floor((window.innerWidth * renderScale) / 2)));
+    const simH = toEvenSize(Math.max(2, Math.floor((window.innerHeight * renderScale) / 2)));
 
     const objA = createFBOAndTexture(simW, simH);
     const objB = createFBOAndTexture(simW, simH);
@@ -264,8 +266,8 @@ export default function TuringCanvas({ params, colors, paused, onStatusChange, r
 
     const resize = () => {
       const pixelScale = window.devicePixelRatio * renderScale;
-      canvas.width = window.innerWidth * pixelScale;
-      canvas.height = window.innerHeight * pixelScale;
+      canvas.width = toEvenSize(window.innerWidth * pixelScale);
+      canvas.height = toEvenSize(window.innerHeight * pixelScale);
     };
     window.addEventListener('resize', resize);
     resize();

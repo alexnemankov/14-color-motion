@@ -45,6 +45,13 @@ interface ToastState {
   message?: string;
 }
 
+interface ExportStatusState {
+  phase: 'idle' | 'preparing' | 'capturing' | 'recording' | 'encoding' | 'complete' | 'error';
+  label: string;
+  detail?: string;
+  progress: number;
+}
+
 export interface WorkflowLocks {
   mode: boolean;
   palette: boolean;
@@ -76,6 +83,7 @@ const SHARE_NAME_PARAM_KEY = 'name';
 const VALID_ANIMATION_TYPES: AnimationType[] = ['liquid', 'waves', 'voronoi', 'turing', 'particles', 'blobs'];
 const HISTORY_LIMIT = 40;
 const PALETTE_TRANSITION_MS = 480;
+const LOOP_SAFE_DURATION_SECONDS = 6;
 
 function cloneScene(scene: SceneState): SceneState {
   return {
@@ -164,6 +172,10 @@ function animationTypeLabel(type: AnimationType) {
     particles: 'Particles',
     blobs: 'Blobs',
   }[type];
+}
+
+function supportsLoopSafeExport(type: AnimationType) {
+  return type === 'liquid' || type === 'waves' || type === 'voronoi' || type === 'blobs';
 }
 
 function interpolatePalettes(from: ColorRgb[], to: ColorRgb[], t: number): ColorRgb[] {
@@ -306,12 +318,22 @@ function App() {
   const [renderScale, setRenderScale] = useState(1);
   const [isRecording, setIsRecording] = useState(false);
   const [activeSceneName, setActiveSceneName] = useState<string | null>(sharedSceneName);
+  const [loopSafePreview, setLoopSafePreview] = useState<{ durationSeconds: number; startedAt: number } | null>(null);
+  const [externalRenderTime, setExternalRenderTime] = useState<number | null>(null);
+  const [exportStatus, setExportStatus] = useState<ExportStatusState>({
+    phase: 'idle',
+    label: 'Ready',
+    progress: 0,
+  });
   const previousSceneRef = useRef<SceneState>(cloneScene(initialScene));
   const suppressHistoryRef = useRef(false);
   const renderColorsRef = useRef<ColorRgb[]>(initialScene.colors);
   const paletteTransitionFrameRef = useRef<number | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordingTimeoutRef = useRef<number | null>(null);
+  const loopPreviewFrameRef = useRef<number | null>(null);
+  const exportProgressFrameRef = useRef<number | null>(null);
+  const exportResetTimeoutRef = useRef<number | null>(null);
 
   const currentScene: SceneState = {
     animationType,
@@ -387,11 +409,56 @@ function App() {
       if (recordingTimeoutRef.current !== null) {
         window.clearTimeout(recordingTimeoutRef.current);
       }
+      if (loopPreviewFrameRef.current !== null) {
+        cancelAnimationFrame(loopPreviewFrameRef.current);
+      }
+      if (exportProgressFrameRef.current !== null) {
+        cancelAnimationFrame(exportProgressFrameRef.current);
+      }
+      if (exportResetTimeoutRef.current !== null) {
+        window.clearTimeout(exportResetTimeoutRef.current);
+      }
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
         mediaRecorderRef.current.stop();
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (!loopSafePreview) {
+      setExternalRenderTime(null);
+      if (loopPreviewFrameRef.current !== null) {
+        cancelAnimationFrame(loopPreviewFrameRef.current);
+        loopPreviewFrameRef.current = null;
+      }
+      return;
+    }
+
+    const durationMs = loopSafePreview.durationSeconds * 1000;
+    const halfDurationMs = durationMs / 2;
+
+    const tick = (now: number) => {
+      const elapsed = Math.min(durationMs, now - loopSafePreview.startedAt);
+      const mirroredElapsed = elapsed <= halfDurationMs ? elapsed : durationMs - elapsed;
+      const seconds = (mirroredElapsed / 1000) * params.speed;
+      setExternalRenderTime(seconds);
+
+      if (elapsed < durationMs) {
+        loopPreviewFrameRef.current = requestAnimationFrame(tick);
+      } else {
+        loopPreviewFrameRef.current = null;
+      }
+    };
+
+    loopPreviewFrameRef.current = requestAnimationFrame(tick);
+
+    return () => {
+      if (loopPreviewFrameRef.current !== null) {
+        cancelAnimationFrame(loopPreviewFrameRef.current);
+        loopPreviewFrameRef.current = null;
+      }
+    };
+  }, [loopSafePreview, params.speed]);
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
@@ -476,6 +543,21 @@ function App() {
     });
   };
 
+  const scheduleExportReset = () => {
+    if (exportResetTimeoutRef.current !== null) {
+      window.clearTimeout(exportResetTimeoutRef.current);
+    }
+
+    exportResetTimeoutRef.current = window.setTimeout(() => {
+      setExportStatus({
+        phase: 'idle',
+        label: 'Ready',
+        progress: 0,
+      });
+      exportResetTimeoutRef.current = null;
+    }, 2200);
+  };
+
   const getSceneName = (scene: SceneState) => {
     const matchingPreset = savedPresets.find(preset => sceneKey(cloneScene(preset)) === sceneKey(scene));
     if (matchingPreset) {
@@ -544,19 +626,47 @@ function App() {
   const handleExportImage = async (scale = 1) => {
     const canvas = document.getElementById('c') as HTMLCanvasElement | null;
     if (!canvas) {
+      setExportStatus({
+        phase: 'error',
+        label: 'Export failed',
+        detail: 'No active canvas found.',
+        progress: 0,
+      });
+      scheduleExportReset();
       showToast('Export failed', 'No active canvas found to export.');
       return;
     }
 
     try {
+      setExportStatus({
+        phase: 'preparing',
+        label: scale > 1 ? `Preparing ${scale}x PNG` : 'Preparing PNG',
+        detail: 'Configuring canvas for capture.',
+        progress: 15,
+      });
+
       if (scale > 1) {
         setRenderScale(scale);
         await waitForPaint(3);
       }
 
+      setExportStatus({
+        phase: 'capturing',
+        label: scale > 1 ? `Capturing ${scale}x PNG` : 'Capturing PNG',
+        detail: 'Rendering the current frame.',
+        progress: 62,
+      });
+
       const exportCanvas = (document.getElementById('c') as HTMLCanvasElement | null) ?? canvas;
       const blob = await captureCanvasBlob(exportCanvas);
       if (!blob) {
+        setExportStatus({
+          phase: 'error',
+          label: 'Export failed',
+          detail: 'The browser could not encode the image.',
+          progress: 0,
+        });
+        scheduleExportReset();
         showToast('Export failed', 'Image export failed.');
         return;
       }
@@ -567,6 +677,13 @@ function App() {
       link.download = `color-motion-${animationType}-${scale}x-${Date.now()}.png`;
       link.click();
       URL.revokeObjectURL(url);
+      setExportStatus({
+        phase: 'complete',
+        label: scale > 1 ? `${scale}x PNG ready` : 'PNG ready',
+        detail: 'Download started.',
+        progress: 100,
+      });
+      scheduleExportReset();
       showToast(scale > 1 ? `${scale}x PNG exported` : 'PNG exported');
     } finally {
       if (scale > 1) {
@@ -584,14 +701,33 @@ function App() {
     URL.revokeObjectURL(url);
   };
 
-  const handleRecordVideo = async (durationSeconds: number) => {
+  const handleRecordVideo = async (durationSeconds: number, loopSafe = false) => {
     if (isRecording) {
       showToast('Recording in progress');
       return;
     }
 
+    if (loopSafe && !supportsLoopSafeExport(animationType)) {
+      setExportStatus({
+        phase: 'error',
+        label: 'Loop-safe export unavailable',
+        detail: 'Choose liquid, waves, voronoi, or blobs.',
+        progress: 0,
+      });
+      scheduleExportReset();
+      showToast('Loop-safe export unavailable', 'Use liquid, waves, voronoi, or blobs for seamless loop export.');
+      return;
+    }
+
     const canvas = document.getElementById('c') as HTMLCanvasElement | null;
     if (!canvas || typeof canvas.captureStream !== 'function' || typeof MediaRecorder === 'undefined') {
+      setExportStatus({
+        phase: 'error',
+        label: 'Recording unavailable',
+        detail: 'This browser cannot record canvas output.',
+        progress: 0,
+      });
+      scheduleExportReset();
       showToast('Recording unavailable', 'This browser cannot record canvas output.');
       return;
     }
@@ -601,6 +737,18 @@ function App() {
 
     try {
       setIsRecording(true);
+      setExportStatus({
+        phase: 'preparing',
+        label: loopSafe ? 'Preparing loop-safe WebM' : 'Preparing WebM',
+        detail: 'Setting up recorder.',
+        progress: 8,
+      });
+      if (loopSafe) {
+        setLoopSafePreview({
+          durationSeconds,
+          startedAt: performance.now(),
+        });
+      }
       await waitForPaint(2);
 
       const stream = canvas.captureStream(60);
@@ -616,7 +764,15 @@ function App() {
 
       recorder.onerror = () => {
         setIsRecording(false);
+        setLoopSafePreview(null);
         stream.getTracks().forEach(track => track.stop());
+        setExportStatus({
+          phase: 'error',
+          label: 'Recording failed',
+          detail: 'The browser stopped the video export.',
+          progress: 0,
+        });
+        scheduleExportReset();
         showToast('Recording failed', 'The browser stopped the video export.');
       };
 
@@ -629,27 +785,77 @@ function App() {
         }
 
         if (chunks.length > 0) {
+          setExportStatus({
+            phase: 'encoding',
+            label: 'Encoding WebM',
+            detail: 'Finalizing video file.',
+            progress: 96,
+          });
           downloadBlob(
             new Blob(chunks, { type: mimeType || 'video/webm' }),
-            `color-motion-${animationType}-${durationSeconds}s-${Date.now()}.webm`
+            `color-motion-${animationType}-${loopSafe ? 'loop-' : ''}${durationSeconds}s-${Date.now()}.webm`
           );
-          showToast('WebM exported', `${durationSeconds}s clip ready`);
+          setExportStatus({
+            phase: 'complete',
+            label: 'WebM ready',
+            detail: loopSafe ? 'Loop-safe clip downloaded.' : `${durationSeconds}s clip downloaded.`,
+            progress: 100,
+          });
+          scheduleExportReset();
+          showToast('WebM exported', loopSafe ? 'Loop-safe clip ready' : `${durationSeconds}s clip ready`);
         } else {
+          setExportStatus({
+            phase: 'error',
+            label: 'Recording failed',
+            detail: 'No video frames were captured.',
+            progress: 0,
+          });
+          scheduleExportReset();
           showToast('Recording failed', 'No video frames were captured.');
         }
 
+        setLoopSafePreview(null);
         setIsRecording(false);
       };
 
       recorder.start();
+      const startedAt = performance.now();
+      const updateProgress = (now: number) => {
+        const elapsed = Math.min(durationSeconds * 1000, now - startedAt);
+        const progress = 18 + Math.round((elapsed / (durationSeconds * 1000)) * 72);
+        setExportStatus({
+          phase: 'recording',
+          label: loopSafe ? 'Recording loop-safe WebM' : 'Recording WebM',
+          detail: `${Math.ceil((durationSeconds * 1000 - elapsed) / 1000)}s remaining`,
+          progress,
+        });
+
+        if (elapsed < durationSeconds * 1000) {
+          exportProgressFrameRef.current = requestAnimationFrame(updateProgress);
+        } else {
+          exportProgressFrameRef.current = null;
+        }
+      };
+      if (exportProgressFrameRef.current !== null) {
+        cancelAnimationFrame(exportProgressFrameRef.current);
+      }
+      exportProgressFrameRef.current = requestAnimationFrame(updateProgress);
       recordingTimeoutRef.current = window.setTimeout(() => {
         if (recorder.state !== 'inactive') {
           recorder.stop();
         }
       }, durationSeconds * 1000);
-      showToast('Recording started', `${durationSeconds}s WebM clip`);
+      showToast('Recording started', loopSafe ? 'Loop-safe WebM clip' : `${durationSeconds}s WebM clip`);
     } catch {
       setIsRecording(false);
+      setLoopSafePreview(null);
+      setExportStatus({
+        phase: 'error',
+        label: 'Recording failed',
+        detail: 'Unable to start video export.',
+        progress: 0,
+      });
+      scheduleExportReset();
       showToast('Recording failed', 'Unable to start video export.');
     }
   };
@@ -746,12 +952,12 @@ function App() {
 
   return (
     <>
-      {animationType === 'liquid' && <LiquidCanvas params={params} colors={renderColors} paused={paused} onStatusChange={setRendererStatus} renderScale={renderScale} />}
-      {animationType === 'waves' && <WavesCanvas params={params} colors={renderColors} paused={paused} onStatusChange={setRendererStatus} renderScale={renderScale} />}
-      {animationType === 'voronoi' && <VoronoiCanvas params={params} colors={renderColors} paused={paused} onStatusChange={setRendererStatus} renderScale={renderScale} />}
+      {animationType === 'liquid' && <LiquidCanvas params={params} colors={renderColors} paused={paused} onStatusChange={setRendererStatus} renderScale={renderScale} externalTime={externalRenderTime} />}
+      {animationType === 'waves' && <WavesCanvas params={params} colors={renderColors} paused={paused} onStatusChange={setRendererStatus} renderScale={renderScale} externalTime={externalRenderTime} />}
+      {animationType === 'voronoi' && <VoronoiCanvas params={params} colors={renderColors} paused={paused} onStatusChange={setRendererStatus} renderScale={renderScale} externalTime={externalRenderTime} />}
       {animationType === 'turing' && <TuringCanvas params={params} colors={renderColors} paused={paused} onStatusChange={setRendererStatus} renderScale={renderScale} />}
       {animationType === 'particles' && <ParticlesCanvas params={params} colors={renderColors} paused={paused} onStatusChange={setRendererStatus} renderScale={renderScale} />}
-      {animationType === 'blobs' && <BlobsCanvas params={params} colors={renderColors} paused={paused} onStatusChange={setRendererStatus} renderScale={renderScale} />}
+      {animationType === 'blobs' && <BlobsCanvas params={params} colors={renderColors} paused={paused} onStatusChange={setRendererStatus} renderScale={renderScale} externalTime={externalRenderTime} />}
 
       {rendererStatus && (
         <div className="renderer-status" role="status" aria-live="polite">
@@ -792,6 +998,9 @@ function App() {
           exportImage={handleExportImage}
           recordVideo={handleRecordVideo}
           isRecording={isRecording}
+          exportStatus={exportStatus}
+          canLoopSafeExport={supportsLoopSafeExport(animationType)}
+          loopSafeDurationSeconds={LOOP_SAFE_DURATION_SECONDS}
           resetMode={handleResetMode}
           resetPalette={handleResetPalette}
           resetScene={handleResetScene}

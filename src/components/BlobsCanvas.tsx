@@ -7,7 +7,10 @@ interface CanvasProps {
   paused: boolean;
   onStatusChange?: (status: RendererStatus | null) => void;
   renderScale?: number;
+  externalTime?: number | null;
 }
+
+const toEvenSize = (value: number) => Math.max(2, Math.floor(value / 2) * 2);
 
 const vsSource = `
 attribute vec2 aPos;
@@ -123,7 +126,7 @@ function createShader(gl: WebGLRenderingContext | WebGL2RenderingContext, type: 
   return s;
 }
 
-const BlobsCanvas: React.FC<CanvasProps> = ({ params, colors, paused, onStatusChange, renderScale = 1 }) => {
+const BlobsCanvas: React.FC<CanvasProps> = ({ params, colors, paused, onStatusChange, renderScale = 1, externalTime = null }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const state = useRef({
@@ -185,8 +188,8 @@ const BlobsCanvas: React.FC<CanvasProps> = ({ params, colors, paused, onStatusCh
 
     const resize = () => {
       const pixelScale = window.devicePixelRatio * renderScale;
-      canvas.width  = window.innerWidth  * pixelScale;
-      canvas.height = window.innerHeight * pixelScale;
+      canvas.width  = toEvenSize(window.innerWidth  * pixelScale);
+      canvas.height = toEvenSize(window.innerHeight * pixelScale);
       gl.viewport(0, 0, canvas.width, canvas.height);
     };
     window.addEventListener('resize', resize);
@@ -198,7 +201,10 @@ const BlobsCanvas: React.FC<CanvasProps> = ({ params, colors, paused, onStatusCh
       animationFrameId = requestAnimationFrame(render);
       const st = state.current;
 
-      if (!st.paused) {
+      if (externalTime !== null) {
+        st.animTime = externalTime;
+        st.lastTimestamp = ts;
+      } else if (!st.paused) {
         const dt = st.lastTimestamp === 0 ? 0 : (ts - st.lastTimestamp) / 1000;
         st.lastTimestamp = ts;
         st.animTime += dt * st.params.speed;
@@ -232,7 +238,7 @@ const BlobsCanvas: React.FC<CanvasProps> = ({ params, colors, paused, onStatusCh
       window.removeEventListener('resize', resize);
       cancelAnimationFrame(animationFrameId);
     };
-  }, [onStatusChange, renderScale]);
+  }, [externalTime, onStatusChange, renderScale]);
 
   return <canvas ref={canvasRef} id="c" />;
 };

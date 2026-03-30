@@ -41,8 +41,16 @@ interface PanelProps {
   deletePreset: (id: string) => void;
   shareScene: () => void;
   exportImage: (scale?: number) => void;
-  recordVideo: (durationSeconds: number) => void;
+  recordVideo: (durationSeconds: number, loopSafe?: boolean) => void;
   isRecording: boolean;
+  exportStatus: {
+    phase: 'idle' | 'preparing' | 'capturing' | 'recording' | 'encoding' | 'complete' | 'error';
+    label: string;
+    detail?: string;
+    progress: number;
+  };
+  canLoopSafeExport: boolean;
+  loopSafeDurationSeconds: number;
   resetMode: () => void;
   resetPalette: () => void;
   resetScene: () => void;
@@ -175,6 +183,9 @@ export default function Panel({
   exportImage,
   recordVideo,
   isRecording,
+  exportStatus,
+  canLoopSafeExport,
+  loopSafeDurationSeconds,
   resetMode,
   resetPalette,
   resetScene,
@@ -193,6 +204,7 @@ export default function Panel({
 }: PanelProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [workflowExpanded, setWorkflowExpanded] = useState(false);
+  const [exportExpanded, setExportExpanded] = useState(false);
 
   const formatPresetDate = (value: string) => {
     try {
@@ -400,22 +412,60 @@ export default function Panel({
       )}
 
       <div className="workspace-section panel-section">
-        <span className="section-label">Workspace</span>
-        <div className="section-copy">Save, share, or export the current scene without leaving the canvas.</div>
-        <div className="workspace-actions">
+        <div className="section-heading">
+          <span className="section-label">Workspace</span>
+          <button
+            className={`section-toggle ${exportExpanded ? 'active' : ''}`}
+            onClick={() => setExportExpanded(expanded => !expanded)}
+            aria-expanded={exportExpanded}
+            aria-controls="export-presets"
+          >
+            {exportExpanded ? <CaretDown size={12} weight="bold" /> : <CaretRight size={12} weight="bold" />}
+            Export Presets
+          </button>
+        </div>
+        <div className="section-copy">Save or share the current scene, then open export presets when you need output files.</div>
+        <div className="workspace-actions workspace-actions-primary">
           <button className="workspace-btn" onClick={savePreset}>Save</button>
           <button className="workspace-btn" onClick={shareScene}>Share</button>
-          <button className="workspace-btn" onClick={() => exportImage(1)}>PNG</button>
         </div>
-        <div className="workspace-actions workspace-actions-secondary">
-          <button className="workspace-btn workspace-btn-wide" onClick={() => exportImage(2)}>2x PNG</button>
-          <button className="workspace-btn workspace-btn-wide" onClick={() => recordVideo(5)} disabled={isRecording}>
-            {isRecording ? 'Recording' : '5s WebM'}
-          </button>
-          <button className="workspace-btn workspace-btn-wide" onClick={() => recordVideo(10)} disabled={isRecording}>
-            {isRecording ? 'Recording' : '10s WebM'}
-          </button>
+        <div id="export-presets" className={`export-details ${exportExpanded ? 'expanded' : ''}`}>
+          <div className="workspace-actions workspace-actions-secondary">
+            <button className="workspace-btn workspace-btn-wide" onClick={() => exportImage(1)}>Still PNG</button>
+            <button className="workspace-btn workspace-btn-wide" onClick={() => exportImage(2)}>HD PNG</button>
+            <button className="workspace-btn workspace-btn-wide" onClick={() => recordVideo(5)} disabled={isRecording}>
+              {isRecording ? 'Recording' : '5s WebM'}
+            </button>
+          </div>
+          <div className="workspace-actions workspace-actions-secondary">
+            <button className="workspace-btn workspace-btn-wide" onClick={() => recordVideo(10)} disabled={isRecording}>
+              {isRecording ? 'Recording' : '10s WebM'}
+            </button>
+            <button
+              className="workspace-btn workspace-btn-wide"
+              onClick={() => recordVideo(loopSafeDurationSeconds, true)}
+              disabled={isRecording || !canLoopSafeExport}
+              title={canLoopSafeExport ? 'Export a seamless boomerang WebM loop' : 'Loop-safe export is available for liquid, waves, voronoi, and blobs'}
+            >
+              {isRecording ? 'Recording' : 'Loop-safe WebM'}
+            </button>
+          </div>
+          <div className="export-note">
+            <span>{canLoopSafeExport ? `Loop-safe export records a ${loopSafeDurationSeconds}s boomerang clip.` : 'Loop-safe export is available for liquid, waves, voronoi, and blobs.'}</span>
+          </div>
         </div>
+        {exportStatus.phase !== 'idle' && (
+          <div className={`export-status export-status-${exportStatus.phase}`}>
+            <div className="export-status-header">
+              <strong>{exportStatus.label}</strong>
+              <span>{exportStatus.progress}%</span>
+            </div>
+            {exportStatus.detail && <p>{exportStatus.detail}</p>}
+            <div className="export-progress-track">
+              <span className="export-progress-bar" style={{ width: `${exportStatus.progress}%` }} />
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="workspace-section panel-section">

@@ -7,7 +7,10 @@ interface CanvasProps {
   paused: boolean;
   onStatusChange?: (status: RendererStatus | null) => void;
   renderScale?: number;
+  externalTime?: number | null;
 }
+
+const toEvenSize = (value: number) => Math.max(2, Math.floor(value / 2) * 2);
 
 const vsSource = `
 attribute vec2 aPos;
@@ -121,7 +124,7 @@ function createShader(gl: WebGLRenderingContext | WebGL2RenderingContext, type: 
   return s;
 }
 
-export default function VoronoiCanvas({ params, colors, paused, onStatusChange, renderScale = 1 }: CanvasProps) {
+export default function VoronoiCanvas({ params, colors, paused, onStatusChange, renderScale = 1, externalTime = null }: CanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const state = useRef({
@@ -183,8 +186,8 @@ export default function VoronoiCanvas({ params, colors, paused, onStatusChange, 
 
     const resize = () => {
       const pixelScale = window.devicePixelRatio * renderScale;
-      canvas.width  = window.innerWidth  * pixelScale;
-      canvas.height = window.innerHeight * pixelScale;
+      canvas.width  = toEvenSize(window.innerWidth  * pixelScale);
+      canvas.height = toEvenSize(window.innerHeight * pixelScale);
       gl.viewport(0, 0, canvas.width, canvas.height);
     };
     window.addEventListener('resize', resize);
@@ -197,7 +200,10 @@ export default function VoronoiCanvas({ params, colors, paused, onStatusChange, 
       
       const currentState = state.current;
       
-      if(!currentState.paused){
+      if (externalTime !== null) {
+        currentState.animTime = externalTime;
+        currentState.lastTimestamp = ts;
+      } else if(!currentState.paused){
         const dt = currentState.lastTimestamp === 0 ? 0 : (ts - currentState.lastTimestamp) / 1000;
         currentState.lastTimestamp = ts;
         currentState.animTime += dt * currentState.params.speed;
@@ -230,7 +236,7 @@ export default function VoronoiCanvas({ params, colors, paused, onStatusChange, 
       window.removeEventListener('resize', resize);
       cancelAnimationFrame(animationFrameId);
     };
-  }, [onStatusChange, renderScale]);
+  }, [externalTime, onStatusChange, renderScale]);
 
   return <canvas ref={canvasRef} id="c" />;
 }
