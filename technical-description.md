@@ -29,7 +29,7 @@ The project is built as a single-page frontend application utilizing modern web 
 │   ├── VoronoiCanvas.tsx    // Generative Art Module: Cell growth logic
 │   ├── TuringCanvas.tsx     // Generative Art Module: Reaction-diffusion patterns
 │   ├── ParticlesCanvas.tsx  // Generative Art Module: Physics-based particles
-│   ├── GeometryCanvas.tsx   // Generative Art Module: Mathematics and shapes
+│   ├── BlobsCanvas.tsx      // Generative Art Module: Molten Blobs fluid simulation
 │   ├── Panel.tsx            // The floating UI control panel (sliders/buttons)
 │   └── PaletteModal.tsx     // The fullscreen palette library modal
 └── data/

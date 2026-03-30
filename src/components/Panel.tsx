@@ -5,8 +5,7 @@ import {
   Hexagon, 
   Atom, 
   ShareNetwork, 
-  Pentagon,
-  Circle,
+  Gradient,
   PlayPause,
   CornersOut,
   EyeSlash,
@@ -157,9 +156,6 @@ export default function Panel({
     particles: {
       seed: 'Reseed', speed: 'Velocity', scale: 'Zoom', amplitude: 'Link Dist', frequency: 'Wander Freq', definition: 'Count', blend: 'Opacity'
     },
-    geometry: {
-      seed: 'Twist/Rot', speed: 'Draw Speed', scale: 'Size', amplitude: 'Morph Amp', frequency: 'Radius Offset', definition: 'Complexity', blend: 'Smoothness'
-    },
     blobs: {
       seed: 'Flux Seed', speed: 'Flow Speed', scale: 'Blob InvScale', amplitude: 'Wander Amp', frequency: 'Blob Count', definition: 'Sharpness', blend: 'Color Blend'
     }
@@ -183,11 +179,8 @@ export default function Panel({
         <button className={`mode-btn ${animationType === 'particles' ? 'active' : ''}`} onClick={() => setAnimationType('particles')} title="Particle Web">
           <ShareNetwork size={16} weight={animationType === 'particles' ? 'fill' : 'bold'} />
         </button>
-        <button className={`mode-btn ${animationType === 'geometry' ? 'active' : ''}`} onClick={() => setAnimationType('geometry')} title="Spirograph">
-          <Pentagon size={16} weight={animationType === 'geometry' ? 'fill' : 'bold'} />
-        </button>
         <button className={`mode-btn ${animationType === 'blobs' ? 'active' : ''}`} onClick={() => setAnimationType('blobs')} title="Molten Blobs">
-          <Circle size={16} weight={animationType === 'blobs' ? 'fill' : 'bold'} />
+          <Gradient size={16} weight={animationType === 'blobs' ? 'fill' : 'bold'} />
         </button>
       </div>
 

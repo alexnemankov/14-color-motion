@@ -21,7 +21,7 @@ Explore six distinct mathematical and physical simulation models:
 3. **Cellular Voronoi**: Procedural cellular structures with smooth morphing.
 4. **Reaction-Diffusion**: A Turing-pattern biological simulation (Gray-Scott model).
 5. **Particle Web**: A 2D physics-based node network with interactive link distances.
-6. **Spirograph**: Mathematical geometric curves (hypotrochoids) with dynamic complexity.
+6. **Molten Blobs**: High-performance WebGL-based fluid gradients with organic folding and tectonic color regions.
 
 ### Parametric Control Suite
 Fine-tune every aspect of the simulation in real-time:
