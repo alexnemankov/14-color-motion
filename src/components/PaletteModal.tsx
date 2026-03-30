@@ -215,33 +215,26 @@ export default function PaletteModal({ isOpen, onClose, onSelect }: PaletteModal
         </div>
 
         <div className="modal-categories">
-          {CATEGORIES.map(({ id, label, Icon }, i) => (
-            <motion.button 
+          {CATEGORIES.map(({ id, label, Icon }) => (
+            <button
               key={id}
               className={`category-chip ${activeCategory === id ? 'active' : ''}`}
               onClick={() => setActiveCategory(id)}
-              initial={{ x: -20, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              transition={{ delay: i * 0.03 }}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
             >
               <Icon size={14} weight={activeCategory === id ? 'fill' : 'bold'} />
               {label}
-            </motion.button>
+            </button>
           ))}
         </div>
 
         <div className="modal-content">
-          <AnimatePresence mode="popLayout">
-            {activePalette && (
-              <motion.div 
-                key="active-bar"
-                className="active-palette-section"
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-              >
+          {activePalette && (
+            <motion.div
+              className="active-palette-section"
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.18 }}
+            >
                 <span className="results-label">ACTIVE SELECTION</span>
                 <div 
                   className="active-palette-row"
@@ -256,41 +249,24 @@ export default function PaletteModal({ isOpen, onClose, onSelect }: PaletteModal
                     </div>
                   </div>
                 </div>
-              </motion.div>
-            )}
+            </motion.div>
+          )}
 
-            <div key="results-info" className="results-info">
-              <span className="results-label">
-                {searchQuery ? 'Search results' : activeCategory}
-              </span>
-              <span className="results-count">{filteredPalettes.length} total</span>
-            </div>
+          <div className="results-info">
+            <span className="results-label">
+              {searchQuery ? 'Search results' : activeCategory}
+            </span>
+            <span className="results-count">{filteredPalettes.length} total</span>
+          </div>
 
-            <motion.div 
-              key="palette-grid"
-              className="palette-grid"
-              layout
-            >
-              <AnimatePresence mode="popLayout">
-                {filteredPalettes.length > 0 ? (
-                  filteredPalettes.map((p: PaletteDescriptor, i: number) => (
-                    <motion.div 
-                      key={p.name} 
-                      layout
-                      layoutId={`card-${p.name}`}
-                      className={`palette-card ${activePaletteName === p.name ? 'active' : ''}`}
-                      onClick={() => handleSelect(p)}
-                      initial={{ opacity: 0, scale: 0.8 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.8 }}
-                      transition={{ 
-                        type: 'spring', 
-                        damping: 15, 
-                        stiffness: 150,
-                        delay: Math.min(i * 0.01, 0.2) 
-                      }}
-                      whileHover={{ y: -5, scale: 1.02 }}
-                    >
+          <div className="palette-grid">
+            {filteredPalettes.length > 0 ? (
+              filteredPalettes.map((p: PaletteDescriptor) => (
+                <div
+                  key={p.name}
+                  className={`palette-card ${activePaletteName === p.name ? 'active' : ''}`}
+                  onClick={() => handleSelect(p)}
+                >
                       <div className="card-preview" style={{ background: `linear-gradient(135deg, ${p.colors.join(', ')})` }}>
                         <button 
                           className={`fav-btn ${favorites.includes(p.name) ? 'active' : ''}`}
@@ -309,34 +285,26 @@ export default function PaletteModal({ isOpen, onClose, onSelect }: PaletteModal
                           {p.colors.length > 4 && <span className="dot-plus">+{p.colors.length - 4}</span>}
                         </div>
                       </div>
-                    </motion.div>
-                  ))
-                ) : (
-                  <motion.div 
-                    key="empty"
-                    className="no-results-state"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.9 }}
-                  >
-                    <Tray size={48} weight="thin" />
-                    <h3>No palettes found</h3>
-                    <p>
-                      {activeCategory === 'Favorites'
-                        ? 'Start saving favorites to build your own palette shelf.'
-                        : activeCategory === 'Recent'
-                          ? 'Pick a few palettes and they will appear here for quick return visits.'
-                          : 'Try searching for a different color or vibe.'}
-                    </p>
-                    <button className="reset-search-btn" onClick={() => { setSearchQuery(''); setActiveCategory('All'); }}>
-                      <ArrowsClockwise size={14} />
-                      Reset library view
-                    </button>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </motion.div>
-          </AnimatePresence>
+                </div>
+              ))
+            ) : (
+              <div className="no-results-state">
+                <Tray size={48} weight="thin" />
+                <h3>No palettes found</h3>
+                <p>
+                  {activeCategory === 'Favorites'
+                    ? 'Start saving favorites to build your own palette shelf.'
+                    : activeCategory === 'Recent'
+                      ? 'Pick a few palettes and they will appear here for quick return visits.'
+                      : 'Try searching for a different color or vibe.'}
+                </p>
+                <button className="reset-search-btn" onClick={() => { setSearchQuery(''); setActiveCategory('All'); }}>
+                  <ArrowsClockwise size={14} />
+                  Reset library view
+                </button>
+              </div>
+            )}
+          </div>
         </div>
           </motion.div>
         </motion.div>

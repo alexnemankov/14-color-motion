@@ -13,6 +13,7 @@
   --accent: #f2622f; /* Orange accent from Image 4 */
   --font-display: 'Space Grotesk', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
+  --modal-gutter: 56px;
 }
 
 html, body {
@@ -988,13 +989,15 @@ canvas {
   border-right: 4px solid var(--accent);
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .modal-header {
-  padding: 32px 60px 20px;
+  padding: 32px var(--modal-gutter) 20px;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 24px;
 }
 
 .header-title-group h2 {
@@ -1082,7 +1085,7 @@ canvas {
 
 /* MODAL SEARCH */
 .modal-search-wrapper {
-  padding: 0 60px 16px;
+  padding: 0 var(--modal-gutter) 16px;
 }
 
 .modal-search {
@@ -1122,13 +1125,11 @@ canvas {
 
 /* CATEGORIES */
 .modal-categories {
-  padding: 0 60px 32px;
+  padding: 0 var(--modal-gutter) 24px;
   display: flex;
   gap: 8px;
-  overflow-x: auto;
-  scrollbar-width: none;
+  flex-wrap: wrap;
 }
-.modal-categories::-webkit-scrollbar { display: none; }
 
 .category-chip {
   padding: 4px 12px;
@@ -1158,7 +1159,7 @@ canvas {
 
 /* ACTIVE BAR */
 .active-palette-section {
-  padding: 0 0 32px 0;
+  padding: 0 0 24px 0;
 }
 
 .active-palette-row {
@@ -1208,7 +1209,7 @@ canvas {
 .modal-content {
   flex: 1;
   overflow-y: auto;
-  padding: 0 60px 60px;
+  padding: 0 var(--modal-gutter) 60px;
 }
 
 .modal-content::-webkit-scrollbar { width: 4px; }
@@ -1218,7 +1219,7 @@ canvas {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 32px;
+  margin-bottom: 24px;
 }
 .results-label, .results-count {
   font-family: var(--font-mono);
@@ -1472,6 +1473,10 @@ canvas {
 }
 
 @media (max-width: 720px) {
+  :root {
+    --modal-gutter: 18px;
+  }
+
   .palette-modal-overlay {
     padding: 0;
     align-items: stretch;
@@ -1488,8 +1493,8 @@ canvas {
   .modal-search-wrapper,
   .modal-categories,
   .modal-content {
-    padding-left: 18px;
-    padding-right: 18px;
+    padding-left: var(--modal-gutter);
+    padding-right: var(--modal-gutter);
   }
 
   .modal-header {
@@ -1508,6 +1513,15 @@ canvas {
     padding: 8px 12px;
     font-size: 10px;
   }
+
+  .modal-categories {
+    padding-bottom: 20px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .modal-categories::-webkit-scrollbar { display: none; }
 
   .palette-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
