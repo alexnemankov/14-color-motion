@@ -10,19 +10,17 @@ interface CanvasProps {
   renderScale?: number;
 }
 
-const toEvenSize = (value: number) => Math.max(2, Math.floor(value / 2) * 2);
-
-interface Particle {
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
+interface RenderFrame {
+  nodes: Float32Array;
+  links: Float32Array;
 }
+
+const toEvenSize = (value: number) => Math.max(2, Math.floor(value / 2) * 2);
 
 const lerpColor = (c1: ColorRgb, c2: ColorRgb, t: number): ColorRgb => [
   Math.round(c1[0] + (c2[0] - c1[0]) * t),
   Math.round(c1[1] + (c2[1] - c1[1]) * t),
-  Math.round(c1[2] + (c2[2] - c1[2]) * t)
+  Math.round(c1[2] + (c2[2] - c1[2]) * t),
 ];
 
 const smoothstep = (edge0: number, edge1: number, x: number) => {
@@ -32,68 +30,40 @@ const smoothstep = (edge0: number, edge1: number, x: number) => {
 
 const paletteColor = (t: number, colors: ColorRgb[], blend: number): ColorRgb => {
   t = Math.max(0, Math.min(1, t));
-  const len = colors.length;
-  if (len === 0) return [0,0,0];
-  if (len === 1) return colors[0];
-  
-  const segment = t * (len - 1);
-  const idx = Math.floor(segment);
-  let f = segment - idx;
-  
-  const c0 = colors[Math.min(idx, len-1)];
-  const c1 = colors[Math.min(idx + 1, len-1)];
-  
-  const b = Math.max(0.0001, blend * 0.5);
-  f = smoothstep(0.5 - b, 0.5 + b, f);
-  
-  return lerpColor(c0, c1, f);
-};
+  if (colors.length === 0) return [0, 0, 0];
+  if (colors.length === 1) return colors[0];
 
-// Deterministic pseudo-random number generator
-function xmur3(str: string) {
-    for(var i = 0, h = 1779033703 ^ str.length; i < str.length; i++) {
-        h = Math.imul(h ^ str.charCodeAt(i), 3432918353);
-        h = h << 13 | h >>> 19;
-    } return function() {
-        h = Math.imul(h ^ (h >>> 16), 2246822507);
-        h = Math.imul(h ^ (h >>> 13), 3266489909);
-        return (h ^= h >>> 16) >>> 0;
-    }
-}
-function sfc32(a: number, b: number, c: number, d: number) {
-    return function() {
-      a >>>= 0; b >>>= 0; c >>>= 0; d >>>= 0; 
-      var t = (a + b) | 0;
-      a = b ^ b >>> 9;
-      b = c + (c << 3) | 0;
-      c = (c << 21 | c >>> 11);
-      d = d + 1 | 0;
-      t = t + d | 0;
-      c = c + t | 0;
-      return (t >>> 0) / 4294967296;
-    }
-}
+  const segment = t * (colors.length - 1);
+  const index = Math.floor(segment);
+  let localT = segment - index;
+  const from = colors[Math.min(index, colors.length - 1)];
+  const to = colors[Math.min(index + 1, colors.length - 1)];
+  const blendWindow = Math.max(0.0001, blend * 0.5);
+  localT = smoothstep(0.5 - blendWindow, 0.5 + blendWindow, localT);
+
+  return lerpColor(from, to, localT);
+};
 
 export default function ParticlesCanvas({ params, colors, paused, onStatusChange, renderScale = 1 }: CanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const workerRef = useRef<Worker | null>(null);
+  const frameRef = useRef<RenderFrame | null>(null);
+  const frameInFlightRef = useRef(false);
 
   const state = useRef({
-    particles: [] as Particle[],
     params,
     displayParams: cloneParams(params),
     colors,
     paused,
-    seed: -1,
     width: 0,
     height: 0,
     pointer: null as { x: number; y: number; active: boolean } | null,
   });
 
-  // Sync props to ref to avoid dependency cycles in requestAnimationFrame
   useEffect(() => {
     state.current.params = params;
     state.current.paused = paused;
-  }, [params, colors, paused]);
+  }, [params, paused]);
 
   useEffect(() => {
     state.current.colors = colors;
@@ -102,15 +72,44 @@ export default function ParticlesCanvas({ params, colors, paused, onStatusChange
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+
     const ctx = canvas.getContext('2d');
     if (!ctx) {
       onStatusChange?.({
         title: 'Renderer unavailable',
-        message: 'This browser could not start the 2D canvas renderer.'
+        message: 'This browser could not start the 2D canvas renderer.',
       });
       return;
     }
+
+    if (typeof Worker === 'undefined') {
+      onStatusChange?.({
+        title: 'Worker support required',
+        message: 'Particle mode needs Web Worker support in this browser.',
+      });
+      return;
+    }
+
+    const worker = new Worker(new URL('../workers/particlesWorker.ts', import.meta.url), { type: 'module' });
+    workerRef.current = worker;
     onStatusChange?.(null);
+
+    worker.onmessage = (event: MessageEvent<RenderFrame & { type: 'frame' }>) => {
+      if (event.data.type !== 'frame') return;
+      frameRef.current = {
+        nodes: event.data.nodes,
+        links: event.data.links,
+      };
+      frameInFlightRef.current = false;
+    };
+
+    worker.onerror = () => {
+      frameInFlightRef.current = false;
+      onStatusChange?.({
+        title: 'Particle worker failed',
+        message: 'Particle simulation could not continue in the background worker.',
+      });
+    };
 
     const resize = () => {
       const pixelScale = window.devicePixelRatio * renderScale;
@@ -118,6 +117,11 @@ export default function ParticlesCanvas({ params, colors, paused, onStatusChange
       canvas.height = toEvenSize(window.innerHeight * pixelScale);
       state.current.width = canvas.width;
       state.current.height = canvas.height;
+      worker.postMessage({
+        type: 'resize',
+        width: canvas.width,
+        height: canvas.height,
+      });
     };
 
     const updatePointer = (clientX: number, clientY: number) => {
@@ -144,136 +148,58 @@ export default function ParticlesCanvas({ params, colors, paused, onStatusChange
     window.addEventListener('resize', resize);
     canvas.addEventListener('pointermove', handlePointerMove);
     canvas.addEventListener('pointerleave', handlePointerLeave);
-    resize();
 
-    let animationFrameId: number;
+    resize();
+    worker.postMessage({
+      type: 'init',
+      width: canvas.width,
+      height: canvas.height,
+    });
+
+    let animationFrameId = 0;
     let lastTime = performance.now();
 
     const render = (time: number) => {
       animationFrameId = requestAnimationFrame(render);
-      const s = state.current;
-      
-      const dt = s.paused ? 0 : (time - lastTime) / 1000;
+      const current = state.current;
+      const dt = current.paused ? 0 : (time - lastTime) / 1000;
       lastTime = time;
-      s.displayParams = stepSmoothedParams(s.displayParams, s.params);
-      const displayParams = s.displayParams;
+      current.displayParams = stepSmoothedParams(current.displayParams, current.params);
 
-      // Re-seed and re-generate particles if the user seed or particle count (definition) changes drastically
-      const targetCount = Math.floor(Math.min(500, Math.max(10, displayParams.definition * 25))); // 10 to ~300 max
-      if (s.seed !== s.params.seed || s.particles.length === 0) {
-        s.seed = s.params.seed;
-        const _seed = xmur3(s.seed.toString());
-        const rand = sfc32(_seed(), _seed(), _seed(), _seed());
-        s.particles = [];
-        for (let i = 0; i < targetCount; i++) {
-          s.particles.push({
-            x: rand() * s.width,
-            y: rand() * s.height,
-            vx: (rand() - 0.5) * 100,
-            vy: (rand() - 0.5) * 100
-          });
-        }
-      } else if (s.particles.length !== targetCount) {
-        // adjust count dynamically without full reset
-        while (s.particles.length < targetCount) {
-          s.particles.push({
-            x: Math.random() * s.width, y: Math.random() * s.height,
-            vx: (Math.random() - 0.5) * 100, vy: (Math.random() - 0.5) * 100
-          });
-        }
-        s.particles.length = targetCount;
-      }
-
-      // Logic overrides based on params
-      const baseVel = displayParams.speed * 2.0;
-      const linkDist = displayParams.amplitude * 200 * displayParams.scale; // Amplitude controls connection reach
-      const linkDistSq = linkDist * linkDist;
-      const turnSpeed = displayParams.frequency * 0.5;
-      const pointer = s.pointer?.active ? s.pointer : null;
-      const pointerRadius = Math.max(80, displayParams.amplitude * 140);
-      const pointerRadiusSq = pointerRadius * pointerRadius;
-
-      // Update positions
-      if (dt > 0) {
-        for (let i = 0; i < s.particles.length; i++) {
-          const p = s.particles[i];
-          
-          // Add some wavy drift (frequency defines the wave, Scale scales space)
-          const angle = Math.sin(p.x * 0.005 * displayParams.scale) + Math.cos(p.y * 0.005 * displayParams.scale);
-          p.vx += Math.cos(angle) * turnSpeed;
-          p.vy += Math.sin(angle) * turnSpeed;
-
-          if (pointer) {
-            const dx = p.x - pointer.x;
-            const dy = p.y - pointer.y;
-            const distSq = dx * dx + dy * dy;
-
-            if (distSq < pointerRadiusSq && distSq > 0.0001) {
-              const dist = Math.sqrt(distSq);
-              const strength = (1 - dist / pointerRadius) * 180;
-              p.vx += (dx / dist) * strength;
-              p.vy += (dy / dist) * strength;
-            }
-          }
-          
-          // Normalize pseudo-velocity and apply global speed
-          const curV = Math.sqrt(p.vx*p.vx + p.vy*p.vy);
-          if (curV > 0) {
-            p.vx = (p.vx / curV) * 100 * baseVel;
-            p.vy = (p.vy / curV) * 100 * baseVel;
-          }
-
-          p.x += p.vx * dt;
-          p.y += p.vy * dt;
-
-          // Wrap boundaries
-          if (p.x < 0) p.x += s.width;
-          if (p.x > s.width) p.x -= s.width;
-          if (p.y < 0) p.y += s.height;
-          if (p.y > s.height) p.y -= s.height;
-        }
+      if (!frameInFlightRef.current) {
+        frameInFlightRef.current = true;
+        worker.postMessage({
+          type: 'step',
+          dt,
+          params: { ...current.displayParams, seed: current.params.seed },
+          seed: current.params.seed,
+          paused: current.paused,
+          pointer: current.pointer?.active ? { x: current.pointer.x, y: current.pointer.y } : null,
+        });
       }
 
       ctx.fillStyle = '#000';
-      ctx.fillRect(0, 0, s.width, s.height);
-
+      ctx.fillRect(0, 0, current.width, current.height);
       ctx.lineWidth = 1.5 * window.devicePixelRatio;
 
-      // Draw connections O(N^2)
-      for (let i = 0; i < s.particles.length; i++) {
-        const p1 = s.particles[i];
-        
-        for (let j = i + 1; j < s.particles.length; j++) {
-          const p2 = s.particles[j];
-          const dx = p1.x - p2.x;
-          const dy = p1.y - p2.y;
-          const distSq = dx*dx + dy*dy;
-          
-          if (distSq < linkDistSq) {
-            const pct = 1.0 - (Math.sqrt(distSq) / linkDist);
-            
-            // Map the screen Y coordinate to a color 
-            const avgY = (p1.y + p2.y) / 2;
-            const yNormal = avgY / s.height;
-            const col = paletteColor(yNormal, s.colors, displayParams.blend);
-            
-            ctx.strokeStyle = `rgba(${col[0]}, ${col[1]}, ${col[2]}, ${pct * pct})`;
-            ctx.beginPath();
-            ctx.moveTo(p1.x, p1.y);
-            ctx.lineTo(p2.x, p2.y);
-            ctx.stroke();
-          }
-        }
+      const frame = frameRef.current;
+      if (!frame) return;
+
+      for (let index = 0; index < frame.links.length; index += 6) {
+        const col = paletteColor(frame.links[index + 5], current.colors, current.displayParams.blend);
+        ctx.strokeStyle = `rgba(${col[0]}, ${col[1]}, ${col[2]}, ${frame.links[index + 4]})`;
+        ctx.beginPath();
+        ctx.moveTo(frame.links[index], frame.links[index + 1]);
+        ctx.lineTo(frame.links[index + 2], frame.links[index + 3]);
+        ctx.stroke();
       }
-      
-      // Draw nodes
-      for (let i = 0; i < s.particles.length; i++) {
-        const p = s.particles[i];
-        const yNormal = p.y / s.height;
-        const col = paletteColor(yNormal, s.colors, displayParams.blend);
+
+      const nodeRadius = Math.max(1.5, 3 * current.displayParams.scale);
+      for (let index = 0; index < frame.nodes.length; index += 3) {
+        const col = paletteColor(frame.nodes[index + 2], current.colors, current.displayParams.blend);
         ctx.fillStyle = `rgb(${col[0]}, ${col[1]}, ${col[2]})`;
         ctx.beginPath();
-        ctx.arc(p.x, p.y, Math.max(1.5, 3 * displayParams.scale), 0, Math.PI * 2);
+        ctx.arc(frame.nodes[index], frame.nodes[index + 1], nodeRadius, 0, Math.PI * 2);
         ctx.fill();
       }
     };
@@ -285,6 +211,10 @@ export default function ParticlesCanvas({ params, colors, paused, onStatusChange
       canvas.removeEventListener('pointermove', handlePointerMove);
       canvas.removeEventListener('pointerleave', handlePointerLeave);
       cancelAnimationFrame(animationFrameId);
+      worker.terminate();
+      workerRef.current = null;
+      frameRef.current = null;
+      frameInFlightRef.current = false;
     };
   }, [onStatusChange, renderScale]);
 
