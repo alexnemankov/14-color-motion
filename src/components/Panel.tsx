@@ -41,6 +41,7 @@ interface PanelProps {
   loadPreset: (preset: SavedPreset) => void;
   loadRecentScene: (scene: RecentScene) => void;
   deletePreset: (id: string) => void;
+  deleteRecentScene: (id: string) => void;
   shareScene: () => void;
   exportImage: (scale?: number) => void;
   recordVideo: (durationSeconds: number, loopSafe?: boolean) => void;
@@ -251,6 +252,7 @@ export default function Panel({
   loadPreset,
   loadRecentScene,
   deletePreset,
+  deleteRecentScene,
   shareScene,
   exportImage,
   recordVideo,
@@ -726,6 +728,9 @@ export default function Panel({
                     <small>{scene.source}</small>
                     <small>{formatPresetDate(scene.seenAt)}</small>
                   </div>
+                </button>
+                <button className="saved-delete-btn" onClick={() => deleteRecentScene(scene.id)} aria-label={`Remove ${scene.name} from recent scenes`}>
+                  <Trash size={14} weight="bold" />
                 </button>
               </div>
             ))}

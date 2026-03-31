@@ -9,6 +9,7 @@ import BlobsCanvas from './components/BlobsCanvas';
 import Panel from './components/Panel';
 import RendererBoundary from './components/RendererBoundary';
 import { RendererHandle } from './components/rendererTypes';
+import { migratePersistedScene, serializeSceneForPersistence, CURRENT_SCENE_VERSION } from './migrations/sceneMigrations';
 import { PALETTES } from './data/palettes';
 
 export type AnimationType = 'liquid' | 'waves' | 'voronoi' | 'turing' | 'particles' | 'blobs';
@@ -137,7 +138,11 @@ function cloneScene(scene: SceneState): SceneState {
 }
 
 function sceneKey(scene: SceneState): string {
-  return JSON.stringify(scene);
+  return JSON.stringify({
+    animationType: scene.animationType,
+    params: scene.params,
+    colors: scene.colors,
+  });
 }
 
 function randomBetween(min: number, max: number, precision = 2) {
@@ -257,6 +262,7 @@ function toShareNumber(value: number) {
 function serializeShareScene(scene: SceneState, name?: string | null) {
   const payload = {
     v: SHARE_SCENE_VERSION,
+    sv: CURRENT_SCENE_VERSION,
     a: VALID_ANIMATION_TYPES.indexOf(scene.animationType),
     p: [
       scene.params.seed,
@@ -278,6 +284,7 @@ function parseCompactSharedScene(raw: string): { scene: SceneState; name: string
   try {
     const decoded = JSON.parse(decodeBase64Url(raw)) as {
       v?: string;
+      sv?: number;
       a?: number;
       p?: unknown[];
       c?: unknown[];
@@ -297,6 +304,7 @@ function parseCompactSharedScene(raw: string): { scene: SceneState; name: string
     if (colors.length < 2) return null;
 
     const scene = normalizeSceneState({
+      version: typeof decoded.sv === 'number' ? decoded.sv : 0,
       animationType: VALID_ANIMATION_TYPES[decoded.a],
       params: {
         seed: decoded.p[0],
@@ -354,13 +362,13 @@ function isColorRgb(value: unknown): value is ColorRgb {
 }
 
 function normalizeSceneState(value: unknown): SceneState | null {
-  if (!value || typeof value !== 'object') return null;
+  const candidate = migratePersistedScene(value, {
+    defaultParams: DEFAULT_PARAMS,
+    validAnimationTypes: VALID_ANIMATION_TYPES,
+  });
+  if (!candidate) return null;
 
-  const candidate = value as Partial<SceneState>;
-  const params = candidate.params as Partial<GradientParams> | undefined;
-
-  if (!candidate.animationType || !VALID_ANIMATION_TYPES.includes(candidate.animationType)) return null;
-  if (!params) return null;
+  const params = candidate.params as Partial<GradientParams>;
 
   const normalizedParams: GradientParams = {
     seed: typeof params.seed === 'number' ? params.seed : DEFAULT_PARAMS.seed,
@@ -740,7 +748,7 @@ function App() {
 
   useEffect(() => {
     try {
-      localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(currentScene));
+      localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(serializeSceneForPersistence(currentScene)));
     } catch (error) {
       if (storageErrorToastRef.current !== 'session') {
         storageErrorToastRef.current = 'session';
@@ -751,7 +759,15 @@ function App() {
 
   useEffect(() => {
     try {
-      localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(savedPresets));
+      localStorage.setItem(
+        PRESETS_STORAGE_KEY,
+        JSON.stringify(savedPresets.map(preset => ({
+          ...serializeSceneForPersistence(preset),
+          id: preset.id,
+          name: preset.name,
+          createdAt: preset.createdAt,
+        })))
+      );
       if (storageErrorToastRef.current === 'presets') {
         storageErrorToastRef.current = null;
       }
@@ -765,7 +781,16 @@ function App() {
 
   useEffect(() => {
     try {
-      localStorage.setItem(RECENT_SCENES_STORAGE_KEY, JSON.stringify(recentScenes));
+      localStorage.setItem(
+        RECENT_SCENES_STORAGE_KEY,
+        JSON.stringify(recentScenes.map(scene => ({
+          ...serializeSceneForPersistence(scene),
+          id: scene.id,
+          name: scene.name,
+          seenAt: scene.seenAt,
+          source: scene.source,
+        })))
+      );
     } catch {
       if (storageErrorToastRef.current !== 'recent-scenes') {
         storageErrorToastRef.current = 'recent-scenes';
@@ -903,6 +928,12 @@ function App() {
         ...prev.filter(entry => sceneKey(entry) !== sceneSignature).slice(0, RECENT_SCENES_LIMIT - 1),
       ];
     });
+  };
+
+  const handleDeleteRecentScene = (id: string) => {
+    const deletedScene = recentScenes.find(scene => scene.id === id);
+    setRecentScenes(prev => prev.filter(scene => scene.id !== id));
+    showToast('Recent scene removed', deletedScene?.name);
   };
 
   const handleSavePreset = () => {
@@ -1536,6 +1567,7 @@ function App() {
           loadPreset={handleLoadPreset}
           loadRecentScene={handleLoadRecentScene}
           deletePreset={handleDeletePreset}
+          deleteRecentScene={handleDeleteRecentScene}
           shareScene={handleShareScene}
           exportImage={handleExportImage}
           recordVideo={handleRecordVideo}
