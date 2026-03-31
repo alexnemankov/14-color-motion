@@ -98,6 +98,7 @@ const RECENT_SCENES_STORAGE_KEY = 'color-motion-recent-scenes';
 const ONBOARDING_STORAGE_KEY = 'color-motion-onboarding-dismissed';
 const SHARE_PARAM_KEY = 'scene';
 const SHARE_NAME_PARAM_KEY = 'name';
+const SHARE_SCENE_VERSION = 'v1';
 const VALID_ANIMATION_TYPES: AnimationType[] = ['liquid', 'waves', 'voronoi', 'turing', 'particles', 'blobs'];
 const HISTORY_LIMIT = 40;
 const PALETTE_TRANSITION_MS = 1500;
@@ -215,6 +216,111 @@ function animationTypeLabel(type: AnimationType) {
   }[type];
 }
 
+function encodeBase64Url(value: string) {
+  const utf8 = new TextEncoder().encode(value);
+  let binary = '';
+  utf8.forEach(byte => {
+    binary += String.fromCharCode(byte);
+  });
+
+  return btoa(binary)
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/g, '');
+}
+
+function decodeBase64Url(value: string) {
+  const normalized = value
+    .replace(/-/g, '+')
+    .replace(/_/g, '/')
+    .padEnd(Math.ceil(value.length / 4) * 4, '=');
+  const binary = atob(normalized);
+  const bytes = Uint8Array.from(binary, char => char.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
+}
+
+function rgbToShareHex(color: ColorRgb) {
+  return color.map(channel => channel.toString(16).padStart(2, '0')).join('');
+}
+
+function shareHexToRgb(value: string): ColorRgb | null {
+  if (!/^[0-9a-fA-F]{6}$/.test(value)) return null;
+  const parsed = parseInt(value, 16);
+  return [(parsed >> 16) & 255, (parsed >> 8) & 255, parsed & 255];
+}
+
+function toShareNumber(value: number) {
+  return Math.round(value * 1000) / 1000;
+}
+
+function serializeShareScene(scene: SceneState, name?: string | null) {
+  const payload = {
+    v: SHARE_SCENE_VERSION,
+    a: VALID_ANIMATION_TYPES.indexOf(scene.animationType),
+    p: [
+      scene.params.seed,
+      toShareNumber(scene.params.speed),
+      toShareNumber(scene.params.scale),
+      toShareNumber(scene.params.amplitude),
+      toShareNumber(scene.params.frequency),
+      scene.params.definition,
+      toShareNumber(scene.params.blend),
+    ],
+    c: scene.colors.map(rgbToShareHex),
+    ...(name ? { n: name.slice(0, 80) } : {}),
+  };
+
+  return encodeBase64Url(JSON.stringify(payload));
+}
+
+function parseCompactSharedScene(raw: string): { scene: SceneState; name: string | null } | null {
+  try {
+    const decoded = JSON.parse(decodeBase64Url(raw)) as {
+      v?: string;
+      a?: number;
+      p?: unknown[];
+      c?: unknown[];
+      n?: string;
+    };
+
+    if (decoded.v !== SHARE_SCENE_VERSION) return null;
+    if (typeof decoded.a !== 'number' || !VALID_ANIMATION_TYPES[decoded.a]) return null;
+    if (!Array.isArray(decoded.p) || decoded.p.length < 7) return null;
+    if (!Array.isArray(decoded.c)) return null;
+
+    const colors = decoded.c
+      .map(value => typeof value === 'string' ? shareHexToRgb(value) : null)
+      .filter((color): color is ColorRgb => color !== null)
+      .slice(0, 8);
+
+    if (colors.length < 2) return null;
+
+    const scene = normalizeSceneState({
+      animationType: VALID_ANIMATION_TYPES[decoded.a],
+      params: {
+        seed: decoded.p[0],
+        speed: decoded.p[1],
+        scale: decoded.p[2],
+        amplitude: decoded.p[3],
+        frequency: decoded.p[4],
+        definition: decoded.p[5],
+        blend: decoded.p[6],
+      },
+      colors,
+    });
+
+    if (!scene) return null;
+
+    const name = typeof decoded.n === 'string' && decoded.n.trim()
+      ? decoded.n.trim().slice(0, 80)
+      : null;
+
+    return { scene, name };
+  } catch {
+    return null;
+  }
+}
+
 function supportsLoopSafeExport(type: AnimationType) {
   return type === 'liquid' || type === 'waves' || type === 'voronoi' || type === 'blobs';
 }
@@ -275,12 +381,25 @@ function normalizeSceneState(value: unknown): SceneState | null {
   };
 }
 
-function readSharedScene(): SceneState | null {
+function readSharedSceneBundle(): { scene: SceneState; name: string | null } | null {
   try {
     const url = new URL(window.location.href);
     const raw = url.searchParams.get(SHARE_PARAM_KEY);
     if (!raw) return null;
-    return normalizeSceneState(JSON.parse(decodeURIComponent(raw)));
+
+    const compact = parseCompactSharedScene(raw);
+    if (compact) return compact;
+
+    const scene = normalizeSceneState(JSON.parse(decodeURIComponent(raw)));
+    if (!scene) return null;
+
+    const legacyNameRaw = url.searchParams.get(SHARE_NAME_PARAM_KEY);
+    const legacyName = legacyNameRaw ? decodeURIComponent(legacyNameRaw).trim().slice(0, 80) : '';
+
+    return {
+      scene,
+      name: legacyName || null,
+    };
   } catch {
     return null;
   }
@@ -375,8 +494,9 @@ function readOnboardingDismissed() {
 }
 
 function App() {
-  const sharedSceneName = readSharedSceneName();
-  const initialScene = readSharedScene() ?? readSessionScene() ?? {
+  const sharedSceneBundle = readSharedSceneBundle();
+  const sharedSceneName = sharedSceneBundle?.name ?? readSharedSceneName();
+  const initialScene = sharedSceneBundle?.scene ?? readSessionScene() ?? {
     animationType: 'liquid' as AnimationType,
     params: DEFAULT_PARAMS,
     colors: DEFAULT_COLORS,
@@ -841,8 +961,8 @@ function App() {
 
   const handleShareScene = async () => {
     const url = new URL(window.location.href);
-    url.searchParams.set(SHARE_PARAM_KEY, encodeURIComponent(JSON.stringify(currentScene)));
-    url.searchParams.set(SHARE_NAME_PARAM_KEY, encodeURIComponent(activeSceneName ?? getSceneName(currentScene)));
+    url.searchParams.set(SHARE_PARAM_KEY, serializeShareScene(currentScene, activeSceneName ?? getSceneName(currentScene)));
+    url.searchParams.delete(SHARE_NAME_PARAM_KEY);
 
     try {
       await navigator.clipboard.writeText(url.toString());
