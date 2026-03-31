@@ -1,70 +1,82 @@
 # Color Motion Lab: Technical Description
 
-This document describes the current technical state of the project and is meant to help future contributors understand how the app is structured, what it already supports, and where the main integration points live.
+This document describes the current implementation of Color Motion Lab as it exists in the repository today.
 
-## 1. Product Shape
+## 1. Product Overview
 
-Color Motion Lab is a single-page generative art application. It combines:
+Color Motion Lab is a fullscreen generative motion app with a single active renderer at a time and a shared scene model across all modes. The root app coordinates renderer selection, parameter editing, persistence, sharing, onboarding, and export.
 
-- a fullscreen rendering surface
-- a floating control panel
-- a fullscreen palette library modal
-- local scene/preset persistence
-- still and video export
-- multiple rendering backends under one shared parameter model
+The shipped product currently includes:
 
-The root `App.tsx` owns the scene state and routes that state into both the active renderer and the UI controls.
+- six rendering modes
+- a floating desktop panel and mobile bottom-sheet UI
+- palette library browsing with favorites and recents
+- local preset storage and recent scene tracking
+- undo/redo scene history
+- share links
+- PNG and WebM export
+- renderer fallback handling and onboarding UX
 
 ## 2. Stack
 
 - Framework: React 18
 - Language: TypeScript
 - Build tool: Vite
-- Styling: plain CSS with CSS variables
-- UI animation: Framer Motion
+- Styling: plain CSS in `src/index.css`
+- UI motion: Framer Motion
 - Icons: `@phosphor-icons/react`
-- Extra visual feedback: `canvas-confetti`
-- Deployment: GitHub Pages via `gh-pages`
+- Micro-interactions: `canvas-confetti`
+- Deployment target: GitHub Pages via `gh-pages`
 
-Rendering uses a mix of:
+Rendering backends currently used in the codebase:
 
 - Canvas 2D
-- WebGL
 - WebGL2
+- WebGPU
 
-depending on the active visual mode.
-
-## 3. Directory Structure
+## 3. Project Structure
 
 ```text
 src/
-  App.tsx                    Root state, scene orchestration, export/share logic
-  main.tsx                   React entry point
-  index.css                  Global styles and component styling
-  components/
-    Panel.tsx                Floating control panel and workflow UI
-    PaletteModal.tsx         Fullscreen palette browser
-    LiquidCanvas.tsx         Fluid FBM renderer
-    WavesCanvas.tsx          Interference wave renderer
-    VoronoiCanvas.tsx        Cellular/Voronoi renderer
-    TuringCanvas.tsx         Reaction-diffusion renderer
-    ParticlesCanvas.tsx      Particle network renderer
-    BlobsCanvas.tsx          Blob-based gradient renderer
+  App.tsx                       App state, orchestration, persistence, sharing, export
+  main.tsx                      React entry point
+  index.css                     Full visual system and responsive layout
   data/
-    palettes.ts              Curated palette library and tag definitions
+    palettes.ts                 Curated palette library
+  migrations/
+    sceneMigrations.ts          Versioned scene persistence migration
+  workers/
+    particlesWorker.ts          Background particle simulation
+  components/
+    Panel.tsx                   Main control surface
+    PaletteModal.tsx            Palette library modal
+    RendererBoundary.tsx        Renderer error boundary
+    rendererTypes.ts            Shared renderer interfaces
+    rendererMotion.ts           Shared parameter smoothing helpers
+    LiquidCanvas.tsx            Canvas renderer with external time support
+    WavesCanvas.tsx             Canvas renderer with external time support
+    VoronoiCanvas.tsx           Canvas renderer with external time support
+    BlobsCanvas.tsx             Canvas renderer with external time support
+    ParticlesCanvas.tsx         Canvas renderer with worker-backed simulation
+    TuringCanvas.tsx            Wrapper choosing WebGPU or WebGL2 implementation
+    TuringWebGLCanvas.tsx       WebGL2 reaction-diffusion implementation
+    TuringWebGPUCanvas.tsx      WebGPU reaction-diffusion implementation
 ```
 
-## 4. Core State Model
+## 4. Core Domain Model
 
-`App.tsx` is the main coordinator. It stores the active scene plus workflow, export, and persistence state.
+`App.tsx` defines the shared scene types used across renderers and persistence.
 
-### Scene State
+### Scene types
 
-`SceneState`
+`AnimationType`
 
-- `animationType`
-- `params`
-- `colors`
+- `liquid`
+- `waves`
+- `voronoi`
+- `turing`
+- `particles`
+- `blobs`
 
 `GradientParams`
 
@@ -76,196 +88,273 @@ src/
 - `definition`
 - `blend`
 
-These parameters are shared across all renderers. Each renderer interprets them differently, but the UI remains consistent.
+`SceneState`
 
-### Persistence State
+- `animationType`
+- `params`
+- `colors`
 
-The app stores the following in local storage:
+Additional persisted scene-shaped records:
 
-- current session scene
+- `SavedPreset`
+- `RecentScene`
+
+The application keeps one normalized scene model and lets each renderer interpret the same parameter set differently.
+
+## 5. App Responsibilities
+
+`src/App.tsx` is the system coordinator. Its responsibilities include:
+
+- loading the initial scene from a share link or session storage
+- validating and migrating persisted scene data
+- maintaining active scene state and scene history
+- driving palette interpolation during palette changes
+- handling mode transition crossfades
+- saving presets and recent scenes
+- copying share links to the clipboard
+- coordinating PNG and WebM export
+- driving deterministic loop-safe playback through `externalRenderTime`
+- showing toast, onboarding, dialog, and export status UI
+
+Important constants in the current implementation:
+
+- history limit: `40`
+- palette transition duration: `1500ms`
+- loop-safe export duration: `6s`
+- recent scenes limit: `8`
+- share payload version: `v1`
+
+## 6. Persistence and Migration
+
+Scene persistence is versioned through `src/migrations/sceneMigrations.ts`.
+
+Current behavior:
+
+- `CURRENT_SCENE_VERSION` is `1`
+- legacy payloads without a version are treated as version `0`
+- `migratePersistedScene()` normalizes older payloads before use
+- `serializeSceneForPersistence()` writes versioned scene payloads back to storage
+
+`localStorage` keys currently used:
+
+- session scene
 - saved presets
 - recent scenes
+- onboarding dismissed state
 - palette favorites
 - recent palettes
 
-### Workflow State
+Storage failures are handled with non-fatal toasts. Preset and recent-scene writes are not assumed to always succeed.
 
-The app also tracks:
+## 7. Sharing Model
 
-- compact vs advanced panel density
-- undo/redo history
-- workflow locks for mode/palette/seed/motion
-- active scene name
-- toast notifications
-- save-dialog visibility
+Share links are generated entirely client-side.
 
-### Export State
+Current format:
 
-Export/recording is managed through:
+- scene data is compacted into a small payload
+- the payload is base64url-encoded
+- the encoded value is stored in the `scene` query parameter
+- scene names may be embedded directly in the compact payload
+- legacy URL parsing is still supported
 
-- `renderScale`
-- `isRecording`
-- loop-safe preview timing
-- external render time overrides for supported renderers
-- structured export status (`idle`, `preparing`, `capturing`, `recording`, `encoding`, `complete`, `error`)
+The share format is compact, but it is not compressed with gzip or an external library.
 
-## 5. UI Architecture
+## 8. Renderer Contract
 
-### Floating Panel
+`src/components/rendererTypes.ts` defines the shared renderer interface:
 
-`Panel.tsx` is responsible for:
+- `supportsExternalTime`
+- `supportsLoopSafeExport`
+- `getCanvas()`
+- `captureFrame()`
+- status reporting through `onStatusChange`
 
-- mode switching
-- palette editing
-- param controls
+This is the formalized renderer contract the roadmap previously called for.
+
+`src/components/rendererMotion.ts` provides shared param smoothing:
+
+- `cloneParams()`
+- `stepSmoothedParams()`
+
+This smoothing is used inside render loops so parameter edits feel continuous instead of snapping instantly.
+
+## 9. Rendering Architecture
+
+### Deterministic Canvas renderers
+
+`LiquidCanvas`, `WavesCanvas`, `VoronoiCanvas`, and `BlobsCanvas`:
+
+- render to fullscreen canvas elements
+- support parameter smoothing
+- support even-dimension sizing during export
+- implement `externalTime`
+- expose `supportsLoopSafeExport: true`
+
+These modes can be driven by `externalRenderTime` during loop-safe export.
+
+### Particle renderer
+
+`ParticlesCanvas` renders with Canvas 2D, but its simulation step runs in `src/workers/particlesWorker.ts`.
+
+Current worker design:
+
+- worker owns particle positions and velocities
+- main thread sends `init`, `resize`, and `step` messages
+- worker returns typed-array frame payloads for nodes and links
+- link and node drawing remains on the main thread canvas
+- pointer interaction is forwarded into the worker simulation
+
+This is already the worker migration that earlier planning documents identified as future work.
+
+### Turing renderer
+
+`TuringCanvas` is a wrapper that prefers WebGPU when `navigator.gpu` exists and otherwise falls back to WebGL2.
+
+`TuringWebGPUCanvas`:
+
+- uses a compute shader for the simulation step
+- uses a render pipeline for final palette mapping
+- rebuilds textures on resize and reseed
+- falls back silently if initialization fails
+
+`TuringWebGLCanvas`:
+
+- runs the simulation in WebGL2 framebuffers
+- uses ping-pong textures for reaction-diffusion state
+- handles palette mapping in a render shader
+
+Turing does not currently support `externalTime` or loop-safe export because it is simulation-driven.
+
+## 10. UI Architecture
+
+### Panel
+
+`src/components/Panel.tsx` is the main workspace surface. It contains:
+
 - workflow tools
+- mode selection
+- palette editing
+- motion and structure controls
+- workspace actions
 - export controls
+- reset actions
 - saved preset browsing
 - recent scene browsing
+- transport controls
 
-The panel includes richer saved-library browsing:
+Current workflow features exposed in the panel:
 
-- preset search
-- mode filtering
-- sort controls
-- recent scenes
+- compact and advanced density modes
+- undo/redo
+- scene shuffle
+- randomize mode, palette, or params independently
+- workflow locks for mode, palette, seed, and motion
 
-### Palette Library
+### Palette modal
 
-`PaletteModal.tsx` provides:
+`src/components/PaletteModal.tsx` is a full-screen portal modal with:
 
 - search
-- category browsing
+- category filters
 - favorites
 - recent palettes
+- active selection preview
 - surprise/random selection
-- active palette preview
 
-The modal uses Framer Motion for shell-level transitions, while the palette list itself is intentionally lightweight to avoid heavy layout animation cost during search and filtering.
+The palette library currently ships with 67 palette descriptors from `src/data/palettes.ts`.
 
-### Responsive Behavior
+### Onboarding and dialogs
 
-Desktop uses a right-side floating panel. Smaller screens switch to a bottom-sheet style panel, while the palette library becomes a mobile-friendly fullscreen view.
+The app now includes:
 
-## 6. Renderer Model
+- a three-step onboarding flow persisted in local storage
+- a save-preset dialog
+- a keyboard shortcuts dialog
+- transient toast notifications
+- renderer fallback overlays
 
-Each renderer is its own component. `App.tsx` mounts exactly one at a time based on `animationType`.
+## 11. Export Pipeline
 
-Current renderer set:
+The export system is entirely browser-side.
 
-- `LiquidCanvas`
-- `WavesCanvas`
-- `VoronoiCanvas`
-- `TuringCanvas`
-- `ParticlesCanvas`
-- `BlobsCanvas`
-
-Shared renderer conventions include:
-
-- full-viewport canvas rendering
-- resize handling
-- pause support
-- shared parameter inputs
-- shared color palette input
-- renderer status reporting back to `App.tsx`
-- even-dimension sizing during export/recording to reduce codec artifacts
-
-Some renderers also support `externalTime`, which is used for deterministic export timing and loop-safe video recording.
-
-## 7. Export and Sharing
-
-The current output system supports:
+### Image export
 
 - standard PNG export
-- higher-resolution PNG export
-- WebM recording
-- loop-safe WebM export for supported renderers
-- shareable URLs with encoded scene state and scene name
+- `2x` PNG export through temporary render scaling
+- progress state transitions through `preparing`, `capturing`, and `complete`
 
-The panel exposes export presets through a dedicated dropdown, and the app displays inline export progress/status instead of relying only on toasts.
+### Video export
 
-Loop-safe export is only available for renderers that can be driven predictably by external time:
+- `MediaRecorder`-based WebM capture
+- standard `5s` and `10s` recordings
+- loop-safe recording for deterministic renderers
+- progress state transitions through `preparing`, `recording`, `encoding`, and `complete`
+- progress arc and frame counter UI in the panel
 
-- liquid
-- waves
-- voronoi
-- blobs
+Loop-safe export currently works by mirroring time across the clip duration and assigning the result to `externalRenderTime`.
 
-Simulation-heavy modes are intentionally excluded.
+## 12. Error Handling and Fallbacks
 
-## 8. Workflow Features
+Current defensive layers include:
 
-The app already supports a deeper workflow layer than a simple shader demo:
+- `RendererBoundary` for renderer crashes
+- renderer-level status reporting for unsupported APIs
+- a visible renderer fallback card with compatibility link
+- storage error toasts
+- recording/export error states in the export panel
 
-- save/load/delete presets
-- in-app preset naming
-- undo/redo scene history
-- randomization by scene, mode, palette, and params
-- workflow locks
-- recent scenes
-- keyboard shortcuts
+The current fallback recommendation in the UI is to switch to `particles` if another renderer fails.
 
-Current keyboard shortcuts:
+## 13. Styling and Responsive Behavior
 
-- `Space`: pause/resume
-- `H`: toggle UI
-- `F`: fullscreen
+`src/index.css` owns the full visual language.
 
-Global hotkeys ignore editable inputs so typing in search or text fields does not trigger panel actions.
+Current design characteristics:
 
-## 9. Styling System
-
-`index.css` defines the full visual system.
-
-Key design characteristics:
-
-- matte dark surfaces
+- black and charcoal surfaces
 - orange accent color
-- `Space Grotesk` for display text
-- `JetBrains Mono` for controls and technical labels
-- strong border-based structure rather than soft glassmorphism
+- `Space Grotesk` display typography
+- `JetBrains Mono` technical typography
+- border-led industrial panel styling
+- animated export states
+- animated palette cards
 
-The CSS file also owns:
+Responsive behavior:
 
-- panel layout
-- modal layout
-- custom range slider styling
-- toast/dialog styling
-- export progress styling
-- palette card and category-chip styling
+- desktop uses a fixed right-side panel
+- smaller screens switch to a bottom-sheet style panel
+- the palette modal adapts to a mobile fullscreen layout
 
-## 10. Build and Deployment
+## 14. What Is Already Implemented vs. Still Roadmap
 
-Development:
+Several features previously listed as future improvements are already implemented in this repository:
+
+- onboarding
+- shortcut discoverability with `?`
+- renderer transition crossfade
+- parameter smoothing
+- palette interpolation
+- typed renderer handle contract
+- persistence migrations
+- worker-backed particle simulation
+- WebGPU progressive enhancement for Turing
+
+Not implemented in the current codebase:
+
+- keyframe timeline editor
+- layered renderer compositing
+- audio reactivity
+- GIF export
+- thumbnail-based saved preset previews
+- compressed or server-backed share URLs
+
+## 15. Development Commands
 
 ```bash
+npm install
 npm run dev
-```
-
-Production build:
-
-```bash
 npm run build
-```
-
-Preview:
-
-```bash
 npm run preview
-```
-
-GitHub Pages deploy:
-
-```bash
 npm run deploy
 ```
-
-## 11. Known Future Work Areas
-
-The current roadmap is focused on a few remaining areas:
-
-- A/B compare workflow
-- richer output formats such as GIF if justified
-- presentation mode
-- broader pointer/touch interaction across more renderers
-- performance modes

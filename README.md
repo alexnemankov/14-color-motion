@@ -1,59 +1,72 @@
 # Color Motion Lab
 
-Color Motion Lab is a browser-based generative art playground built with React, TypeScript, Vite, Canvas 2D, and WebGL. It combines curated palette exploration with multiple motion/rendering systems so users can build, save, export, and share animated color scenes.
+Color Motion Lab is a browser-based motion design playground for building animated color studies with curated palettes and multiple rendering systems. It runs as a React + TypeScript single-page app and combines fullscreen rendering, a compact control panel, local scene persistence, share links, and in-browser export.
 
-## What It Does
+## Current Feature Set
 
-- Explore six visual modes:
+- Six renderers:
   - Fluid FBM
   - Interference Waves
   - Cellular Voronoi
   - Reaction-Diffusion
   - Particle Web
   - Molten Blobs
-- Edit a shared parameter set in real time:
-  - seed
-  - speed
-  - scale
-  - amplitude
-  - frequency
-  - definition
-  - blend
-- Browse a curated palette library with:
-  - search
-  - category filters
-  - favorites
-  - recent palettes
-  - surprise/random selection
-- Save scenes locally and revisit them through:
-  - preset search
-  - mode filtering
-  - sort controls
+- Shared scene controls:
+  - `seed`
+  - `speed`
+  - `scale`
+  - `amplitude`
+  - `frequency`
+  - `definition`
+  - `blend`
+- Palette workflow:
+  - 67 curated palettes
+  - search and category filters
+  - favorites and recent palettes
+  - surprise/random palette selection
+  - manual color editing with 2-8 colors
+  - animated palette interpolation on palette changes
+- Scene workflow:
+  - local preset saving
   - recent scenes
-- Share and export scenes through:
-  - shareable URLs with scene metadata
+  - undo/redo history
+  - scene, mode, palette, and parameter randomization
+  - workflow locks for mode, palette, seed, and motion
+  - compact and advanced control density modes
+- Export and sharing:
   - PNG export
-  - higher-resolution PNG export
-  - WebM recording
-  - loop-safe WebM export for supported renderers
-
-## Workflow Features
-
-- Compact and advanced control density modes
-- Undo and redo scene history
-- Randomization for full scenes, palettes, parameters, and mode
-- Workflow locks for mode, palette, seed, and motion
-- In-app preset naming and toast feedback
-- Export status/progress UI
-- Fullscreen and hide-UI shortcuts
+  - 2x PNG export
+  - 5s and 10s WebM recording
+  - loop-safe WebM export for deterministic renderers
+  - compact shareable URLs with encoded scene state
+- UX:
+  - first-run onboarding
+  - keyboard shortcut dialog
+  - renderer error fallback UI
+  - mode-switch crossfade
+  - export progress UI with status phases
+  - desktop floating panel and mobile bottom-sheet layout
 
 ## Keyboard Shortcuts
 
-- `Space`: pause/resume animation
-- `H`: toggle panel visibility
+- `?`: open shortcuts
+- `Space`: pause/resume
+- `H`: hide/show UI
 - `F`: toggle fullscreen
+- `R`: randomize scene
+- `S`: save preset
+- `Ctrl/Cmd + Z`: undo
+- `Ctrl/Cmd + Y`: redo
+- `Ctrl/Cmd + Shift + Z`: redo
 
-Hotkeys are disabled while typing in editable inputs.
+Shortcuts are ignored while typing in editable fields.
+
+## Renderer Notes
+
+- `liquid`, `waves`, `voronoi`, and `blobs` support deterministic `externalTime` playback and loop-safe export.
+- `particles` runs its simulation in a Web Worker.
+- `turing` prefers WebGPU when available and falls back to WebGL2.
+- A renderer boundary and status overlay handle unsupported or failed rendering paths.
 
 ## Tech Stack
 
@@ -63,46 +76,27 @@ Hotkeys are disabled while typing in editable inputs.
 - Framer Motion
 - Phosphor Icons
 - Canvas Confetti
-- Canvas 2D, WebGL, and WebGL2 rendering
+- Canvas 2D, WebGL2, and WebGPU
 
 ## Development
 
-Install dependencies:
-
 ```bash
 npm install
-```
-
-Start the dev server:
-
-```bash
 npm run dev
 ```
 
-Build for production:
+Other scripts:
 
 ```bash
 npm run build
-```
-
-Preview the production build:
-
-```bash
 npm run preview
-```
-
-Deploy to GitHub Pages:
-
-```bash
 npm run deploy
 ```
 
-## Project Notes
+## Persistence
 
-- Scene state, presets, palette favorites, recent palettes, and recent scenes are stored in local storage.
-- Some renderers support loop-safe export timing; simulation-heavy modes do not.
-- The UI is designed around a floating control panel on desktop and a bottom-sheet panel on smaller screens.
+The app stores the current session, saved presets, recent scenes, palette favorites, recent palettes, and onboarding dismissal state in `localStorage`. Persisted scene payloads are versioned and migrated on load.
 
-## License
+## Status
 
-MIT
+This repository already includes several items that were previously roadmap ideas, including onboarding, keyboard shortcut discovery, renderer transition crossfades, palette interpolation, typed renderer handles, persistence migrations, a worker-backed particles renderer, and WebGPU enhancement for Turing mode.
