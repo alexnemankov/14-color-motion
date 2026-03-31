@@ -8,6 +8,7 @@ import ParticlesCanvas from './components/ParticlesCanvas';
 import BlobsCanvas from './components/BlobsCanvas';
 import Panel from './components/Panel';
 import RendererBoundary from './components/RendererBoundary';
+import { RendererHandle } from './components/rendererTypes';
 import { PALETTES } from './data/palettes';
 
 export type AnimationType = 'liquid' | 'waves' | 'voronoi' | 'turing' | 'particles' | 'blobs';
@@ -551,6 +552,7 @@ function App() {
   const modeTransitionTimeoutRef = useRef<number | null>(null);
   const storageErrorToastRef = useRef<string | null>(null);
   const previousExportPhaseRef = useRef<ExportStatusState['phase']>('idle');
+  const rendererRef = useRef<RendererHandle | null>(null);
 
   const currentScene: SceneState = {
     animationType,
@@ -799,7 +801,7 @@ function App() {
   function startModeTransition(nextType: AnimationType) {
     if (nextType === animationType) return;
 
-    const activeCanvas = document.getElementById('c') as HTMLCanvasElement | null;
+    const activeCanvas = rendererRef.current?.getCanvas();
     if (activeCanvas) {
       try {
         const imageUrl = activeCanvas.toDataURL('image/png');
@@ -984,7 +986,7 @@ function App() {
   };
 
   const handleExportImage = async (scale = 1) => {
-    const canvas = document.getElementById('c') as HTMLCanvasElement | null;
+    const canvas = rendererRef.current?.getCanvas();
     if (!canvas) {
       setExportStatus({
         phase: 'error',
@@ -1019,7 +1021,7 @@ function App() {
         frameTotal: 1,
       });
 
-      const exportCanvas = (document.getElementById('c') as HTMLCanvasElement | null) ?? canvas;
+      const exportCanvas = rendererRef.current?.getCanvas() ?? canvas;
       const blob = await captureCanvasBlob(exportCanvas);
       if (!blob) {
         setExportStatus({
@@ -1069,7 +1071,7 @@ function App() {
       return;
     }
 
-    if (loopSafe && !supportsLoopSafeExport(animationType)) {
+    if (loopSafe && !(rendererRef.current?.supportsLoopSafeExport ?? supportsLoopSafeExport(animationType))) {
       setExportStatus({
         phase: 'error',
         label: 'Loop-safe export unavailable',
@@ -1081,7 +1083,7 @@ function App() {
       return;
     }
 
-    const canvas = document.getElementById('c') as HTMLCanvasElement | null;
+    const canvas = rendererRef.current?.getCanvas();
     if (!canvas || typeof canvas.captureStream !== 'function' || typeof MediaRecorder === 'undefined') {
       setExportStatus({
         phase: 'error',
@@ -1394,12 +1396,12 @@ function App() {
   return (
     <>
       <RendererBoundary resetKey={animationType} onError={handleRendererBoundaryError}>
-        {animationType === 'liquid' && <LiquidCanvas params={params} colors={renderColors} paused={paused} onStatusChange={setRendererStatus} renderScale={renderScale} externalTime={externalRenderTime} />}
-        {animationType === 'waves' && <WavesCanvas params={params} colors={renderColors} paused={paused} onStatusChange={setRendererStatus} renderScale={renderScale} externalTime={externalRenderTime} />}
-        {animationType === 'voronoi' && <VoronoiCanvas params={params} colors={renderColors} paused={paused} onStatusChange={setRendererStatus} renderScale={renderScale} externalTime={externalRenderTime} />}
-        {animationType === 'turing' && <TuringCanvas params={params} colors={renderColors} paused={paused} onStatusChange={setRendererStatus} renderScale={renderScale} />}
-        {animationType === 'particles' && <ParticlesCanvas params={params} colors={renderColors} paused={paused} onStatusChange={setRendererStatus} renderScale={renderScale} />}
-        {animationType === 'blobs' && <BlobsCanvas params={params} colors={renderColors} paused={paused} onStatusChange={setRendererStatus} renderScale={renderScale} externalTime={externalRenderTime} />}
+        {animationType === 'liquid' && <LiquidCanvas ref={rendererRef} params={params} colors={renderColors} paused={paused} onStatusChange={setRendererStatus} renderScale={renderScale} externalTime={externalRenderTime} />}
+        {animationType === 'waves' && <WavesCanvas ref={rendererRef} params={params} colors={renderColors} paused={paused} onStatusChange={setRendererStatus} renderScale={renderScale} externalTime={externalRenderTime} />}
+        {animationType === 'voronoi' && <VoronoiCanvas ref={rendererRef} params={params} colors={renderColors} paused={paused} onStatusChange={setRendererStatus} renderScale={renderScale} externalTime={externalRenderTime} />}
+        {animationType === 'turing' && <TuringCanvas ref={rendererRef} params={params} colors={renderColors} paused={paused} onStatusChange={setRendererStatus} renderScale={renderScale} />}
+        {animationType === 'particles' && <ParticlesCanvas ref={rendererRef} params={params} colors={renderColors} paused={paused} onStatusChange={setRendererStatus} renderScale={renderScale} />}
+        {animationType === 'blobs' && <BlobsCanvas ref={rendererRef} params={params} colors={renderColors} paused={paused} onStatusChange={setRendererStatus} renderScale={renderScale} externalTime={externalRenderTime} />}
       </RendererBoundary>
 
       {modeTransition && (
@@ -1539,7 +1541,7 @@ function App() {
           recordVideo={handleRecordVideo}
           isRecording={isRecording}
           exportStatus={exportStatus}
-          canLoopSafeExport={supportsLoopSafeExport(animationType)}
+          canLoopSafeExport={rendererRef.current?.supportsLoopSafeExport ?? supportsLoopSafeExport(animationType)}
           loopSafeDurationSeconds={LOOP_SAFE_DURATION_SECONDS}
           resetMode={handleResetMode}
           resetPalette={handleResetPalette}

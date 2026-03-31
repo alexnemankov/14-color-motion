@@ -1,15 +1,7 @@
-import { useEffect, useRef } from 'react';
-import { GradientParams, ColorRgb, RendererStatus } from '../App';
+import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
+import { RendererStatus } from '../App';
 import { cloneParams, stepSmoothedParams } from './rendererMotion';
-
-interface CanvasProps {
-  params: GradientParams;
-  colors: ColorRgb[];
-  paused: boolean;
-  onStatusChange?: (status: RendererStatus | null) => void;
-  renderScale?: number;
-  externalTime?: number | null;
-}
+import { RendererHandle, RendererProps, captureCanvasImageData } from './rendererTypes';
 
 const toEvenSize = (value: number) => Math.max(2, Math.floor(value / 2) * 2);
 
@@ -111,8 +103,22 @@ function createShader(gl: WebGLRenderingContext | WebGL2RenderingContext, type: 
   return s;
 }
 
-export default function WavesCanvas({ params, colors, paused, onStatusChange, renderScale = 1, externalTime = null }: CanvasProps) {
+const WavesCanvas = forwardRef<RendererHandle, RendererProps>(function WavesCanvas(
+  { params, colors, paused, onStatusChange, renderScale = 1, externalTime = null },
+  ref
+) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const statusRef = useRef<RendererStatus | null>(null);
+
+  useImperativeHandle(ref, () => ({
+    get status() {
+      return statusRef.current;
+    },
+    supportsExternalTime: true,
+    supportsLoopSafeExport: true,
+    getCanvas: () => canvasRef.current,
+    captureFrame: () => captureCanvasImageData(canvasRef.current),
+  }), []);
 
   const state = useRef({
     animTime: 0,
@@ -141,12 +147,14 @@ export default function WavesCanvas({ params, colors, paused, onStatusChange, re
       || canvas.getContext('webgl', { preserveDrawingBuffer: true })
     ) as WebGLRenderingContext | WebGL2RenderingContext | null;
     if (!gl) {
-      onStatusChange?.({
+      statusRef.current = {
         title: 'Renderer unavailable',
         message: 'This mode needs WebGL support. Try the particle mode or use a browser/device with graphics acceleration enabled.'
-      });
+      };
+      onStatusChange?.(statusRef.current);
       return;
     }
+    statusRef.current = null;
     onStatusChange?.(null);
 
     const vShader = createShader(gl, gl.VERTEX_SHADER, vsSource);
@@ -233,4 +241,6 @@ export default function WavesCanvas({ params, colors, paused, onStatusChange, re
   }, [externalTime, onStatusChange, renderScale]);
 
   return <canvas ref={canvasRef} id="c" />;
-}
+});
+
+export default WavesCanvas;

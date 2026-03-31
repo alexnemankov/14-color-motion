@@ -1,14 +1,7 @@
-import { useEffect, useRef } from 'react';
-import { GradientParams, ColorRgb, RendererStatus } from '../App';
+import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
+import { RendererStatus } from '../App';
 import { cloneParams, stepSmoothedParams } from './rendererMotion';
-
-interface CanvasProps {
-  params: GradientParams;
-  colors: ColorRgb[];
-  paused: boolean;
-  onStatusChange?: (status: RendererStatus | null) => void;
-  renderScale?: number;
-}
+import { RendererHandle, RendererProps, captureCanvasImageData } from './rendererTypes';
 
 const toEvenSize = (value: number) => Math.max(2, Math.floor(value / 2) * 2);
 
@@ -141,8 +134,12 @@ function createProgram(gl: WebGL2RenderingContext, vs: string, fs: string) {
   return program;
 }
 
-export default function TuringWebGLCanvas({ params, colors, paused, onStatusChange, renderScale = 1 }: CanvasProps) {
+const TuringWebGLCanvas = forwardRef<RendererHandle, RendererProps>(function TuringWebGLCanvas(
+  { params, colors, paused, onStatusChange, renderScale = 1 },
+  ref
+) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const statusRef = useRef<RendererStatus | null>(null);
   const state = useRef({ params, displayParams: cloneParams(params), colors, paused, lastSeed: params.seed });
   const glRef = useRef<{
     gl: WebGL2RenderingContext;
@@ -156,6 +153,16 @@ export default function TuringWebGLCanvas({ params, colors, paused, onStatusChan
     height: number;
     flip: boolean;
   } | null>(null);
+
+  useImperativeHandle(ref, () => ({
+    get status() {
+      return statusRef.current;
+    },
+    supportsExternalTime: false,
+    supportsLoopSafeExport: false,
+    getCanvas: () => canvasRef.current,
+    captureFrame: () => captureCanvasImageData(canvasRef.current),
+  }), []);
 
   useEffect(() => {
     state.current.params = params;
@@ -171,12 +178,14 @@ export default function TuringWebGLCanvas({ params, colors, paused, onStatusChan
     if (!canvas) return;
     const gl = canvas.getContext('webgl2', { antialias: false, preserveDrawingBuffer: true });
     if (!gl) {
-      onStatusChange?.({
+      statusRef.current = {
         title: 'WebGL2 required',
         message: 'Reaction-diffusion needs WebGL2. Switch to another mode or use a browser/device with newer graphics support.',
-      });
+      };
+      onStatusChange?.(statusRef.current);
       return;
     }
+    statusRef.current = null;
     onStatusChange?.(null);
 
     gl.getExtension('EXT_color_buffer_float');
@@ -336,4 +345,6 @@ export default function TuringWebGLCanvas({ params, colors, paused, onStatusChan
   }, [onStatusChange, params.seed, renderScale]);
 
   return <canvas ref={canvasRef} id="c" />;
-}
+});
+
+export default TuringWebGLCanvas;

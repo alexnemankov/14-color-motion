@@ -1,12 +1,9 @@
-import { useEffect, useRef } from 'react';
-import { GradientParams, ColorRgb } from '../App';
+import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
+import { RendererStatus } from '../App';
 import { cloneParams, stepSmoothedParams } from './rendererMotion';
+import { RendererHandle, RendererProps, captureCanvasImageData } from './rendererTypes';
 
-interface CanvasProps {
-  params: GradientParams;
-  colors: ColorRgb[];
-  paused: boolean;
-  renderScale?: number;
+interface CanvasProps extends RendererProps {
   onReady?: () => void;
   onFallback: () => void;
 }
@@ -168,9 +165,23 @@ function createShaderModule(device: any, code: string) {
   return device.createShaderModule({ code });
 }
 
-export default function TuringWebGPUCanvas({ params, colors, paused, renderScale = 1, onReady, onFallback }: CanvasProps) {
+const TuringWebGPUCanvas = forwardRef<RendererHandle, CanvasProps>(function TuringWebGPUCanvas(
+  { params, colors, paused, renderScale = 1, onReady, onFallback },
+  ref
+) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const statusRef = useRef<RendererStatus | null>(null);
   const state = useRef({ params, displayParams: cloneParams(params), colors, paused, lastSeed: params.seed });
+
+  useImperativeHandle(ref, () => ({
+    get status() {
+      return statusRef.current;
+    },
+    supportsExternalTime: false,
+    supportsLoopSafeExport: false,
+    getCanvas: () => canvasRef.current,
+    captureFrame: () => captureCanvasImageData(canvasRef.current),
+  }), []);
 
   useEffect(() => {
     state.current.params = params;
@@ -185,6 +196,7 @@ export default function TuringWebGPUCanvas({ params, colors, paused, renderScale
     const gpu = (navigator as Navigator & { gpu?: any }).gpu;
     const canvas = canvasRef.current;
     if (!gpu || !canvas) {
+      statusRef.current = null;
       onFallback();
       return;
     }
@@ -333,6 +345,7 @@ export default function TuringWebGPUCanvas({ params, colors, paused, renderScale
         };
 
         rebuildTextures(params.seed);
+        statusRef.current = null;
         onReady?.();
 
         const resize = () => {
@@ -409,6 +422,7 @@ export default function TuringWebGPUCanvas({ params, colors, paused, renderScale
         };
       } catch {
         if (!disposed) {
+          statusRef.current = null;
           onFallback();
         }
       }
@@ -428,4 +442,6 @@ export default function TuringWebGPUCanvas({ params, colors, paused, renderScale
   }, [onFallback, onReady, params.seed, renderScale]);
 
   return <canvas ref={canvasRef} id="c" />;
-}
+});
+
+export default TuringWebGPUCanvas;

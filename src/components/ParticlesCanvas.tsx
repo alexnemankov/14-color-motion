@@ -1,14 +1,7 @@
-import { useEffect, useRef } from 'react';
-import { GradientParams, ColorRgb, RendererStatus } from '../App';
+import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
+import { ColorRgb, RendererStatus } from '../App';
 import { cloneParams, stepSmoothedParams } from './rendererMotion';
-
-interface CanvasProps {
-  params: GradientParams;
-  colors: ColorRgb[];
-  paused: boolean;
-  onStatusChange?: (status: RendererStatus | null) => void;
-  renderScale?: number;
-}
+import { RendererHandle, RendererProps, captureCanvasImageData } from './rendererTypes';
 
 interface RenderFrame {
   nodes: Float32Array;
@@ -44,11 +37,25 @@ const paletteColor = (t: number, colors: ColorRgb[], blend: number): ColorRgb =>
   return lerpColor(from, to, localT);
 };
 
-export default function ParticlesCanvas({ params, colors, paused, onStatusChange, renderScale = 1 }: CanvasProps) {
+const ParticlesCanvas = forwardRef<RendererHandle, RendererProps>(function ParticlesCanvas(
+  { params, colors, paused, onStatusChange, renderScale = 1 },
+  ref
+) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const workerRef = useRef<Worker | null>(null);
   const frameRef = useRef<RenderFrame | null>(null);
   const frameInFlightRef = useRef(false);
+  const statusRef = useRef<RendererStatus | null>(null);
+
+  useImperativeHandle(ref, () => ({
+    get status() {
+      return statusRef.current;
+    },
+    supportsExternalTime: false,
+    supportsLoopSafeExport: false,
+    getCanvas: () => canvasRef.current,
+    captureFrame: () => captureCanvasImageData(canvasRef.current),
+  }), []);
 
   const state = useRef({
     params,
@@ -75,23 +82,26 @@ export default function ParticlesCanvas({ params, colors, paused, onStatusChange
 
     const ctx = canvas.getContext('2d');
     if (!ctx) {
-      onStatusChange?.({
+      statusRef.current = {
         title: 'Renderer unavailable',
         message: 'This browser could not start the 2D canvas renderer.',
-      });
+      };
+      onStatusChange?.(statusRef.current);
       return;
     }
 
     if (typeof Worker === 'undefined') {
-      onStatusChange?.({
+      statusRef.current = {
         title: 'Worker support required',
         message: 'Particle mode needs Web Worker support in this browser.',
-      });
+      };
+      onStatusChange?.(statusRef.current);
       return;
     }
 
     const worker = new Worker(new URL('../workers/particlesWorker.ts', import.meta.url), { type: 'module' });
     workerRef.current = worker;
+    statusRef.current = null;
     onStatusChange?.(null);
 
     worker.onmessage = (event: MessageEvent<RenderFrame & { type: 'frame' }>) => {
@@ -105,10 +115,11 @@ export default function ParticlesCanvas({ params, colors, paused, onStatusChange
 
     worker.onerror = () => {
       frameInFlightRef.current = false;
-      onStatusChange?.({
+      statusRef.current = {
         title: 'Particle worker failed',
         message: 'Particle simulation could not continue in the background worker.',
-      });
+      };
+      onStatusChange?.(statusRef.current);
     };
 
     const resize = () => {
@@ -219,4 +230,6 @@ export default function ParticlesCanvas({ params, colors, paused, onStatusChange
   }, [onStatusChange, renderScale]);
 
   return <canvas ref={canvasRef} id="c" />;
-}
+});
+
+export default ParticlesCanvas;
