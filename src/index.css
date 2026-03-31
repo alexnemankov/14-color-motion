@@ -599,16 +599,69 @@ canvas {
   background: rgba(255,255,255,0.02);
 }
 
+.export-status-shell {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.export-progress-arc {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+}
+
+.export-progress-arc-svg {
+  width: 56px;
+  height: 56px;
+  transform: rotate(-90deg);
+}
+
+.export-progress-arc-track,
+.export-progress-arc-fill {
+  fill: none;
+  stroke-width: 3;
+}
+
+.export-progress-arc-track {
+  stroke: rgba(255,255,255,0.08);
+}
+
+.export-progress-arc-fill {
+  stroke: var(--accent);
+  stroke-linecap: round;
+  transition: stroke-dashoffset 280ms ease, stroke 180ms ease;
+  filter: drop-shadow(0 0 8px rgba(242, 98, 47, 0.35));
+}
+
+.export-progress-arc > span {
+  position: absolute;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+}
+
+.export-status-main {
+  min-width: 0;
+}
+
 .export-status-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
 }
 
 .export-status strong,
-.export-status span {
+.export-status span,
+.export-frame-counter span,
+.export-frame-counter strong,
+.export-frame-counter small {
   font-family: var(--font-mono);
   font-size: 9px;
   letter-spacing: 0.12em;
@@ -619,7 +672,8 @@ canvas {
   color: var(--text);
 }
 
-.export-status span {
+.export-status span,
+.export-frame-counter strong {
   color: var(--accent);
 }
 
@@ -629,6 +683,28 @@ canvas {
   font-family: var(--font-mono);
   font-size: 9px;
   line-height: 1.5;
+}
+
+.export-frame-counter {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.export-frame-counter span {
+  color: var(--text-dim);
+}
+
+.export-frame-counter strong {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.export-frame-counter small {
+  color: var(--text-dim);
+  font-size: 8px;
 }
 
 .export-progress-track {
@@ -650,10 +726,52 @@ canvas {
 }
 
 .export-status-error span,
-.export-status-error .export-progress-bar {
+.export-status-error .export-progress-bar,
+.export-status-error .export-progress-arc-fill,
+.export-status-error .export-progress-arc > span,
+.export-status-error .export-frame-counter strong {
   color: #ff6b6b;
   background: #ff6b6b;
   box-shadow: none;
+}
+
+.export-status-error .export-progress-arc-fill {
+  stroke: #ff6b6b;
+  filter: none;
+}
+
+.export-status-capturing .export-progress-arc,
+.export-status-recording .export-progress-arc {
+  animation: exportArcPulse 1s ease-in-out infinite;
+}
+
+.export-status-complete .export-progress-arc-fill,
+.export-status-complete .export-progress-bar {
+  animation: exportCompleteGlow 1s ease-out;
+}
+
+@keyframes exportArcPulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+@keyframes exportCompleteGlow {
+  0% {
+    filter: brightness(1);
+    box-shadow: 0 0 0 rgba(242, 98, 47, 0);
+  }
+  40% {
+    filter: brightness(1.2);
+    box-shadow: 0 0 18px rgba(242, 98, 47, 0.45);
+  }
+  100% {
+    filter: brightness(1);
+    box-shadow: 0 0 12px rgba(242, 98, 47, 0.45);
+  }
 }
 
 .reset-actions {
@@ -909,18 +1027,6 @@ canvas {
   color: var(--accent);
 }
 
-.renderer-status {
-  position: fixed;
-  left: 24px;
-  bottom: 24px;
-  max-width: min(360px, calc(100vw - 48px));
-  padding: 14px 16px;
-  background: rgba(17,17,17,0.94);
-  border: 1px solid rgba(242, 98, 47, 0.45);
-  box-shadow: 0 10px 30px rgba(0,0,0,0.45);
-  z-index: 150;
-}
-
 .renderer-transition-overlay {
   position: fixed;
   inset: 0;
@@ -943,22 +1049,104 @@ canvas {
   }
 }
 
-.renderer-status strong {
+.onboarding-inline {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid rgba(242, 98, 47, 0.3);
+  background: rgba(255,255,255,0.02);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.01);
+}
+
+.onboarding-target {
+  padding: 10px;
+  border: 1px solid rgba(242, 98, 47, 0.28);
+}
+
+.onboarding-inline strong {
   display: block;
-  margin-bottom: 6px;
+  margin: 8px 0 5px;
+  color: var(--text);
   font-family: var(--font-display);
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
-  color: var(--accent);
-  letter-spacing: 0.12em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
-.renderer-status p {
+.onboarding-inline p {
   color: var(--text-dark);
   font-family: var(--font-mono);
-  font-size: 11px;
-  line-height: 1.5;
+  font-size: 9px;
+  line-height: 1.6;
+}
+
+.onboarding-progress {
+  display: flex;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.onboarding-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.14);
+}
+
+.onboarding-dot.active {
+  background: var(--accent);
+  box-shadow: 0 0 10px rgba(242, 98, 47, 0.45);
+}
+
+.onboarding-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.renderer-fallback {
+  position: fixed;
+  left: 24px;
+  bottom: 24px;
+  z-index: 155;
+  width: min(360px, calc(100vw - 48px));
+  padding: 16px;
+  border: 1px solid rgba(242, 98, 47, 0.42);
+  background: rgba(17,17,17,0.96);
+  box-shadow: 0 18px 36px rgba(0,0,0,0.42);
+}
+
+.renderer-fallback strong {
+  display: block;
+  margin: 8px 0 6px;
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.renderer-fallback p {
+  color: var(--text-dark);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+.renderer-fallback-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.renderer-fallback-link {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .app-toast {
@@ -1090,6 +1278,45 @@ canvas {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
+}
+
+.shortcuts-card {
+  width: min(460px, calc(100vw - 32px));
+}
+
+.shortcuts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.shortcut-row {
+  display: grid;
+  grid-template-columns: 92px 1fr;
+  gap: 12px;
+  align-items: center;
+}
+
+.shortcut-row span {
+  color: var(--text-dark);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+kbd {
+  min-height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--panel-border);
+  background: rgba(255,255,255,0.03);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* ================== PALETTE MODAL ================== */
@@ -1631,11 +1858,11 @@ canvas {
     font-size: 9px;
   }
 
-  .renderer-status {
+  .renderer-fallback {
     left: 12px;
     right: 12px;
     bottom: calc(12px + env(safe-area-inset-bottom));
-    max-width: none;
+    width: auto;
   }
 
   .app-toast {

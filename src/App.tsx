@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
+import confetti from 'canvas-confetti';
 import LiquidCanvas from './components/LiquidCanvas';
 import WavesCanvas from './components/WavesCanvas';
 import VoronoiCanvas from './components/VoronoiCanvas';
@@ -6,6 +7,7 @@ import TuringCanvas from './components/TuringCanvas';
 import ParticlesCanvas from './components/ParticlesCanvas';
 import BlobsCanvas from './components/BlobsCanvas';
 import Panel from './components/Panel';
+import RendererBoundary from './components/RendererBoundary';
 import { PALETTES } from './data/palettes';
 
 export type AnimationType = 'liquid' | 'waves' | 'voronoi' | 'turing' | 'particles' | 'blobs';
@@ -57,6 +59,8 @@ interface ExportStatusState {
   label: string;
   detail?: string;
   progress: number;
+  frameCount?: number;
+  frameTotal?: number;
 }
 
 interface ModeTransitionState {
@@ -91,14 +95,36 @@ const DEFAULT_PARAMS: GradientParams = {
 const SESSION_STORAGE_KEY = 'color-motion-session';
 const PRESETS_STORAGE_KEY = 'color-motion-presets';
 const RECENT_SCENES_STORAGE_KEY = 'color-motion-recent-scenes';
+const ONBOARDING_STORAGE_KEY = 'color-motion-onboarding-dismissed';
 const SHARE_PARAM_KEY = 'scene';
 const SHARE_NAME_PARAM_KEY = 'name';
 const VALID_ANIMATION_TYPES: AnimationType[] = ['liquid', 'waves', 'voronoi', 'turing', 'particles', 'blobs'];
 const HISTORY_LIMIT = 40;
-const PALETTE_TRANSITION_MS = 480;
+const PALETTE_TRANSITION_MS = 1500;
 const LOOP_SAFE_DURATION_SECONDS = 6;
 const RECENT_SCENES_LIMIT = 8;
 const APP_TITLE = 'Color Motion Lab';
+const WEBGL_COMPATIBILITY_URL = 'https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API';
+const ONBOARDING_STEPS = [
+  {
+    targetId: 'panel',
+    eyebrow: 'Controls',
+    title: 'This is the main studio panel',
+    message: 'Use it to switch renderers, explore palettes, tune motion, save scenes, and export output.',
+  },
+  {
+    targetId: 'onboarding-mode-section',
+    eyebrow: 'Modes',
+    title: 'Each mode is a different visual engine',
+    message: 'Switch between liquid, waves, voronoi, turing, particles, and blobs to explore different motion systems.',
+  },
+  {
+    targetId: 'onboarding-workspace-section',
+    eyebrow: 'Workspace',
+    title: 'Save, share, and export when a scene feels right',
+    message: 'Store presets locally, copy a share link, or export still and video output from here.',
+  },
+];
 
 function cloneScene(scene: SceneState): SceneState {
   return {
@@ -206,6 +232,12 @@ function interpolatePalettes(from: ColorRgb[], to: ColorRgb[], t: number): Color
       clampChannel(sourceColor[2] + (targetColor[2] - sourceColor[2]) * t),
     ] as ColorRgb;
   });
+}
+
+function easeInOutCubic(t: number) {
+  return t < 0.5
+    ? 4 * t * t * t
+    : 1 - ((-2 * t + 2) ** 3) / 2;
 }
 
 function isColorRgb(value: unknown): value is ColorRgb {
@@ -334,6 +366,14 @@ function readRecentScenes(): RecentScene[] {
   }
 }
 
+function readOnboardingDismissed() {
+  try {
+    return localStorage.getItem(ONBOARDING_STORAGE_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
+
 function App() {
   const sharedSceneName = readSharedSceneName();
   const initialScene = readSharedScene() ?? readSessionScene() ?? {
@@ -369,8 +409,10 @@ function App() {
   const [loopSafePreview, setLoopSafePreview] = useState<{ durationSeconds: number; startedAt: number } | null>(null);
   const [externalRenderTime, setExternalRenderTime] = useState<number | null>(null);
   const [isSavePresetOpen, setIsSavePresetOpen] = useState(false);
+  const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
   const [savePresetName, setSavePresetName] = useState('');
   const [modeTransition, setModeTransition] = useState<ModeTransitionState | null>(null);
+  const [onboardingStep, setOnboardingStep] = useState<number | null>(() => (readOnboardingDismissed() ? null : 0));
   const [exportStatus, setExportStatus] = useState<ExportStatusState>({
     phase: 'idle',
     label: 'Ready',
@@ -387,6 +429,8 @@ function App() {
   const exportResetTimeoutRef = useRef<number | null>(null);
   const savePresetInputRef = useRef<HTMLInputElement | null>(null);
   const modeTransitionTimeoutRef = useRef<number | null>(null);
+  const storageErrorToastRef = useRef<string | null>(null);
+  const previousExportPhaseRef = useRef<ExportStatusState['phase']>('idle');
 
   const currentScene: SceneState = {
     animationType,
@@ -404,6 +448,40 @@ function App() {
     const timer = window.setTimeout(() => setToast(null), 2400);
     return () => window.clearTimeout(timer);
   }, [toast]);
+
+  useEffect(() => {
+    if (exportStatus.phase === 'complete' && previousExportPhaseRef.current !== 'complete') {
+      void confetti({
+        particleCount: 90,
+        spread: 70,
+        startVelocity: 28,
+        origin: { x: 0.85, y: 0.18 },
+        colors: ['#F2622F', '#FF9B5C', '#FFE3D2', '#FFFFFF'],
+      });
+    }
+
+    previousExportPhaseRef.current = exportStatus.phase;
+  }, [exportStatus.phase]);
+
+  useEffect(() => {
+    if (onboardingStep === null || onboardingStep === 0) return;
+
+    const step = ONBOARDING_STEPS[onboardingStep];
+    const target = document.getElementById(step.targetId);
+    const panel = document.getElementById('panel');
+    if (!target || !panel) return;
+
+    const targetRect = target.getBoundingClientRect();
+    const panelRect = panel.getBoundingClientRect();
+    const currentScroll = panel.scrollTop;
+    const targetOffset = targetRect.top - panelRect.top + currentScroll;
+    const desiredTop = Math.max(0, targetOffset - 120);
+
+    panel.scrollTo({
+      top: desiredTop,
+      behavior: 'smooth',
+    });
+  }, [onboardingStep]);
 
   useEffect(() => {
     if (!sharedSceneName) return;
@@ -441,12 +519,13 @@ function App() {
     const startedAt = performance.now();
 
     const animate = (now: number) => {
-      const progress = Math.min(1, (now - startedAt) / PALETTE_TRANSITION_MS);
-      const nextPalette = interpolatePalettes(startPalette, colors, progress);
+      const linearProgress = Math.min(1, (now - startedAt) / PALETTE_TRANSITION_MS);
+      const easedProgress = easeInOutCubic(linearProgress);
+      const nextPalette = interpolatePalettes(startPalette, colors, easedProgress);
       renderColorsRef.current = nextPalette;
       setRenderColors(nextPalette);
 
-      if (progress < 1) {
+      if (linearProgress < 1) {
         paletteTransitionFrameRef.current = requestAnimationFrame(animate);
       } else {
         renderColorsRef.current = colors;
@@ -538,49 +617,27 @@ function App() {
   };
 
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (isSavePresetOpen && e.key === 'Escape') {
-        e.preventDefault();
-        closeSavePresetDialog();
-        return;
-      }
-
-      const target = e.target as HTMLElement | null;
-      const isEditableTarget = !!target && (
-        target.tagName === 'INPUT'
-        || target.tagName === 'TEXTAREA'
-        || target.tagName === 'SELECT'
-        || target.isContentEditable
-      );
-
-      if (isEditableTarget) {
-        return;
-      }
-
-      if (e.key.toLowerCase() === 'h') setUiVisible(v => !v);
-      if (e.key.toLowerCase() === 'f') toggleFullscreen();
-      if (e.key === ' ') {
-        e.preventDefault();
-        setPaused(p => !p);
-      }
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isSavePresetOpen]);
-
-  useEffect(() => {
     try {
       localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(currentScene));
-    } catch {
-      // Ignore storage failures and keep the live session usable.
+    } catch (error) {
+      if (storageErrorToastRef.current !== 'session') {
+        storageErrorToastRef.current = 'session';
+        showToast('Storage unavailable', 'Session changes could not be saved locally.');
+      }
     }
   }, [animationType, params, colors]);
 
   useEffect(() => {
     try {
       localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(savedPresets));
+      if (storageErrorToastRef.current === 'presets') {
+        storageErrorToastRef.current = null;
+      }
     } catch {
-      // Ignore storage failures and keep the live session usable.
+      if (storageErrorToastRef.current !== 'presets') {
+        storageErrorToastRef.current = 'presets';
+        showToast('Preset save failed', 'Local storage is full or unavailable. Delete old presets and try again.');
+      }
     }
   }, [savedPresets]);
 
@@ -588,7 +645,10 @@ function App() {
     try {
       localStorage.setItem(RECENT_SCENES_STORAGE_KEY, JSON.stringify(recentScenes));
     } catch {
-      // Ignore storage failures and keep the live session usable.
+      if (storageErrorToastRef.current !== 'recent-scenes') {
+        storageErrorToastRef.current = 'recent-scenes';
+        showToast('Storage unavailable', 'Recent scenes could not be stored locally.');
+      }
     }
   }, [recentScenes]);
 
@@ -649,6 +709,35 @@ function App() {
       id: Date.now(),
       title,
       message,
+    });
+  };
+
+  const handleRendererBoundaryError = (status: RendererStatus) => {
+    setRendererStatus(status);
+    showToast(status.title, status.message);
+  };
+
+  const dismissOnboarding = () => {
+    setOnboardingStep(null);
+    try {
+      localStorage.setItem(ONBOARDING_STORAGE_KEY, 'true');
+    } catch {
+      // Ignore storage failures and keep onboarding dismissible for the session.
+    }
+  };
+
+  const advanceOnboarding = () => {
+    setOnboardingStep(current => {
+      if (current === null) return null;
+      if (current >= ONBOARDING_STEPS.length - 1) {
+        try {
+          localStorage.setItem(ONBOARDING_STORAGE_KEY, 'true');
+        } catch {
+          // Ignore storage failures and keep onboarding dismissible for the session.
+        }
+        return null;
+      }
+      return current + 1;
     });
   };
 
@@ -806,6 +895,8 @@ function App() {
         label: scale > 1 ? `Capturing ${scale}x PNG` : 'Capturing PNG',
         detail: 'Rendering the current frame.',
         progress: 62,
+        frameCount: 1,
+        frameTotal: 1,
       });
 
       const exportCanvas = (document.getElementById('c') as HTMLCanvasElement | null) ?? canvas;
@@ -974,11 +1065,14 @@ function App() {
       const updateProgress = (now: number) => {
         const elapsed = Math.min(durationSeconds * 1000, now - startedAt);
         const progress = 18 + Math.round((elapsed / (durationSeconds * 1000)) * 72);
+        const frameCount = Math.min(Math.round((elapsed / 1000) * 60), durationSeconds * 60);
         setExportStatus({
           phase: 'recording',
           label: loopSafe ? 'Recording loop-safe WebM' : 'Recording WebM',
           detail: `${Math.ceil((durationSeconds * 1000 - elapsed) / 1000)}s remaining`,
           progress,
+          frameCount,
+          frameTotal: durationSeconds * 60,
         });
 
         if (elapsed < durationSeconds * 1000) {
@@ -1101,14 +1195,92 @@ function App() {
     showToast('Scene randomized');
   };
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (isSavePresetOpen && e.key === 'Escape') {
+        e.preventDefault();
+        closeSavePresetDialog();
+        return;
+      }
+
+      if (isShortcutsOpen && e.key === 'Escape') {
+        e.preventDefault();
+        setIsShortcutsOpen(false);
+        return;
+      }
+
+      if (onboardingStep !== null && e.key === 'Escape') {
+        e.preventDefault();
+        dismissOnboarding();
+        return;
+      }
+
+      const target = e.target as HTMLElement | null;
+      const isEditableTarget = !!target && (
+        target.tagName === 'INPUT'
+        || target.tagName === 'TEXTAREA'
+        || target.tagName === 'SELECT'
+        || target.isContentEditable
+      );
+
+      if (isEditableTarget) {
+        return;
+      }
+
+      const modifierKey = e.ctrlKey || e.metaKey;
+      const lowerKey = e.key.toLowerCase();
+
+      if (e.key === '?' || (e.shiftKey && e.key === '/')) {
+        e.preventDefault();
+        setIsShortcutsOpen(open => !open);
+        return;
+      }
+
+      if (modifierKey && !e.shiftKey && lowerKey === 'z') {
+        e.preventDefault();
+        handleUndo();
+        return;
+      }
+
+      if (modifierKey && (lowerKey === 'y' || (e.shiftKey && lowerKey === 'z'))) {
+        e.preventDefault();
+        handleRedo();
+        return;
+      }
+
+      if (lowerKey === 'r') {
+        e.preventDefault();
+        handleRandomizeScene();
+        return;
+      }
+
+      if (lowerKey === 's') {
+        e.preventDefault();
+        handleSavePreset();
+        return;
+      }
+
+      if (lowerKey === 'h') setUiVisible(v => !v);
+      if (lowerKey === 'f') toggleFullscreen();
+      if (e.key === ' ') {
+        e.preventDefault();
+        setPaused(p => !p);
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isSavePresetOpen, isShortcutsOpen, onboardingStep, handleRedo, handleRandomizeScene, handleSavePreset, handleUndo]);
+
   return (
     <>
-      {animationType === 'liquid' && <LiquidCanvas params={params} colors={renderColors} paused={paused} onStatusChange={setRendererStatus} renderScale={renderScale} externalTime={externalRenderTime} />}
-      {animationType === 'waves' && <WavesCanvas params={params} colors={renderColors} paused={paused} onStatusChange={setRendererStatus} renderScale={renderScale} externalTime={externalRenderTime} />}
-      {animationType === 'voronoi' && <VoronoiCanvas params={params} colors={renderColors} paused={paused} onStatusChange={setRendererStatus} renderScale={renderScale} externalTime={externalRenderTime} />}
-      {animationType === 'turing' && <TuringCanvas params={params} colors={renderColors} paused={paused} onStatusChange={setRendererStatus} renderScale={renderScale} />}
-      {animationType === 'particles' && <ParticlesCanvas params={params} colors={renderColors} paused={paused} onStatusChange={setRendererStatus} renderScale={renderScale} />}
-      {animationType === 'blobs' && <BlobsCanvas params={params} colors={renderColors} paused={paused} onStatusChange={setRendererStatus} renderScale={renderScale} externalTime={externalRenderTime} />}
+      <RendererBoundary resetKey={animationType} onError={handleRendererBoundaryError}>
+        {animationType === 'liquid' && <LiquidCanvas params={params} colors={renderColors} paused={paused} onStatusChange={setRendererStatus} renderScale={renderScale} externalTime={externalRenderTime} />}
+        {animationType === 'waves' && <WavesCanvas params={params} colors={renderColors} paused={paused} onStatusChange={setRendererStatus} renderScale={renderScale} externalTime={externalRenderTime} />}
+        {animationType === 'voronoi' && <VoronoiCanvas params={params} colors={renderColors} paused={paused} onStatusChange={setRendererStatus} renderScale={renderScale} externalTime={externalRenderTime} />}
+        {animationType === 'turing' && <TuringCanvas params={params} colors={renderColors} paused={paused} onStatusChange={setRendererStatus} renderScale={renderScale} />}
+        {animationType === 'particles' && <ParticlesCanvas params={params} colors={renderColors} paused={paused} onStatusChange={setRendererStatus} renderScale={renderScale} />}
+        {animationType === 'blobs' && <BlobsCanvas params={params} colors={renderColors} paused={paused} onStatusChange={setRendererStatus} renderScale={renderScale} externalTime={externalRenderTime} />}
+      </RendererBoundary>
 
       {modeTransition && (
         <div
@@ -1120,9 +1292,18 @@ function App() {
       )}
 
       {rendererStatus && (
-        <div className="renderer-status" role="status" aria-live="polite">
-          <strong>{rendererStatus.title}</strong>
+        <div className="renderer-fallback" role="dialog" aria-modal="false" aria-labelledby="renderer-fallback-title">
+          <span className="section-label">Renderer Status</span>
+          <strong id="renderer-fallback-title">{rendererStatus.title}</strong>
           <p>{rendererStatus.message}</p>
+          <div className="renderer-fallback-actions">
+            <a className="workspace-btn renderer-fallback-link" href={WEBGL_COMPATIBILITY_URL} target="_blank" rel="noreferrer">
+              Compatibility
+            </a>
+            <button type="button" className="workspace-btn" onClick={() => startModeTransition('particles')}>
+              Use Particles
+            </button>
+          </div>
         </div>
       )}
 
@@ -1177,6 +1358,39 @@ function App() {
         </div>
       )}
 
+      {isShortcutsOpen && (
+        <div className="dialog-overlay" role="presentation" onClick={() => setIsShortcutsOpen(false)}>
+          <div
+            className="dialog-card shortcuts-card"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="shortcuts-title"
+            onClick={event => event.stopPropagation()}
+          >
+            <div className="dialog-header">
+              <span className="section-label">Shortcuts</span>
+              <button className="dialog-close" onClick={() => setIsShortcutsOpen(false)} aria-label="Close shortcuts dialog">
+                +
+              </button>
+            </div>
+            <div className="dialog-copy">
+              <strong id="shortcuts-title">Keyboard Shortcuts</strong>
+              <p>Shortcuts only run when a text field or search input is not focused.</p>
+            </div>
+            <div className="shortcuts-list">
+              <div className="shortcut-row"><kbd>?</kbd><span>Open or close this shortcuts panel</span></div>
+              <div className="shortcut-row"><kbd>Space</kbd><span>Pause or resume animation</span></div>
+              <div className="shortcut-row"><kbd>H</kbd><span>Hide or show the panel</span></div>
+              <div className="shortcut-row"><kbd>F</kbd><span>Toggle fullscreen</span></div>
+              <div className="shortcut-row"><kbd>R</kbd><span>Randomize the current scene</span></div>
+              <div className="shortcut-row"><kbd>S</kbd><span>Save the current scene as a preset</span></div>
+              <div className="shortcut-row"><kbd>Ctrl/⌘ + Z</kbd><span>Undo the last scene change</span></div>
+              <div className="shortcut-row"><kbd>Ctrl/⌘ + Y</kbd><span>Redo the next scene change</span></div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div id="panel" className={uiVisible ? '' : 'hidden'}>
         <div className="panel-header">
           <span className="panel-title">{APP_TITLE}</span>
@@ -1222,6 +1436,11 @@ function App() {
           randomizeScene={handleRandomizeScene}
           workflowLocks={workflowLocks}
           toggleWorkflowLock={toggleWorkflowLock}
+          onboardingStep={onboardingStep}
+          onboardingSteps={ONBOARDING_STEPS}
+          dismissOnboarding={dismissOnboarding}
+          advanceOnboarding={advanceOnboarding}
+          openShortcuts={() => setIsShortcutsOpen(true)}
         />
       </div>
 

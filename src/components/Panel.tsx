@@ -50,6 +50,8 @@ interface PanelProps {
     label: string;
     detail?: string;
     progress: number;
+    frameCount?: number;
+    frameTotal?: number;
   };
   canLoopSafeExport: boolean;
   loopSafeDurationSeconds: number;
@@ -68,6 +70,16 @@ interface PanelProps {
   randomizeScene: () => void;
   workflowLocks: WorkflowLocks;
   toggleWorkflowLock: (key: keyof WorkflowLocks) => void;
+  onboardingStep: number | null;
+  onboardingSteps: Array<{
+    targetId: string;
+    eyebrow: string;
+    title: string;
+    message: string;
+  }>;
+  dismissOnboarding: () => void;
+  advanceOnboarding: () => void;
+  openShortcuts: () => void;
 }
 
 const hexToRgb = (hex: string): ColorRgb => {
@@ -260,7 +272,12 @@ export default function Panel({
   randomizeParams,
   randomizeScene,
   workflowLocks,
-  toggleWorkflowLock
+  toggleWorkflowLock,
+  onboardingStep,
+  onboardingSteps,
+  dismissOnboarding,
+  advanceOnboarding,
+  openShortcuts
 }: PanelProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [workflowExpanded, setWorkflowExpanded] = useState(false);
@@ -340,9 +357,36 @@ export default function Panel({
     </div>
   );
 
+  const renderOnboardingCard = (stepIndex: number) => {
+    if (onboardingStep !== stepIndex) return null;
+    const step = onboardingSteps[stepIndex];
+
+    return (
+      <div className="onboarding-inline" role="dialog" aria-modal="true" aria-labelledby={`onboarding-title-${stepIndex}`}>
+        <span className="section-label">{step.eyebrow}</span>
+        <strong id={`onboarding-title-${stepIndex}`}>{step.title}</strong>
+        <p>{step.message}</p>
+        <div className="onboarding-progress" aria-hidden="true">
+          {onboardingSteps.map((_, index) => (
+            <span key={index} className={`onboarding-dot ${index === stepIndex ? 'active' : ''}`} />
+          ))}
+        </div>
+        <div className="onboarding-actions">
+          <button type="button" className="workspace-btn" onClick={dismissOnboarding}>
+            Skip
+          </button>
+          <button type="button" className="workspace-btn" onClick={advanceOnboarding}>
+            {stepIndex === onboardingSteps.length - 1 ? 'Finish' : 'Next'}
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <>
-      <div className="panel-section">
+      {renderOnboardingCard(0)}
+      <div className={`panel-section ${onboardingStep === 0 ? 'onboarding-target' : ''}`}>
         <div className="section-heading">
           <span className="section-label">Workflow</span>
           <button
@@ -397,7 +441,8 @@ export default function Panel({
         </div>
       </div>
 
-      <div className="panel-section">
+      <div id="onboarding-mode-section" className={`panel-section ${onboardingStep === 1 ? 'onboarding-target' : ''}`}>
+        {renderOnboardingCard(1)}
         <span className="section-label">Mode</span>
         <div className="mode-card">
           <div className="mode-switcher">
@@ -496,7 +541,8 @@ export default function Panel({
         </div>
       )}
 
-      <div className="workspace-section panel-section">
+      <div id="onboarding-workspace-section" className={`workspace-section panel-section ${onboardingStep === 2 ? 'onboarding-target' : ''}`}>
+        {renderOnboardingCard(2)}
         <div className="section-heading">
           <span className="section-label">Workspace</span>
           <button
@@ -546,11 +592,37 @@ export default function Panel({
         )}
         {exportStatus.phase !== 'idle' && (
           <div className={`export-status export-status-${exportStatus.phase}`}>
-            <div className="export-status-header">
-              <strong>{exportStatus.label}</strong>
-              <span>{exportStatus.progress}%</span>
+            <div className="export-status-shell">
+              <div className="export-progress-arc" aria-hidden="true">
+                <svg viewBox="0 0 48 48" className="export-progress-arc-svg">
+                  <circle className="export-progress-arc-track" cx="24" cy="24" r="18" />
+                  <circle
+                    className="export-progress-arc-fill"
+                    cx="24"
+                    cy="24"
+                    r="18"
+                    pathLength="100"
+                    style={{ strokeDashoffset: `${100 - exportStatus.progress}` }}
+                  />
+                </svg>
+                <span>{exportStatus.progress}%</span>
+              </div>
+              <div className="export-status-main">
+                <div className="export-status-header">
+                  <strong>{exportStatus.label}</strong>
+                </div>
+                {exportStatus.detail && <p>{exportStatus.detail}</p>}
+                {typeof exportStatus.frameCount === 'number' && typeof exportStatus.frameTotal === 'number' && (
+                  <div className="export-frame-counter">
+                    <span>Frames</span>
+                    <strong>
+                      {exportStatus.frameCount}
+                      <small> / {exportStatus.frameTotal}</small>
+                    </strong>
+                  </div>
+                )}
+              </div>
             </div>
-            {exportStatus.detail && <p>{exportStatus.detail}</p>}
             <div className="export-progress-track">
               <span className="export-progress-bar" style={{ width: `${exportStatus.progress}%` }} />
             </div>
@@ -683,6 +755,9 @@ export default function Panel({
         <button className="ctrl-btn" onClick={hideUI} title="Hide UI (H)">
           <EyeSlash size={14} weight="bold" />
           HIDE
+        </button>
+        <button className="ctrl-btn" onClick={openShortcuts} title="Shortcuts (?)" aria-label="Open keyboard shortcuts">
+          ?
         </button>
       </div>
     </>
