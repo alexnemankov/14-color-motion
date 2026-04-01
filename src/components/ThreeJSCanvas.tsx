@@ -260,7 +260,7 @@ const ThreeJSCanvas = forwardRef<RendererHandle, RendererProps>(
       const ambient = new THREE.AmbientLight(0x888888);
       scene.add(ambient);
 
-      const geometry = new THREE.PlaneGeometry(80, 80, 320, 320);
+      const geometry = new THREE.PlaneGeometry(80, 80, 640, 640);
 
       const shaderMaterial = new THREE.ShaderMaterial({
         vertexShader: `

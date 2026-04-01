@@ -859,9 +859,13 @@ export default function Panel({
               <span className="slider" />
             </label>
           </div>
-          {renderParamRow("focusDistance", 10, 80, 1, !params.dofEnabled)}
-          {renderParamRow("aperture", 0.001, 0.06, 0.001, !params.dofEnabled)}
-          {renderParamRow("maxBlur", 0.01, 0.35, 0.01, !params.dofEnabled)}
+          {params.dofEnabled && (
+            <>
+              {renderParamRow("focusDistance", 10, 80, 1)}
+              {renderParamRow("aperture", 0.001, 0.06, 0.001)}
+              {renderParamRow("maxBlur", 0.01, 0.35, 0.01)}
+            </>
+          )}
         </div>
       )}
 
