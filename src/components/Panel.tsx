@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowCounterClockwise,
   Atom,
@@ -21,6 +21,7 @@ import {
   Trash,
   Waves
 } from '@phosphor-icons/react';
+import { HexColorPicker } from 'react-colorful';
 import { AnimationType, ColorRgb, GradientParams, RecentScene, SavedPreset, WorkflowLocks } from '../App';
 import PaletteModal from './PaletteModal';
 
@@ -140,22 +141,37 @@ const ColorRow = ({
   showRemove: boolean;
 }) => {
   const [localHex, setLocalHex] = useState(`#${rgbToHex(rgb[0], rgb[1], rgb[2])}`);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const rowRef = useRef<HTMLDivElement | null>(null);
   const fullHexStr = `#${rgbToHex(rgb[0], rgb[1], rgb[2])}`;
 
   useEffect(() => {
     setLocalHex(`#${rgbToHex(rgb[0], rgb[1], rgb[2])}`);
   }, [rgb]);
 
+  useEffect(() => {
+    if (!pickerOpen) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!rowRef.current?.contains(event.target as Node)) {
+        setPickerOpen(false);
+      }
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => document.removeEventListener('pointerdown', handlePointerDown);
+  }, [pickerOpen]);
+
   return (
-    <div className="color-row">
-      <div className="color-swatch" style={{ background: fullHexStr }}>
-        <input
-          type="color"
-          value={fullHexStr}
-          onChange={e => update(e.target.value)}
-          className="color-picker"
-        />
-      </div>
+    <div ref={rowRef} className={`color-row ${pickerOpen ? 'open' : ''}`}>
+      <button
+        type="button"
+        className="color-swatch"
+        style={{ background: fullHexStr }}
+        onClick={() => setPickerOpen(open => !open)}
+        aria-label={`Open color picker for ${fullHexStr}`}
+        aria-expanded={pickerOpen}
+      />
       <input
         className="color-hex"
         type="text"
@@ -174,6 +190,17 @@ const ColorRow = ({
         <button className="btn-remove" onClick={remove} title="Remove Color">
           <Trash size={14} weight="bold" />
         </button>
+      )}
+      {pickerOpen && (
+        <div className="color-popover">
+          <HexColorPicker color={fullHexStr} onChange={update} />
+          <div className="color-popover-footer">
+            <span>Pick a color</span>
+            <button type="button" className="color-popover-close" onClick={() => setPickerOpen(false)}>
+              Done
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );
