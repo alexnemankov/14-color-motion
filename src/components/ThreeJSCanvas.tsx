@@ -74,10 +74,28 @@ const GaussianDofShader = {
 
 void GaussianDofShader;
 
-const DEFAULT_FOCUS_DISTANCE = 32;
-const BOKEH_APERTURE_SCALE = 0.002;
-const BOKEH_MAX_BLUR_SCALE = 0.045;
-const FOCUS_OFFSET_SCALE = 0.35;
+const MIN_UI_FOCUS_DISTANCE = 10;
+const MAX_UI_FOCUS_DISTANCE = 80;
+const MIN_UI_APERTURE = 0.001;
+const MAX_UI_APERTURE = 0.06;
+const MIN_UI_MAX_BLUR = 0.01;
+const MAX_UI_MAX_BLUR = 0.35;
+
+function mapRange(
+  value: number,
+  inMin: number,
+  inMax: number,
+  outMin: number,
+  outMax: number,
+) {
+  return THREE.MathUtils.mapLinear(
+    THREE.MathUtils.clamp(value, inMin, inMax),
+    inMin,
+    inMax,
+    outMin,
+    outMax,
+  );
+}
 
 function syncDofPass(
   dofPass: BokehPass,
@@ -92,15 +110,19 @@ function syncDofPass(
     camera.near + 0.001,
     camera.far - 1,
   );
-  uniforms.aperture.value = THREE.MathUtils.clamp(
-    params.aperture * BOKEH_APERTURE_SCALE,
-    0.000001,
-    0.00015,
+  uniforms.aperture.value = mapRange(
+    params.aperture,
+    MIN_UI_APERTURE,
+    MAX_UI_APERTURE,
+    0.00002,
+    0.00035,
   );
-  uniforms.maxblur.value = THREE.MathUtils.clamp(
-    params.maxBlur * BOKEH_MAX_BLUR_SCALE,
-    0.0005,
-    0.02,
+  uniforms.maxblur.value = mapRange(
+    params.maxBlur,
+    MIN_UI_MAX_BLUR,
+    MAX_UI_MAX_BLUR,
+    0.002,
+    0.03,
   );
   uniforms.nearClip.value = camera.near;
   uniforms.farClip.value = camera.far;
@@ -566,9 +588,13 @@ const ThreeJSCanvas = forwardRef<RendererHandle, RendererProps>(
         if (cameraRef.current && dofPassRef.current) {
           const focusBaseDistance =
             cameraRef.current.position.distanceTo(focusPoint);
-          const focusOffset =
-            (displayParams.focusDistance - DEFAULT_FOCUS_DISTANCE) *
-            FOCUS_OFFSET_SCALE;
+          const focusOffset = mapRange(
+            displayParams.focusDistance,
+            MIN_UI_FOCUS_DISTANCE,
+            MAX_UI_FOCUS_DISTANCE,
+            -12,
+            18,
+          );
           syncDofPass(
             dofPassRef.current,
             cameraRef.current,
