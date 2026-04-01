@@ -506,14 +506,29 @@ export default function Panel({
           ))}
         </div>
 
-        <div className="add-color-row">
-          <button className="add-color-btn" onClick={() => {
+        <div
+          className="add-color-row"
+          role="button"
+          tabIndex={0}
+          onClick={() => {
             if (colors.length < 8) {
               setColors(prev => [...prev, [Math.random() * 255 | 0, Math.random() * 255 | 0, Math.random() * 255 | 0] as ColorRgb]);
             }
-          }} title="Add Color" aria-label="Add color">
-            <Plus size={16} weight="bold" />
-          </button>
+          }}
+          onKeyDown={e => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              if (colors.length < 8) {
+                setColors(prev => [...prev, [Math.random() * 255 | 0, Math.random() * 255 | 0, Math.random() * 255 | 0] as ColorRgb]);
+              }
+            }
+          }}
+          title="Add Color"
+          aria-label="Add color"
+        >
+          <div className="add-color-btn">
+            <Plus size={11} weight="bold" />
+          </div>
           <span className="add-color-label">Add color...</span>
         </div>
       </div>
