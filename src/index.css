@@ -133,6 +133,13 @@ canvas {
   gap: 12px;
 }
 
+.section-heading-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
 .section-heading-stack {
   align-items: flex-start;
   flex-direction: column;
@@ -228,18 +235,20 @@ canvas {
 }
 
 .section-toggle {
-  min-height: 26px;
-  padding: 0 8px;
+  min-height: 30px;
+  min-width: 92px;
+  padding: 0 10px;
   border: 1px solid var(--panel-border);
   background: rgba(255,255,255,0.025);
   color: var(--text-dim);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 5px;
   font-family: var(--font-mono);
-  font-size: 9px;
-  letter-spacing: 0.1em;
+  font-size: 10px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   transition: var(--transition);
   border-radius: var(--radius-sm);
@@ -1182,10 +1191,10 @@ canvas {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 5px;
-  padding-top: 14px;
+  padding-top: 18px;
   border-top: 1px solid var(--panel-border);
   flex-shrink: 0;
-  margin-top: auto;
+  margin-top: 6px;
 }
 
 .ctrl-btn {
@@ -1193,8 +1202,9 @@ canvas {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  padding: 8px 4px;
+  gap: 5px;
+  min-height: 50px;
+  padding: 10px 4px 8px;
   background: rgba(255,255,255,0.02);
   border: 1px solid var(--panel-border);
   color: var(--text-dim);
@@ -1210,6 +1220,7 @@ canvas {
 
 .ctrl-btn svg {
   flex-shrink: 0;
+  opacity: 0.9;
 }
 
 .ctrl-btn:hover {
@@ -1954,11 +1965,6 @@ kbd {
 .palette-card:focus-visible .card-name {
   color: var(--text);
 }
-.palette-card-shell.active .card-name::before {
-  content: "> ";
-  color: var(--accent);
-}
-
 .card-dots {
   display: flex;
   align-items: center;
@@ -2035,22 +2041,28 @@ kbd {
 
 /* EMPTY STATE */
 .no-results-state {
+  min-height: 240px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 14px;
   text-align: left;
-  padding-top: 40px;
+  padding: 16px 0 8px;
 }
 .no-results-state h3 {
   font-family: var(--font-display);
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 600;
   text-transform: uppercase;
   color: var(--text);
-  margin-bottom: 16px;
+  margin-bottom: 0;
 }
 .no-results-state p {
   color: var(--text-dim);
   font-family: var(--font-mono);
   font-size: 12px;
-  max-width: 400px;
+  max-width: 320px;
   line-height: 1.6;
 }
 

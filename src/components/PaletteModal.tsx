@@ -157,6 +157,10 @@ export default function PaletteModal({ isOpen, onClose, onSelect }: PaletteModal
     return PALETTES.find((p: PaletteDescriptor) => p.name === activePaletteName);
   }, [activePaletteName]);
 
+  const activePaletteInResults = useMemo(() => {
+    return filteredPalettes.some(palette => palette.name === activePaletteName);
+  }, [activePaletteName, filteredPalettes]);
+
   const favoritePalettes = useMemo(() => {
     return favorites
       .map(name => PALETTES.find(palette => palette.name === name))
@@ -297,7 +301,9 @@ export default function PaletteModal({ isOpen, onClose, onSelect }: PaletteModal
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.18 }}
                 >
-                  <span className="results-label">Selected palette</span>
+                  <span className="results-label">
+                    {searchQuery || activeCategory !== 'All' ? 'Current scene palette' : 'Selected palette'}
+                  </span>
                   <div
                     className="active-palette-row"
                     style={getGradientStyle(activePalette.colors)}
@@ -305,7 +311,10 @@ export default function PaletteModal({ isOpen, onClose, onSelect }: PaletteModal
                     <div className="active-info">
                       <div className="active-copy">
                         <span className="active-name">{activePalette.name}</span>
-                        <span className="active-meta">{activePalette.colors.length} colors</span>
+                        <span className="active-meta">
+                          {activePalette.colors.length} colors
+                          {!activePaletteInResults && (searchQuery || activeCategory !== 'All') ? ' • outside current results' : ''}
+                        </span>
                       </div>
                       <div className="active-dots">
                         {activePalette.colors.map((color, index) => (

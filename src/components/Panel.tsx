@@ -15,6 +15,7 @@ import {
   Palette,
   PlayPause,
   Plus,
+  Question,
   ShareNetwork,
   Shuffle,
   Trash,
@@ -658,7 +659,12 @@ export default function Panel({
 
       <div className="panel-section panel-section-secondary">
         <div className="section-heading">
-          <span className="section-label">Library</span>
+          <div className="section-heading-inline">
+            <span className="section-label">Library</span>
+            {savedPresets.length > 0 && (
+              <span className="section-count">{filteredSavedPresets.length} shown</span>
+            )}
+          </div>
           <button
             className={`section-toggle ${savedExpanded ? 'active' : ''}`}
             onClick={() => setSavedExpanded(expanded => !expanded)}
@@ -735,7 +741,12 @@ export default function Panel({
 
       <div className="panel-section panel-section-secondary">
         <div className="section-heading">
-          <span className="section-label">History</span>
+          <div className="section-heading-inline">
+            <span className="section-label">History</span>
+            {recentScenes.length > 0 && (
+              <span className="section-count">{Math.min(recentScenes.length, 4)} recent</span>
+            )}
+          </div>
           <button
             className={`section-toggle ${recentExpanded ? 'active' : ''}`}
             onClick={() => setRecentExpanded(expanded => !expanded)}
@@ -815,7 +826,8 @@ export default function Panel({
           HIDE
         </button>
         <button className="ctrl-btn" onClick={openShortcuts} title="Shortcuts (?)" aria-label="Open keyboard shortcuts">
-          ?
+          <Question size={14} weight="bold" />
+          Help
         </button>
       </div>
     </>
