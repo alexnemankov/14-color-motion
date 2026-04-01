@@ -122,7 +122,7 @@ const DEFAULT_PARAMS: GradientParams = {
   focusDistance: 32,
   aperture: 0.0125,
   maxBlur: 0.35,
-  dofEnabled: true,
+  dofEnabled: false,
 };
 
 const SESSION_STORAGE_KEY = "color-motion-session";
