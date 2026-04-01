@@ -265,7 +265,6 @@ const ThreeJSCanvas = forwardRef<RendererHandle, RendererProps>(
       const shaderMaterial = new THREE.ShaderMaterial({
         vertexShader: `
         varying vec2 vUv;
-        varying float vHeight;
         uniform float uTime;
         uniform float uScale;
         uniform float uAmplitude;
@@ -288,33 +287,75 @@ const ThreeJSCanvas = forwardRef<RendererHandle, RendererProps>(
           return mix(nx, ny, f.y);
         }
 
+        float computeHeight(vec2 planePos, float time, float scale, float amplitude, float frequency, float seed) {
+          float wave1 = sin((planePos.x * scale + time) * frequency) * 0.6;
+          float wave2 = cos((planePos.y * scale + time * 0.7) * frequency * 0.8) * 0.6;
+          float wave3 = sin((planePos.x * 0.3 + planePos.y * 0.3 + time * 0.5) * frequency * 1.2) * 0.4;
+          float noiseVal = smoothNoise(vec3(
+            planePos.x * scale * 0.5 + time * 0.4,
+            planePos.y * scale * 0.5 + time * 0.4,
+            seed
+          )) * 0.6;
+
+          return (wave1 + wave2 + wave3 + noiseVal * 0.5) * amplitude * 1.8;
+        }
+
         void main() {
           vUv = uv;
           vec3 pos = position;
           float t = uTime * 0.12;
           float seed = uSeed * 0.001;
-
-          // Strong wave patterns
-          float wave1 = sin((pos.x * uScale + t) * uFrequency) * 0.6;
-          float wave2 = cos((pos.y * uScale + t * 0.7) * uFrequency * 0.8) * 0.6;
-          float wave3 = sin((pos.x * 0.3 + pos.y * 0.3 + t * 0.5) * uFrequency * 1.2) * 0.4;
-          
-          // Organic noise overlay
-          float noiseVal = smoothNoise(vec3(pos.x * uScale * 0.5 + t * 0.4, pos.y * uScale * 0.5 + t * 0.4, seed)) * 0.6;
-
-          float totalDisplacement = (wave1 + wave2 + wave3 + noiseVal * 0.5) * uAmplitude * 1.8;
-          pos.z += totalDisplacement;
-          vHeight = pos.z;
+          pos.z += computeHeight(
+            pos.xy,
+            t,
+            uScale,
+            uAmplitude,
+            uFrequency,
+            seed
+          );
 
           gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
         }
       `,
         fragmentShader: `
         varying vec2 vUv;
-        varying float vHeight;
         uniform vec3 uColors[8];
         uniform int uColorCount;
         uniform float uBlend;
+        uniform float uTime;
+        uniform float uScale;
+        uniform float uAmplitude;
+        uniform float uFrequency;
+        uniform float uSeed;
+
+        float smoothNoise(vec3 p) {
+          vec3 i = floor(p);
+          vec3 f = fract(p);
+          f = f * f * (3.0 - 2.0 * f);
+
+          float n0 = fract(sin(dot(i, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+          float n1 = fract(sin(dot(i + vec3(1.0, 0.0, 0.0), vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+          float nx = mix(n0, n1, f.x);
+
+          float n2 = fract(sin(dot(i + vec3(0.0, 1.0, 0.0), vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+          float n3 = fract(sin(dot(i + vec3(1.0, 1.0, 0.0), vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+          float ny = mix(n2, n3, f.x);
+
+          return mix(nx, ny, f.y);
+        }
+
+        float computeHeight(vec2 planePos, float time, float scale, float amplitude, float frequency, float seed) {
+          float wave1 = sin((planePos.x * scale + time) * frequency) * 0.6;
+          float wave2 = cos((planePos.y * scale + time * 0.7) * frequency * 0.8) * 0.6;
+          float wave3 = sin((planePos.x * 0.3 + planePos.y * 0.3 + time * 0.5) * frequency * 1.2) * 0.4;
+          float noiseVal = smoothNoise(vec3(
+            planePos.x * scale * 0.5 + time * 0.4,
+            planePos.y * scale * 0.5 + time * 0.4,
+            seed
+          )) * 0.6;
+
+          return (wave1 + wave2 + wave3 + noiseVal * 0.5) * amplitude * 1.8;
+        }
 
         vec3 paletteColor(float t) {
           t = clamp(t, 0.0, 1.0);
@@ -335,7 +376,18 @@ const ThreeJSCanvas = forwardRef<RendererHandle, RendererProps>(
         }
 
         void main() {
-          float h = (vHeight + 3.2) / 6.4;
+          vec2 planePos = (vUv - 0.5) * 80.0;
+          float t = uTime * 0.12;
+          float seed = uSeed * 0.001;
+          float height = computeHeight(
+            planePos,
+            t,
+            uScale,
+            uAmplitude,
+            uFrequency,
+            seed
+          );
+          float h = (height + 3.2) / 6.4;
           vec3 col = paletteColor(h);
           float glow = 1.0 - length(vUv - 0.5) * 0.8;
           col *= mix(0.6, 1.0, glow);
