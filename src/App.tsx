@@ -34,6 +34,8 @@ export interface GradientParams {
   frequency: number;
   definition: number;
   blend: number;
+  morphSpeed: number;
+  morphAmount: number;
   focusDistance: number;
   aperture: number;
   maxBlur: number;
@@ -115,6 +117,8 @@ const DEFAULT_PARAMS: GradientParams = {
   frequency: 1.19,
   definition: 2,
   blend: 1.0,
+  morphSpeed: 0.2,
+  morphAmount: 0.35,
   focusDistance: 32,
   aperture: 0.0125,
   maxBlur: 0.35,
@@ -217,6 +221,8 @@ function randomParams(
     frequency: locks.motion ? base.frequency : randomBetween(0.3, 2.6),
     definition: locks.motion ? base.definition : randomInt(1, 8),
     blend: locks.motion ? base.blend : randomBetween(0.15, 1, 2),
+    morphSpeed: locks.motion ? base.morphSpeed : randomBetween(0.05, 1.2),
+    morphAmount: locks.motion ? base.morphAmount : randomBetween(0, 1.2),
     focusDistance: locks.motion ? base.focusDistance : randomBetween(20, 60),
     aperture: locks.motion ? base.aperture : randomBetween(0.005, 0.04),
     maxBlur: locks.motion ? base.maxBlur : randomBetween(0.1, 0.45),
@@ -324,6 +330,8 @@ function serializeShareScene(scene: SceneState, name?: string | null) {
       toShareNumber(scene.params.frequency),
       scene.params.definition,
       toShareNumber(scene.params.blend),
+      toShareNumber(scene.params.morphSpeed),
+      toShareNumber(scene.params.morphAmount),
       toShareNumber(scene.params.focusDistance),
       toShareNumber(scene.params.aperture),
       toShareNumber(scene.params.maxBlur),
@@ -373,13 +381,15 @@ function parseCompactSharedScene(
         frequency: decoded.p[4],
         definition: decoded.p[5],
         blend: decoded.p[6],
-        focusDistance: decoded.p[7] ?? DEFAULT_PARAMS.focusDistance,
-        aperture: decoded.p[8] ?? DEFAULT_PARAMS.aperture,
-        maxBlur: decoded.p[9] ?? DEFAULT_PARAMS.maxBlur,
+        morphSpeed: decoded.p[7] ?? DEFAULT_PARAMS.morphSpeed,
+        morphAmount: decoded.p[8] ?? DEFAULT_PARAMS.morphAmount,
+        focusDistance: decoded.p[9] ?? DEFAULT_PARAMS.focusDistance,
+        aperture: decoded.p[10] ?? DEFAULT_PARAMS.aperture,
+        maxBlur: decoded.p[11] ?? DEFAULT_PARAMS.maxBlur,
         dofEnabled:
-          decoded.p[10] === 0
+          decoded.p[12] === 0
             ? false
-            : decoded.p[10] === 1
+            : decoded.p[12] === 1
               ? true
               : DEFAULT_PARAMS.dofEnabled,
       },
@@ -472,6 +482,14 @@ function normalizeSceneState(value: unknown): SceneState | null {
         : DEFAULT_PARAMS.definition,
     blend:
       typeof params.blend === "number" ? params.blend : DEFAULT_PARAMS.blend,
+    morphSpeed:
+      typeof params.morphSpeed === "number"
+        ? params.morphSpeed
+        : DEFAULT_PARAMS.morphSpeed,
+    morphAmount:
+      typeof params.morphAmount === "number"
+        ? params.morphAmount
+        : DEFAULT_PARAMS.morphAmount,
     focusDistance:
       typeof params.focusDistance === "number"
         ? params.focusDistance

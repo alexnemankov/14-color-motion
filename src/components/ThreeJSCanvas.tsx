@@ -270,24 +270,47 @@ const ThreeJSCanvas = forwardRef<RendererHandle, RendererProps>(
         uniform float uAmplitude;
         uniform float uFrequency;
         uniform float uSeed;
+        uniform float uMorphSpeed;
+        uniform float uMorphAmount;
+
+        float hashNoise(vec3 p) {
+          return fract(sin(dot(p, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+        }
 
         float smoothNoise(vec3 p) {
           vec3 i = floor(p);
           vec3 f = fract(p);
           f = f * f * (3.0 - 2.0 * f);
-          
-          float n0 = fract(sin(dot(i, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
-          float n1 = fract(sin(dot(i + vec3(1.0, 0.0, 0.0), vec3(12.9898, 78.233, 37.719))) * 43758.5453);
-          float nx = mix(n0, n1, f.x);
-          
-          float n2 = fract(sin(dot(i + vec3(0.0, 1.0, 0.0), vec3(12.9898, 78.233, 37.719))) * 43758.5453);
-          float n3 = fract(sin(dot(i + vec3(1.0, 1.0, 0.0), vec3(12.9898, 78.233, 37.719))) * 43758.5453);
-          float ny = mix(n2, n3, f.x);
-          
-          return mix(nx, ny, f.y);
+
+          float n000 = hashNoise(i + vec3(0.0, 0.0, 0.0));
+          float n100 = hashNoise(i + vec3(1.0, 0.0, 0.0));
+          float n010 = hashNoise(i + vec3(0.0, 1.0, 0.0));
+          float n110 = hashNoise(i + vec3(1.0, 1.0, 0.0));
+          float n001 = hashNoise(i + vec3(0.0, 0.0, 1.0));
+          float n101 = hashNoise(i + vec3(1.0, 0.0, 1.0));
+          float n011 = hashNoise(i + vec3(0.0, 1.0, 1.0));
+          float n111 = hashNoise(i + vec3(1.0, 1.0, 1.0));
+
+          float nx00 = mix(n000, n100, f.x);
+          float nx10 = mix(n010, n110, f.x);
+          float nx01 = mix(n001, n101, f.x);
+          float nx11 = mix(n011, n111, f.x);
+          float nxy0 = mix(nx00, nx10, f.y);
+          float nxy1 = mix(nx01, nx11, f.y);
+
+          return mix(nxy0, nxy1, f.z);
         }
 
-        float computeHeight(vec2 planePos, float time, float scale, float amplitude, float frequency, float seed) {
+        float computeHeight(
+          vec2 planePos,
+          float time,
+          float scale,
+          float amplitude,
+          float frequency,
+          float seed,
+          float morphSpeed,
+          float morphAmount
+        ) {
           float wave1 = sin((planePos.x * scale + time) * frequency) * 0.6;
           float wave2 = cos((planePos.y * scale + time * 0.7) * frequency * 0.8) * 0.6;
           float wave3 = sin((planePos.x * 0.3 + planePos.y * 0.3 + time * 0.5) * frequency * 1.2) * 0.4;
@@ -296,8 +319,22 @@ const ThreeJSCanvas = forwardRef<RendererHandle, RendererProps>(
             planePos.y * scale * 0.5 + time * 0.4,
             seed
           )) * 0.6;
+          float driftNoise = smoothNoise(vec3(
+            planePos.x * scale * 0.18 + seed * 4.13,
+            planePos.y * scale * 0.18 - seed * 2.71,
+            time * morphSpeed * 0.22 + seed * 1.37
+          ));
+          float driftWave = sin(
+            planePos.x * 0.08 +
+            planePos.y * 0.05 +
+            time * morphSpeed * 0.6 +
+            seed * 2.1
+          ) * 0.5;
+          float driftHeight =
+            ((driftNoise - 0.5) * 2.0 + driftWave) * morphAmount * amplitude * 1.2;
 
-          return (wave1 + wave2 + wave3 + noiseVal * 0.5) * amplitude * 1.8;
+          return (wave1 + wave2 + wave3 + noiseVal * 0.5) * amplitude * 1.8 +
+            driftHeight;
         }
 
         void main() {
@@ -311,7 +348,9 @@ const ThreeJSCanvas = forwardRef<RendererHandle, RendererProps>(
             uScale,
             uAmplitude,
             uFrequency,
-            seed
+            seed,
+            uMorphSpeed,
+            uMorphAmount
           );
 
           gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
@@ -327,24 +366,47 @@ const ThreeJSCanvas = forwardRef<RendererHandle, RendererProps>(
         uniform float uAmplitude;
         uniform float uFrequency;
         uniform float uSeed;
+        uniform float uMorphSpeed;
+        uniform float uMorphAmount;
+
+        float hashNoise(vec3 p) {
+          return fract(sin(dot(p, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+        }
 
         float smoothNoise(vec3 p) {
           vec3 i = floor(p);
           vec3 f = fract(p);
           f = f * f * (3.0 - 2.0 * f);
 
-          float n0 = fract(sin(dot(i, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
-          float n1 = fract(sin(dot(i + vec3(1.0, 0.0, 0.0), vec3(12.9898, 78.233, 37.719))) * 43758.5453);
-          float nx = mix(n0, n1, f.x);
+          float n000 = hashNoise(i + vec3(0.0, 0.0, 0.0));
+          float n100 = hashNoise(i + vec3(1.0, 0.0, 0.0));
+          float n010 = hashNoise(i + vec3(0.0, 1.0, 0.0));
+          float n110 = hashNoise(i + vec3(1.0, 1.0, 0.0));
+          float n001 = hashNoise(i + vec3(0.0, 0.0, 1.0));
+          float n101 = hashNoise(i + vec3(1.0, 0.0, 1.0));
+          float n011 = hashNoise(i + vec3(0.0, 1.0, 1.0));
+          float n111 = hashNoise(i + vec3(1.0, 1.0, 1.0));
 
-          float n2 = fract(sin(dot(i + vec3(0.0, 1.0, 0.0), vec3(12.9898, 78.233, 37.719))) * 43758.5453);
-          float n3 = fract(sin(dot(i + vec3(1.0, 1.0, 0.0), vec3(12.9898, 78.233, 37.719))) * 43758.5453);
-          float ny = mix(n2, n3, f.x);
+          float nx00 = mix(n000, n100, f.x);
+          float nx10 = mix(n010, n110, f.x);
+          float nx01 = mix(n001, n101, f.x);
+          float nx11 = mix(n011, n111, f.x);
+          float nxy0 = mix(nx00, nx10, f.y);
+          float nxy1 = mix(nx01, nx11, f.y);
 
-          return mix(nx, ny, f.y);
+          return mix(nxy0, nxy1, f.z);
         }
 
-        float computeHeight(vec2 planePos, float time, float scale, float amplitude, float frequency, float seed) {
+        float computeHeight(
+          vec2 planePos,
+          float time,
+          float scale,
+          float amplitude,
+          float frequency,
+          float seed,
+          float morphSpeed,
+          float morphAmount
+        ) {
           float wave1 = sin((planePos.x * scale + time) * frequency) * 0.6;
           float wave2 = cos((planePos.y * scale + time * 0.7) * frequency * 0.8) * 0.6;
           float wave3 = sin((planePos.x * 0.3 + planePos.y * 0.3 + time * 0.5) * frequency * 1.2) * 0.4;
@@ -353,8 +415,22 @@ const ThreeJSCanvas = forwardRef<RendererHandle, RendererProps>(
             planePos.y * scale * 0.5 + time * 0.4,
             seed
           )) * 0.6;
+          float driftNoise = smoothNoise(vec3(
+            planePos.x * scale * 0.18 + seed * 4.13,
+            planePos.y * scale * 0.18 - seed * 2.71,
+            time * morphSpeed * 0.22 + seed * 1.37
+          ));
+          float driftWave = sin(
+            planePos.x * 0.08 +
+            planePos.y * 0.05 +
+            time * morphSpeed * 0.6 +
+            seed * 2.1
+          ) * 0.5;
+          float driftHeight =
+            ((driftNoise - 0.5) * 2.0 + driftWave) * morphAmount * amplitude * 1.2;
 
-          return (wave1 + wave2 + wave3 + noiseVal * 0.5) * amplitude * 1.8;
+          return (wave1 + wave2 + wave3 + noiseVal * 0.5) * amplitude * 1.8 +
+            driftHeight;
         }
 
         vec3 paletteColor(float t) {
@@ -385,7 +461,9 @@ const ThreeJSCanvas = forwardRef<RendererHandle, RendererProps>(
             uScale,
             uAmplitude,
             uFrequency,
-            seed
+            seed,
+            uMorphSpeed,
+            uMorphAmount
           );
           float h = (height + 3.2) / 6.4;
           vec3 col = paletteColor(h);
@@ -400,6 +478,8 @@ const ThreeJSCanvas = forwardRef<RendererHandle, RendererProps>(
           uAmplitude: { value: params.amplitude },
           uFrequency: { value: params.frequency },
           uSeed: { value: params.seed },
+          uMorphSpeed: { value: params.morphSpeed },
+          uMorphAmount: { value: params.morphAmount },
           uBlend: { value: params.blend },
           uColors: { value: new Array(8).fill(new THREE.Color(0, 0, 0)) },
           uColorCount: { value: Math.max(2, colors.length) },
@@ -604,6 +684,8 @@ const ThreeJSCanvas = forwardRef<RendererHandle, RendererProps>(
           shaderMaterial.uniforms.uAmplitude.value = displayParams.amplitude;
           shaderMaterial.uniforms.uFrequency.value = displayParams.frequency;
           shaderMaterial.uniforms.uSeed.value = displayParams.seed;
+          shaderMaterial.uniforms.uMorphSpeed.value = displayParams.morphSpeed;
+          shaderMaterial.uniforms.uMorphAmount.value = displayParams.morphAmount;
           shaderMaterial.uniforms.uBlend.value = displayParams.blend;
 
           const colorValues = cur.colors.map(

@@ -495,6 +495,8 @@ export default function Panel({
       frequency: "Noise Freq",
       definition: "Detail",
       blend: "Blend Edge",
+      morphSpeed: "Shift Speed",
+      morphAmount: "Shift Height",
       focusDistance: "Focus Dist",
       aperture: "Aperture",
       maxBlur: "Max Blur",
@@ -836,6 +838,17 @@ export default function Panel({
         {renderParamRow("scale", 0.01, 2, 0.01)}
         {viewMode === "advanced" && renderParamRow("amplitude", 0, 2, 0.01)}
       </div>
+
+      {viewMode === "advanced" && animationType === "three" && (
+        <div className="panel-section">
+          <span className="section-label">Terrain Drift</span>
+          <div className="section-copy">
+            Slowly reshape the mesh with random height drift over time.
+          </div>
+          {renderParamRow("morphSpeed", 0, 2, 0.01)}
+          {renderParamRow("morphAmount", 0, 1.5, 0.01)}
+        </div>
+      )}
 
       {viewMode === "advanced" && animationType === "three" && (
         <div className="panel-section">

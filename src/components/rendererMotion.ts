@@ -15,6 +15,10 @@ export function stepSmoothedParams(current: GradientParams, target: GradientPara
     frequency: current.frequency + (target.frequency - current.frequency) * alpha,
     definition: current.definition + (target.definition - current.definition) * alpha,
     blend: current.blend + (target.blend - current.blend) * alpha,
+    morphSpeed:
+      current.morphSpeed + (target.morphSpeed - current.morphSpeed) * alpha,
+    morphAmount:
+      current.morphAmount + (target.morphAmount - current.morphAmount) * alpha,
     focusDistance:
       current.focusDistance + (target.focusDistance - current.focusDistance) * alpha,
     aperture: current.aperture + (target.aperture - current.aperture) * alpha,
