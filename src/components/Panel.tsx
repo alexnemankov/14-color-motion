@@ -284,6 +284,9 @@ export default function Panel({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [workflowExpanded, setWorkflowExpanded] = useState(false);
   const [exportExpanded, setExportExpanded] = useState(false);
+  const [savedExpanded, setSavedExpanded] = useState(false);
+  const [recentExpanded, setRecentExpanded] = useState(false);
+  const [resetExpanded, setResetExpanded] = useState(false);
   const [savedSearch, setSavedSearch] = useState('');
   const [savedSort, setSavedSort] = useState<'newest' | 'oldest' | 'name'>('newest');
   const [savedMode, setSavedMode] = useState<'all' | AnimationType>('all');
@@ -445,7 +448,10 @@ export default function Panel({
 
       <div id="onboarding-mode-section" className={`panel-section ${onboardingStep === 1 ? 'onboarding-target' : ''}`}>
         {renderOnboardingCard(1)}
-        <span className="section-label">Mode</span>
+        <div className="section-heading section-heading-stack">
+          <span className="section-label">Mode</span>
+          <div className="section-copy section-copy-tight">Pick the visual engine first.</div>
+        </div>
         <div className="mode-card">
           <div className="mode-switcher">
             <button className={`mode-btn ${animationType === 'liquid' ? 'active' : ''}`} onClick={() => setAnimationType('liquid')} title="Fluid FBM" aria-label="Switch to Fluid FBM mode">
@@ -475,7 +481,10 @@ export default function Panel({
       </div>
 
       <div className="panel-section">
-        <span className="section-label">Palette</span>
+        <div className="section-heading section-heading-stack">
+          <span className="section-label">Palette</span>
+          <div className="section-copy section-copy-tight">Choose a library preset or fine-tune the current colors.</div>
+        </div>
         <button className="open-library-btn" onClick={() => setIsModalOpen(true)}>
           <Palette size={16} weight="bold" />
           <div className="library-btn-text">
@@ -647,112 +656,141 @@ export default function Panel({
         )}
       </div>
 
-      <div className="workspace-section panel-section">
-        <span className="section-label">Reset</span>
-        <div className="reset-actions">
-          <button className="workspace-btn" onClick={resetMode}>Mode</button>
-          <button className="workspace-btn" onClick={resetPalette}>Palette</button>
-          <button className="workspace-btn" onClick={resetScene}>All</button>
+      <div className="panel-section panel-section-secondary">
+        <div className="section-heading">
+          <span className="section-label">Library</span>
+          <button
+            className={`section-toggle ${savedExpanded ? 'active' : ''}`}
+            onClick={() => setSavedExpanded(expanded => !expanded)}
+            aria-expanded={savedExpanded}
+            aria-controls="saved-library"
+          >
+            {savedExpanded ? <CaretDown size={12} weight="bold" /> : <CaretRight size={12} weight="bold" />}
+            Saved
+          </button>
+        </div>
+        <div id="saved-library" className={`saved-library-shell ${savedExpanded ? 'expanded' : ''}`}>
+          {savedPresets.length > 0 ? (
+            <>
+              <div className="saved-tools">
+                <input
+                  className="saved-search"
+                  type="text"
+                  value={savedSearch}
+                  onChange={event => setSavedSearch(event.target.value)}
+                  placeholder="Search saved scenes..."
+                />
+                <div className="saved-select-row">
+                  <InlineSelect
+                    label="Mode"
+                    value={savedMode}
+                    onChange={setSavedMode}
+                    options={[
+                      { value: 'all', label: 'All modes' },
+                      ...Object.keys(MODE_DETAILS).map(type => ({
+                        value: type as AnimationType,
+                        label: MODE_DETAILS[type as AnimationType].name,
+                      })),
+                    ]}
+                  />
+                  <InlineSelect
+                    label="Sort"
+                    value={savedSort}
+                    onChange={setSavedSort}
+                    options={[
+                      { value: 'newest', label: 'Newest' },
+                      { value: 'oldest', label: 'Oldest' },
+                      { value: 'name', label: 'Name' },
+                    ]}
+                  />
+                </div>
+              </div>
+              {filteredSavedPresets.length > 0 ? (
+                <div className="saved-list">
+                  {filteredSavedPresets.map(preset => (
+                    <div key={preset.id} className="saved-item">
+                      <button className="saved-load-btn" onClick={() => loadPreset(preset)} title={preset.name}>
+                        <div className="saved-preview" style={{ background: `linear-gradient(90deg, ${preset.colors.map(color => `rgb(${color.join(',')})`).join(', ')})` }} />
+                        <span>{preset.name}</span>
+                        <div className="saved-meta">
+                          <small>{formatAnimationType(preset.animationType)}</small>
+                          <small>{formatPresetDate(preset.createdAt)}</small>
+                        </div>
+                      </button>
+                      <button className="saved-delete-btn" onClick={() => deletePreset(preset.id)} title="Delete preset" aria-label={`Delete preset ${preset.name}`}>
+                        <Trash size={12} weight="bold" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="saved-empty">No saved presets match the current search or mode filter.</p>
+              )}
+            </>
+          ) : (
+            <p className="saved-empty">No saved presets yet. Save the current scene to start building your library.</p>
+          )}
         </div>
       </div>
 
-      <div className="saved-section panel-section">
+      <div className="panel-section panel-section-secondary">
         <div className="section-heading">
-          <span className="section-label">Saved Library</span>
-          {savedPresets.length > 0 && (
-            <span className="section-count">{filteredSavedPresets.length} shown</span>
-          )}
+          <span className="section-label">History</span>
+          <button
+            className={`section-toggle ${recentExpanded ? 'active' : ''}`}
+            onClick={() => setRecentExpanded(expanded => !expanded)}
+            aria-expanded={recentExpanded}
+            aria-controls="recent-scenes"
+          >
+            {recentExpanded ? <CaretDown size={12} weight="bold" /> : <CaretRight size={12} weight="bold" />}
+            Recent
+          </button>
         </div>
-        {savedPresets.length > 0 ? (
-          <>
-            <div className="saved-tools">
-              <input
-                className="saved-search"
-                type="text"
-                value={savedSearch}
-                onChange={event => setSavedSearch(event.target.value)}
-                placeholder="Search saved scenes..."
-              />
-              <div className="saved-select-row">
-                <InlineSelect
-                  label="Mode"
-                  value={savedMode}
-                  onChange={setSavedMode}
-                  options={[
-                    { value: 'all', label: 'All modes' },
-                    ...Object.keys(MODE_DETAILS).map(type => ({
-                      value: type as AnimationType,
-                      label: MODE_DETAILS[type as AnimationType].name,
-                    })),
-                  ]}
-                />
-                <InlineSelect
-                  label="Sort"
-                  value={savedSort}
-                  onChange={setSavedSort}
-                  options={[
-                    { value: 'newest', label: 'Newest' },
-                    { value: 'oldest', label: 'Oldest' },
-                    { value: 'name', label: 'Name' },
-                  ]}
-                />
-              </div>
+        <div id="recent-scenes" className={`saved-library-shell ${recentExpanded ? 'expanded' : ''}`}>
+          {recentScenes.length > 0 ? (
+            <div className="saved-list">
+              {recentScenes.slice(0, 4).map(scene => (
+                <div key={scene.id} className="saved-item">
+                  <button className="saved-load-btn" onClick={() => loadRecentScene(scene)} title={scene.name}>
+                    <div className="saved-preview" style={{ background: `linear-gradient(90deg, ${scene.colors.map(color => `rgb(${color.join(',')})`).join(', ')})` }} />
+                    <span>{scene.name}</span>
+                    <div className="saved-meta">
+                      <small>{scene.source}</small>
+                      <small>{formatPresetDate(scene.seenAt)}</small>
+                    </div>
+                  </button>
+                  <button className="saved-delete-btn" onClick={() => deleteRecentScene(scene.id)} aria-label={`Remove ${scene.name} from recent scenes`}>
+                    <Trash size={14} weight="bold" />
+                  </button>
+                </div>
+              ))}
             </div>
-            {filteredSavedPresets.length > 0 ? (
-              <div className="saved-list">
-                {filteredSavedPresets.map(preset => (
-                  <div key={preset.id} className="saved-item">
-                    <button className="saved-load-btn" onClick={() => loadPreset(preset)} title={preset.name}>
-                      <div className="saved-preview" style={{ background: `linear-gradient(90deg, ${preset.colors.map(color => `rgb(${color.join(',')})`).join(', ')})` }} />
-                      <span>{preset.name}</span>
-                      <div className="saved-meta">
-                        <small>{formatAnimationType(preset.animationType)}</small>
-                        <small>{formatPresetDate(preset.createdAt)}</small>
-                      </div>
-                    </button>
-                    <button className="saved-delete-btn" onClick={() => deletePreset(preset.id)} title="Delete preset" aria-label={`Delete preset ${preset.name}`}>
-                      <Trash size={12} weight="bold" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="saved-empty">No saved presets match the current search or mode filter.</p>
-            )}
-          </>
-        ) : (
-          <p className="saved-empty">No saved presets yet. Save the current scene to start building your library.</p>
-        )}
-      </div>
-
-      <div className="saved-section panel-section">
-        <div className="section-heading">
-          <span className="section-label">Recent Scenes</span>
-          {recentScenes.length > 0 && (
-            <span className="section-count">{Math.min(recentScenes.length, 4)} recent</span>
+          ) : (
+            <p className="saved-empty">Recent scenes will appear here after you load, save, or share a scene.</p>
           )}
         </div>
-        {recentScenes.length > 0 ? (
-          <div className="saved-list">
-            {recentScenes.slice(0, 4).map(scene => (
-              <div key={scene.id} className="saved-item">
-                <button className="saved-load-btn" onClick={() => loadRecentScene(scene)} title={scene.name}>
-                  <div className="saved-preview" style={{ background: `linear-gradient(90deg, ${scene.colors.map(color => `rgb(${color.join(',')})`).join(', ')})` }} />
-                  <span>{scene.name}</span>
-                  <div className="saved-meta">
-                    <small>{scene.source}</small>
-                    <small>{formatPresetDate(scene.seenAt)}</small>
-                  </div>
-                </button>
-                <button className="saved-delete-btn" onClick={() => deleteRecentScene(scene.id)} aria-label={`Remove ${scene.name} from recent scenes`}>
-                  <Trash size={14} weight="bold" />
-                </button>
-              </div>
-            ))}
+      </div>
+
+      <div className="panel-section panel-section-secondary">
+        <div className="section-heading">
+          <span className="section-label">Utilities</span>
+          <button
+            className={`section-toggle ${resetExpanded ? 'active' : ''}`}
+            onClick={() => setResetExpanded(expanded => !expanded)}
+            aria-expanded={resetExpanded}
+            aria-controls="reset-tools"
+          >
+            {resetExpanded ? <CaretDown size={12} weight="bold" /> : <CaretRight size={12} weight="bold" />}
+            Reset
+          </button>
+        </div>
+        <div id="reset-tools" className={`saved-library-shell ${resetExpanded ? 'expanded' : ''}`}>
+          <div className="reset-actions">
+            <button className="workspace-btn" onClick={resetMode}>Mode</button>
+            <button className="workspace-btn" onClick={resetPalette}>Palette</button>
+            <button className="workspace-btn" onClick={resetScene}>All</button>
           </div>
-        ) : (
-          <p className="saved-empty">Recent scenes will appear here after you load, save, or share a scene.</p>
-        )}
+        </div>
       </div>
 
       <div className="bottom-controls">

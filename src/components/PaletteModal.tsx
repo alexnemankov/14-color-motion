@@ -157,9 +157,66 @@ export default function PaletteModal({ isOpen, onClose, onSelect }: PaletteModal
     return PALETTES.find((p: PaletteDescriptor) => p.name === activePaletteName);
   }, [activePaletteName]);
 
+  const favoritePalettes = useMemo(() => {
+    return favorites
+      .map(name => PALETTES.find(palette => palette.name === name))
+      .filter((palette): palette is PaletteDescriptor => Boolean(palette));
+  }, [favorites]);
+
+  const recentPalettes = useMemo(() => {
+    return recentPaletteNames
+      .map(name => PALETTES.find(palette => palette.name === name))
+      .filter((palette): palette is PaletteDescriptor => Boolean(palette));
+  }, [recentPaletteNames]);
+
+  const featuredPalettes = useMemo(() => {
+    return PALETTES.filter(palette =>
+      palette.tags.includes('Vibrant')
+      || palette.tags.includes('Neon')
+      || palette.tags.includes('Pastel')
+    ).slice(0, 6);
+  }, []);
+
+  const showLibraryShelves = activeCategory === 'All' && !searchQuery.trim();
+
   const getGradientStyle = (colors: string[]): CSSProperties => ({
     ['--palette-gradient' as any]: `linear-gradient(135deg, ${colors.join(', ')})`,
   } as CSSProperties);
+
+  const renderPaletteCard = (palette: PaletteDescriptor, compact = false) => (
+    <div
+      key={palette.name}
+      className={`palette-card-shell ${activePaletteName === palette.name ? 'active' : ''} ${compact ? 'palette-card-compact' : ''}`}
+    >
+      <button
+        type="button"
+        className="palette-card"
+        onClick={() => handleSelect(palette)}
+        aria-pressed={activePaletteName === palette.name}
+      >
+        <div className="card-preview" style={getGradientStyle(palette.colors)} />
+        <div className="card-info">
+          <div className="card-heading">
+            <span className="card-name">{palette.name}</span>
+          </div>
+          <div className="card-dots">
+            {palette.colors.slice(0, 4).map((color, index) => (
+              <div key={index} className="color-dot" style={{ background: color }} />
+            ))}
+            {palette.colors.length > 4 && <span className="dot-plus">+{palette.colors.length - 4}</span>}
+          </div>
+        </div>
+      </button>
+      <button
+        type="button"
+        className={`fav-btn fav-btn-floating ${favorites.includes(palette.name) ? 'active' : ''}`}
+        onClick={event => toggleFavorite(event, palette.name)}
+        aria-label={favorites.includes(palette.name) ? `Remove ${palette.name} from favorites` : `Add ${palette.name} to favorites`}
+      >
+        <Heart size={18} weight={favorites.includes(palette.name) ? 'fill' : 'bold'} />
+      </button>
+    </div>
+  );
 
   return createPortal(
     <AnimatePresence>
@@ -178,7 +235,7 @@ export default function PaletteModal({ isOpen, onClose, onSelect }: PaletteModal
             onClick={e => e.stopPropagation()}
             role="dialog"
             aria-modal="true"
-            aria-label="Palette library"
+            aria-labelledby="palette-library-title"
             initial={{ y: 50, opacity: 0, scale: 0.95 }}
             animate={{ y: 0, opacity: 1, scale: 1 }}
             exit={{ y: 50, opacity: 0, scale: 0.95 }}
@@ -186,8 +243,9 @@ export default function PaletteModal({ isOpen, onClose, onSelect }: PaletteModal
           >
             <div className="modal-header">
               <div className="header-title-group">
-                <h2>Color Motion Lab</h2>
-                <p className="header-subtitle">Pick a vibe or create your own</p>
+                <span className="modal-kicker">Palette Library</span>
+                <h2 id="palette-library-title">Curated color systems for motion studies</h2>
+                <p className="header-subtitle">Start with featured picks, jump to recents, or search the full library.</p>
               </div>
               <div className="modal-actions">
                 <button className="surprise-btn" onClick={handleSurprise} title="Surprise Me" aria-label="Surprise me with a random palette">
@@ -239,13 +297,16 @@ export default function PaletteModal({ isOpen, onClose, onSelect }: PaletteModal
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.18 }}
                 >
-                  <span className="results-label">ACTIVE SELECTION</span>
+                  <span className="results-label">Selected palette</span>
                   <div
                     className="active-palette-row"
                     style={getGradientStyle(activePalette.colors)}
                   >
                     <div className="active-info">
-                      <span className="active-name">{activePalette.name}</span>
+                      <div className="active-copy">
+                        <span className="active-name">{activePalette.name}</span>
+                        <span className="active-meta">{activePalette.colors.length} colors</span>
+                      </div>
                       <div className="active-dots">
                         {activePalette.colors.map((color, index) => (
                           <div key={index} className="color-dot" style={{ background: color }} />
@@ -256,43 +317,54 @@ export default function PaletteModal({ isOpen, onClose, onSelect }: PaletteModal
                 </motion.div>
               )}
 
+              {showLibraryShelves && (
+                <div className="library-shelves">
+                  <section className="library-shelf" aria-labelledby="featured-palettes-title">
+                    <div className="results-info">
+                      <span id="featured-palettes-title" className="results-label">Featured picks</span>
+                      <span className="results-count">{featuredPalettes.length} ready to try</span>
+                    </div>
+                    <div className="palette-shelf-grid">
+                      {featuredPalettes.map(palette => renderPaletteCard(palette, true))}
+                    </div>
+                  </section>
+
+                  {recentPalettes.length > 0 && (
+                    <section className="library-shelf" aria-labelledby="recent-palettes-title">
+                      <div className="results-info">
+                        <span id="recent-palettes-title" className="results-label">Recent</span>
+                        <span className="results-count">{recentPalettes.length} recent</span>
+                      </div>
+                      <div className="palette-shelf-grid">
+                        {recentPalettes.slice(0, 4).map(palette => renderPaletteCard(palette, true))}
+                      </div>
+                    </section>
+                  )}
+
+                  {favoritePalettes.length > 0 && (
+                    <section className="library-shelf" aria-labelledby="favorite-palettes-title">
+                      <div className="results-info">
+                        <span id="favorite-palettes-title" className="results-label">Favorites</span>
+                        <span className="results-count">{favoritePalettes.length} saved</span>
+                      </div>
+                      <div className="palette-shelf-grid">
+                        {favoritePalettes.slice(0, 4).map(palette => renderPaletteCard(palette, true))}
+                      </div>
+                    </section>
+                  )}
+                </div>
+              )}
+
               <div className="results-info">
                 <span className="results-label">
-                  {searchQuery ? 'Search results' : activeCategory}
+                  {searchQuery ? 'Search results' : activeCategory === 'All' ? 'Browse all palettes' : activeCategory}
                 </span>
                 <span className="results-count">{filteredPalettes.length} total</span>
               </div>
 
               <div className="palette-grid">
                 {filteredPalettes.length > 0 ? (
-                  filteredPalettes.map((palette: PaletteDescriptor) => (
-                    <div
-                      key={palette.name}
-                      className={`palette-card ${activePaletteName === palette.name ? 'active' : ''}`}
-                      onClick={() => handleSelect(palette)}
-                    >
-                      <div className="card-preview" style={getGradientStyle(palette.colors)}>
-                        <button
-                          className={`fav-btn ${favorites.includes(palette.name) ? 'active' : ''}`}
-                          onClick={event => toggleFavorite(event, palette.name)}
-                          aria-label={favorites.includes(palette.name) ? `Remove ${palette.name} from favorites` : `Add ${palette.name} to favorites`}
-                        >
-                          <Heart size={18} weight={favorites.includes(palette.name) ? 'fill' : 'bold'} />
-                        </button>
-                      </div>
-                      <div className="card-info">
-                        <div className="card-heading">
-                          <span className="card-name">{palette.name}</span>
-                        </div>
-                        <div className="card-dots">
-                          {palette.colors.slice(0, 4).map((color, index) => (
-                            <div key={index} className="color-dot" style={{ background: color }} />
-                          ))}
-                          {palette.colors.length > 4 && <span className="dot-plus">+{palette.colors.length - 4}</span>}
-                        </div>
-                      </div>
-                    </div>
-                  ))
+                  filteredPalettes.map((palette: PaletteDescriptor) => renderPaletteCard(palette))
                 ) : (
                   <div className="no-results-state">
                     <Tray size={48} weight="thin" />
