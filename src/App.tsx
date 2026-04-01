@@ -1,18 +1,30 @@
-import { FormEvent, useEffect, useRef, useState } from 'react';
-import confetti from 'canvas-confetti';
-import LiquidCanvas from './components/LiquidCanvas';
-import WavesCanvas from './components/WavesCanvas';
-import VoronoiCanvas from './components/VoronoiCanvas';
-import TuringCanvas from './components/TuringCanvas';
-import ParticlesCanvas from './components/ParticlesCanvas';
-import BlobsCanvas from './components/BlobsCanvas';
-import Panel from './components/Panel';
-import RendererBoundary from './components/RendererBoundary';
-import { RendererHandle } from './components/rendererTypes';
-import { migratePersistedScene, serializeSceneForPersistence, CURRENT_SCENE_VERSION } from './migrations/sceneMigrations';
-import { PALETTES } from './data/palettes';
+import { FormEvent, useEffect, useRef, useState } from "react";
+import confetti from "canvas-confetti";
+import LiquidCanvas from "./components/LiquidCanvas";
+import WavesCanvas from "./components/WavesCanvas";
+import VoronoiCanvas from "./components/VoronoiCanvas";
+import TuringCanvas from "./components/TuringCanvas";
+import ParticlesCanvas from "./components/ParticlesCanvas";
+import BlobsCanvas from "./components/BlobsCanvas";
+import ThreeJSCanvas from "./components/ThreeJSCanvas";
+import Panel from "./components/Panel";
+import RendererBoundary from "./components/RendererBoundary";
+import { RendererHandle } from "./components/rendererTypes";
+import {
+  migratePersistedScene,
+  serializeSceneForPersistence,
+  CURRENT_SCENE_VERSION,
+} from "./migrations/sceneMigrations";
+import { PALETTES } from "./data/palettes";
 
-export type AnimationType = 'liquid' | 'waves' | 'voronoi' | 'turing' | 'particles' | 'blobs';
+export type AnimationType =
+  | "liquid"
+  | "waves"
+  | "voronoi"
+  | "turing"
+  | "particles"
+  | "blobs"
+  | "three";
 
 export interface GradientParams {
   seed: number;
@@ -22,6 +34,10 @@ export interface GradientParams {
   frequency: number;
   definition: number;
   blend: number;
+  focusDistance: number;
+  aperture: number;
+  maxBlur: number;
+  dofEnabled: boolean;
 }
 
 export type ColorRgb = [number, number, number];
@@ -42,7 +58,7 @@ export interface RecentScene extends SceneState {
   id: string;
   name: string;
   seenAt: string;
-  source: 'preset' | 'shared' | 'live';
+  source: "preset" | "shared" | "live";
 }
 
 export interface RendererStatus {
@@ -57,7 +73,14 @@ interface ToastState {
 }
 
 interface ExportStatusState {
-  phase: 'idle' | 'preparing' | 'capturing' | 'recording' | 'encoding' | 'complete' | 'error';
+  phase:
+    | "idle"
+    | "preparing"
+    | "capturing"
+    | "recording"
+    | "encoding"
+    | "complete"
+    | "error";
   label: string;
   detail?: string;
   progress: number;
@@ -91,41 +114,57 @@ const DEFAULT_PARAMS: GradientParams = {
   amplitude: 0.99,
   frequency: 1.19,
   definition: 2,
-  blend: 1.0
+  blend: 1.0,
+  focusDistance: 32,
+  aperture: 0.0125,
+  maxBlur: 0.35,
+  dofEnabled: true,
 };
 
-const SESSION_STORAGE_KEY = 'color-motion-session';
-const PRESETS_STORAGE_KEY = 'color-motion-presets';
-const RECENT_SCENES_STORAGE_KEY = 'color-motion-recent-scenes';
-const ONBOARDING_STORAGE_KEY = 'color-motion-onboarding-dismissed';
-const SHARE_PARAM_KEY = 'scene';
-const SHARE_NAME_PARAM_KEY = 'name';
-const SHARE_SCENE_VERSION = 'v1';
-const VALID_ANIMATION_TYPES: AnimationType[] = ['liquid', 'waves', 'voronoi', 'turing', 'particles', 'blobs'];
+const SESSION_STORAGE_KEY = "color-motion-session";
+const PRESETS_STORAGE_KEY = "color-motion-presets";
+const RECENT_SCENES_STORAGE_KEY = "color-motion-recent-scenes";
+const ONBOARDING_STORAGE_KEY = "color-motion-onboarding-dismissed";
+const SHARE_PARAM_KEY = "scene";
+const SHARE_NAME_PARAM_KEY = "name";
+const SHARE_SCENE_VERSION = "v1";
+const VALID_ANIMATION_TYPES: AnimationType[] = [
+  "liquid",
+  "waves",
+  "voronoi",
+  "turing",
+  "particles",
+  "blobs",
+  "three",
+];
 const HISTORY_LIMIT = 40;
 const PALETTE_TRANSITION_MS = 1500;
 const LOOP_SAFE_DURATION_SECONDS = 6;
 const RECENT_SCENES_LIMIT = 8;
-const APP_TITLE = 'Color Motion Lab';
-const WEBGL_COMPATIBILITY_URL = 'https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API';
+const APP_TITLE = "Color Motion Lab";
+const WEBGL_COMPATIBILITY_URL =
+  "https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API";
 const ONBOARDING_STEPS = [
   {
-    targetId: 'panel',
-    eyebrow: 'Controls',
-    title: 'This is the main studio panel',
-    message: 'Use it to switch renderers, explore palettes, tune motion, save scenes, and export output.',
+    targetId: "panel",
+    eyebrow: "Controls",
+    title: "This is the main studio panel",
+    message:
+      "Use it to switch renderers, explore palettes, tune motion, save scenes, and export output.",
   },
   {
-    targetId: 'onboarding-mode-section',
-    eyebrow: 'Modes',
-    title: 'Each mode is a different visual engine',
-    message: 'Switch between liquid, waves, voronoi, turing, particles, and blobs to explore different motion systems.',
+    targetId: "onboarding-mode-section",
+    eyebrow: "Modes",
+    title: "Each mode is a different visual engine",
+    message:
+      "Switch between liquid, waves, voronoi, turing, particles, and blobs to explore different motion systems.",
   },
   {
-    targetId: 'onboarding-workspace-section',
-    eyebrow: 'Workspace',
-    title: 'Save, share, and export when a scene feels right',
-    message: 'Store presets locally, copy a share link, or export still and video output from here.',
+    targetId: "onboarding-workspace-section",
+    eyebrow: "Workspace",
+    title: "Save, share, and export when a scene feels right",
+    message:
+      "Store presets locally, copy a share link, or export still and video output from here.",
   },
 ];
 
@@ -133,7 +172,7 @@ function cloneScene(scene: SceneState): SceneState {
   return {
     animationType: scene.animationType,
     params: { ...scene.params },
-    colors: scene.colors.map(color => [...color] as ColorRgb),
+    colors: scene.colors.map((color) => [...color] as ColorRgb),
   };
 }
 
@@ -160,13 +199,16 @@ function randomAnimationType(): AnimationType {
 
 function randomPaletteColors(): ColorRgb[] {
   const palette = PALETTES[randomInt(0, PALETTES.length - 1)];
-  return palette.colors.map(color => {
+  return palette.colors.map((color) => {
     const value = parseInt(color.slice(1), 16);
     return [(value >> 16) & 255, (value >> 8) & 255, value & 255] as ColorRgb;
   });
 }
 
-function randomParams(base: GradientParams, locks: Pick<WorkflowLocks, 'seed' | 'motion'>): GradientParams {
+function randomParams(
+  base: GradientParams,
+  locks: Pick<WorkflowLocks, "seed" | "motion">,
+): GradientParams {
   return {
     seed: locks.seed ? base.seed : randomInt(0, 9999),
     speed: locks.motion ? base.speed : randomBetween(0.2, 2.4),
@@ -175,6 +217,10 @@ function randomParams(base: GradientParams, locks: Pick<WorkflowLocks, 'seed' | 
     frequency: locks.motion ? base.frequency : randomBetween(0.3, 2.6),
     definition: locks.motion ? base.definition : randomInt(1, 8),
     blend: locks.motion ? base.blend : randomBetween(0.15, 1, 2),
+    focusDistance: locks.motion ? base.focusDistance : randomBetween(20, 60),
+    aperture: locks.motion ? base.aperture : randomBetween(0.005, 0.04),
+    maxBlur: locks.motion ? base.maxBlur : randomBetween(0.1, 0.45),
+    dofEnabled: locks.motion ? base.dofEnabled : true,
   };
 }
 
@@ -183,7 +229,10 @@ function clampChannel(value: number) {
 }
 
 function palettesEqual(a: ColorRgb[], b: ColorRgb[]) {
-  return sceneKey({ animationType: 'liquid', params: DEFAULT_PARAMS, colors: a }) === sceneKey({ animationType: 'liquid', params: DEFAULT_PARAMS, colors: b });
+  return (
+    sceneKey({ animationType: "liquid", params: DEFAULT_PARAMS, colors: a }) ===
+    sceneKey({ animationType: "liquid", params: DEFAULT_PARAMS, colors: b })
+  );
 }
 
 function samplePaletteColor(palette: ColorRgb[], t: number): ColorRgb {
@@ -208,45 +257,48 @@ function resamplePalette(palette: ColorRgb[], count: number): ColorRgb[] {
   if (count <= 0) return [];
   if (count === 1) return [samplePaletteColor(palette, 0.5)];
 
-  return Array.from({ length: count }, (_, index) => samplePaletteColor(palette, index / (count - 1)));
+  return Array.from({ length: count }, (_, index) =>
+    samplePaletteColor(palette, index / (count - 1)),
+  );
 }
 
 function animationTypeLabel(type: AnimationType) {
   return {
-    liquid: 'Liquid',
-    waves: 'Waves',
-    voronoi: 'Voronoi',
-    turing: 'Turing',
-    particles: 'Particles',
-    blobs: 'Blobs',
+    liquid: "Liquid",
+    waves: "Waves",
+    voronoi: "Voronoi",
+    turing: "Turing",
+    particles: "Particles",
+    blobs: "Blobs",
+    three: "3D Mesh",
   }[type];
 }
 
 function encodeBase64Url(value: string) {
   const utf8 = new TextEncoder().encode(value);
-  let binary = '';
-  utf8.forEach(byte => {
+  let binary = "";
+  utf8.forEach((byte) => {
     binary += String.fromCharCode(byte);
   });
 
   return btoa(binary)
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/g, '');
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
 }
 
 function decodeBase64Url(value: string) {
   const normalized = value
-    .replace(/-/g, '+')
-    .replace(/_/g, '/')
-    .padEnd(Math.ceil(value.length / 4) * 4, '=');
+    .replace(/-/g, "+")
+    .replace(/_/g, "/")
+    .padEnd(Math.ceil(value.length / 4) * 4, "=");
   const binary = atob(normalized);
-  const bytes = Uint8Array.from(binary, char => char.charCodeAt(0));
+  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
   return new TextDecoder().decode(bytes);
 }
 
 function rgbToShareHex(color: ColorRgb) {
-  return color.map(channel => channel.toString(16).padStart(2, '0')).join('');
+  return color.map((channel) => channel.toString(16).padStart(2, "0")).join("");
 }
 
 function shareHexToRgb(value: string): ColorRgb | null {
@@ -272,6 +324,10 @@ function serializeShareScene(scene: SceneState, name?: string | null) {
       toShareNumber(scene.params.frequency),
       scene.params.definition,
       toShareNumber(scene.params.blend),
+      toShareNumber(scene.params.focusDistance),
+      toShareNumber(scene.params.aperture),
+      toShareNumber(scene.params.maxBlur),
+      scene.params.dofEnabled ? 1 : 0,
     ],
     c: scene.colors.map(rgbToShareHex),
     ...(name ? { n: name.slice(0, 80) } : {}),
@@ -280,7 +336,9 @@ function serializeShareScene(scene: SceneState, name?: string | null) {
   return encodeBase64Url(JSON.stringify(payload));
 }
 
-function parseCompactSharedScene(raw: string): { scene: SceneState; name: string | null } | null {
+function parseCompactSharedScene(
+  raw: string,
+): { scene: SceneState; name: string | null } | null {
   try {
     const decoded = JSON.parse(decodeBase64Url(raw)) as {
       v?: string;
@@ -292,19 +350,20 @@ function parseCompactSharedScene(raw: string): { scene: SceneState; name: string
     };
 
     if (decoded.v !== SHARE_SCENE_VERSION) return null;
-    if (typeof decoded.a !== 'number' || !VALID_ANIMATION_TYPES[decoded.a]) return null;
-    if (!Array.isArray(decoded.p) || decoded.p.length < 7) return null;
+    if (typeof decoded.a !== "number" || !VALID_ANIMATION_TYPES[decoded.a])
+      return null;
+    if (!Array.isArray(decoded.p) || decoded.p.length < 10) return null;
     if (!Array.isArray(decoded.c)) return null;
 
     const colors = decoded.c
-      .map(value => typeof value === 'string' ? shareHexToRgb(value) : null)
+      .map((value) => (typeof value === "string" ? shareHexToRgb(value) : null))
       .filter((color): color is ColorRgb => color !== null)
       .slice(0, 8);
 
     if (colors.length < 2) return null;
 
     const scene = normalizeSceneState({
-      version: typeof decoded.sv === 'number' ? decoded.sv : 0,
+      version: typeof decoded.sv === "number" ? decoded.sv : 0,
       animationType: VALID_ANIMATION_TYPES[decoded.a],
       params: {
         seed: decoded.p[0],
@@ -314,15 +373,25 @@ function parseCompactSharedScene(raw: string): { scene: SceneState; name: string
         frequency: decoded.p[4],
         definition: decoded.p[5],
         blend: decoded.p[6],
+        focusDistance: decoded.p[7] ?? DEFAULT_PARAMS.focusDistance,
+        aperture: decoded.p[8] ?? DEFAULT_PARAMS.aperture,
+        maxBlur: decoded.p[9] ?? DEFAULT_PARAMS.maxBlur,
+        dofEnabled:
+          decoded.p[10] === 0
+            ? false
+            : decoded.p[10] === 1
+              ? true
+              : DEFAULT_PARAMS.dofEnabled,
       },
       colors,
     });
 
     if (!scene) return null;
 
-    const name = typeof decoded.n === 'string' && decoded.n.trim()
-      ? decoded.n.trim().slice(0, 80)
-      : null;
+    const name =
+      typeof decoded.n === "string" && decoded.n.trim()
+        ? decoded.n.trim().slice(0, 80)
+        : null;
 
     return { scene, name };
   } catch {
@@ -331,10 +400,20 @@ function parseCompactSharedScene(raw: string): { scene: SceneState; name: string
 }
 
 function supportsLoopSafeExport(type: AnimationType) {
-  return type === 'liquid' || type === 'waves' || type === 'voronoi' || type === 'blobs';
+  return (
+    type === "liquid" ||
+    type === "waves" ||
+    type === "voronoi" ||
+    type === "blobs" ||
+    type === "three"
+  );
 }
 
-function interpolatePalettes(from: ColorRgb[], to: ColorRgb[], t: number): ColorRgb[] {
+function interpolatePalettes(
+  from: ColorRgb[],
+  to: ColorRgb[],
+  t: number,
+): ColorRgb[] {
   const count = Math.max(2, to.length);
   const start = resamplePalette(from, count);
   const end = resamplePalette(to, count);
@@ -350,15 +429,18 @@ function interpolatePalettes(from: ColorRgb[], to: ColorRgb[], t: number): Color
 }
 
 function easeInOutCubic(t: number) {
-  return t < 0.5
-    ? 4 * t * t * t
-    : 1 - ((-2 * t + 2) ** 3) / 2;
+  return t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
 }
 
 function isColorRgb(value: unknown): value is ColorRgb {
-  return Array.isArray(value)
-    && value.length === 3
-    && value.every(channel => typeof channel === 'number' && channel >= 0 && channel <= 255);
+  return (
+    Array.isArray(value) &&
+    value.length === 3 &&
+    value.every(
+      (channel) =>
+        typeof channel === "number" && channel >= 0 && channel <= 255,
+    )
+  );
 }
 
 function normalizeSceneState(value: unknown): SceneState | null {
@@ -371,16 +453,46 @@ function normalizeSceneState(value: unknown): SceneState | null {
   const params = candidate.params as Partial<GradientParams>;
 
   const normalizedParams: GradientParams = {
-    seed: typeof params.seed === 'number' ? params.seed : DEFAULT_PARAMS.seed,
-    speed: typeof params.speed === 'number' ? params.speed : DEFAULT_PARAMS.speed,
-    scale: typeof params.scale === 'number' ? params.scale : DEFAULT_PARAMS.scale,
-    amplitude: typeof params.amplitude === 'number' ? params.amplitude : DEFAULT_PARAMS.amplitude,
-    frequency: typeof params.frequency === 'number' ? params.frequency : DEFAULT_PARAMS.frequency,
-    definition: typeof params.definition === 'number' ? params.definition : DEFAULT_PARAMS.definition,
-    blend: typeof params.blend === 'number' ? params.blend : DEFAULT_PARAMS.blend,
+    seed: typeof params.seed === "number" ? params.seed : DEFAULT_PARAMS.seed,
+    speed:
+      typeof params.speed === "number" ? params.speed : DEFAULT_PARAMS.speed,
+    scale:
+      typeof params.scale === "number" ? params.scale : DEFAULT_PARAMS.scale,
+    amplitude:
+      typeof params.amplitude === "number"
+        ? params.amplitude
+        : DEFAULT_PARAMS.amplitude,
+    frequency:
+      typeof params.frequency === "number"
+        ? params.frequency
+        : DEFAULT_PARAMS.frequency,
+    definition:
+      typeof params.definition === "number"
+        ? params.definition
+        : DEFAULT_PARAMS.definition,
+    blend:
+      typeof params.blend === "number" ? params.blend : DEFAULT_PARAMS.blend,
+    focusDistance:
+      typeof params.focusDistance === "number"
+        ? params.focusDistance
+        : DEFAULT_PARAMS.focusDistance,
+    aperture:
+      typeof params.aperture === "number"
+        ? params.aperture
+        : DEFAULT_PARAMS.aperture,
+    maxBlur:
+      typeof params.maxBlur === "number"
+        ? params.maxBlur
+        : DEFAULT_PARAMS.maxBlur,
+    dofEnabled:
+      typeof params.dofEnabled === "boolean"
+        ? params.dofEnabled
+        : DEFAULT_PARAMS.dofEnabled,
   };
 
-  const colors = Array.isArray(candidate.colors) ? candidate.colors.filter(isColorRgb).slice(0, 8) : [];
+  const colors = Array.isArray(candidate.colors)
+    ? candidate.colors.filter(isColorRgb).slice(0, 8)
+    : [];
   if (colors.length < 2) return null;
 
   return {
@@ -390,7 +502,10 @@ function normalizeSceneState(value: unknown): SceneState | null {
   };
 }
 
-function readSharedSceneBundle(): { scene: SceneState; name: string | null } | null {
+function readSharedSceneBundle(): {
+  scene: SceneState;
+  name: string | null;
+} | null {
   try {
     const url = new URL(window.location.href);
     const raw = url.searchParams.get(SHARE_PARAM_KEY);
@@ -403,7 +518,9 @@ function readSharedSceneBundle(): { scene: SceneState; name: string | null } | n
     if (!scene) return null;
 
     const legacyNameRaw = url.searchParams.get(SHARE_NAME_PARAM_KEY);
-    const legacyName = legacyNameRaw ? decodeURIComponent(legacyNameRaw).trim().slice(0, 80) : '';
+    const legacyName = legacyNameRaw
+      ? decodeURIComponent(legacyNameRaw).trim().slice(0, 80)
+      : "";
 
     return {
       scene,
@@ -445,7 +562,12 @@ function readSavedPresets(): SavedPreset[] {
     return parsed
       .map((item): SavedPreset | null => {
         const scene = normalizeSceneState(item);
-        if (!scene || typeof item.id !== 'string' || typeof item.name !== 'string' || typeof item.createdAt !== 'string') {
+        if (
+          !scene ||
+          typeof item.id !== "string" ||
+          typeof item.name !== "string" ||
+          typeof item.createdAt !== "string"
+        ) {
           return null;
         }
 
@@ -472,13 +594,21 @@ function readRecentScenes(): RecentScene[] {
     return parsed
       .map((item): RecentScene | null => {
         const scene = normalizeSceneState(item);
-        if (!scene || typeof item.id !== 'string' || typeof item.name !== 'string' || typeof item.seenAt !== 'string') {
+        if (
+          !scene ||
+          typeof item.id !== "string" ||
+          typeof item.name !== "string" ||
+          typeof item.seenAt !== "string"
+        ) {
           return null;
         }
 
-        const source = item.source === 'preset' || item.source === 'shared' || item.source === 'live'
-          ? item.source
-          : 'live';
+        const source =
+          item.source === "preset" ||
+          item.source === "shared" ||
+          item.source === "live"
+            ? item.source
+            : "live";
 
         return {
           ...scene,
@@ -496,7 +626,7 @@ function readRecentScenes(): RecentScene[] {
 
 function readOnboardingDismissed() {
   try {
-    return localStorage.getItem(ONBOARDING_STORAGE_KEY) === 'true';
+    return localStorage.getItem(ONBOARDING_STORAGE_KEY) === "true";
   } catch {
     return false;
   }
@@ -505,25 +635,34 @@ function readOnboardingDismissed() {
 function App() {
   const sharedSceneBundle = readSharedSceneBundle();
   const sharedSceneName = sharedSceneBundle?.name ?? readSharedSceneName();
-  const initialScene = sharedSceneBundle?.scene ?? readSessionScene() ?? {
-    animationType: 'liquid' as AnimationType,
-    params: DEFAULT_PARAMS,
-    colors: DEFAULT_COLORS,
-  };
+  const initialScene = sharedSceneBundle?.scene ??
+    readSessionScene() ?? {
+      animationType: "liquid" as AnimationType,
+      params: DEFAULT_PARAMS,
+      colors: DEFAULT_COLORS,
+    };
 
   const [params, setParams] = useState<GradientParams>(initialScene.params);
   const [colors, setColors] = useState<ColorRgb[]>(initialScene.colors);
-  const [renderColors, setRenderColors] = useState<ColorRgb[]>(initialScene.colors);
-  const [animationType, setAnimationType] = useState<AnimationType>(initialScene.animationType);
+  const [renderColors, setRenderColors] = useState<ColorRgb[]>(
+    initialScene.colors,
+  );
+  const [animationType, setAnimationType] = useState<AnimationType>(
+    initialScene.animationType,
+  );
   const [uiVisible, setUiVisible] = useState(true);
   const [paused, setPaused] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [hintVisible, setHintVisible] = useState(true);
-  const [savedPresets, setSavedPresets] = useState<SavedPreset[]>(readSavedPresets);
-  const [recentScenes, setRecentScenes] = useState<RecentScene[]>(readRecentScenes);
-  const [rendererStatus, setRendererStatus] = useState<RendererStatus | null>(null);
+  const [savedPresets, setSavedPresets] =
+    useState<SavedPreset[]>(readSavedPresets);
+  const [recentScenes, setRecentScenes] =
+    useState<RecentScene[]>(readRecentScenes);
+  const [rendererStatus, setRendererStatus] = useState<RendererStatus | null>(
+    null,
+  );
   const [toast, setToast] = useState<ToastState | null>(null);
-  const [viewMode, setViewMode] = useState<'compact' | 'advanced'>('compact');
+  const [viewMode, setViewMode] = useState<"compact" | "advanced">("compact");
   const [workflowLocks, setWorkflowLocks] = useState<WorkflowLocks>({
     mode: false,
     palette: false,
@@ -534,17 +673,27 @@ function App() {
   const [futureScenes, setFutureScenes] = useState<SceneState[]>([]);
   const [renderScale, setRenderScale] = useState(1);
   const [isRecording, setIsRecording] = useState(false);
-  const [activeSceneName, setActiveSceneName] = useState<string | null>(sharedSceneName);
-  const [loopSafePreview, setLoopSafePreview] = useState<{ durationSeconds: number; startedAt: number } | null>(null);
-  const [externalRenderTime, setExternalRenderTime] = useState<number | null>(null);
+  const [activeSceneName, setActiveSceneName] = useState<string | null>(
+    sharedSceneName,
+  );
+  const [loopSafePreview, setLoopSafePreview] = useState<{
+    durationSeconds: number;
+    startedAt: number;
+  } | null>(null);
+  const [externalRenderTime, setExternalRenderTime] = useState<number | null>(
+    null,
+  );
   const [isSavePresetOpen, setIsSavePresetOpen] = useState(false);
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
-  const [savePresetName, setSavePresetName] = useState('');
-  const [modeTransition, setModeTransition] = useState<ModeTransitionState | null>(null);
-  const [onboardingStep, setOnboardingStep] = useState<number | null>(() => (readOnboardingDismissed() ? null : 0));
+  const [savePresetName, setSavePresetName] = useState("");
+  const [modeTransition, setModeTransition] =
+    useState<ModeTransitionState | null>(null);
+  const [onboardingStep, setOnboardingStep] = useState<number | null>(() =>
+    readOnboardingDismissed() ? null : 0,
+  );
   const [exportStatus, setExportStatus] = useState<ExportStatusState>({
-    phase: 'idle',
-    label: 'Ready',
+    phase: "idle",
+    label: "Ready",
     progress: 0,
   });
   const previousSceneRef = useRef<SceneState>(cloneScene(initialScene));
@@ -559,7 +708,7 @@ function App() {
   const savePresetInputRef = useRef<HTMLInputElement | null>(null);
   const modeTransitionTimeoutRef = useRef<number | null>(null);
   const storageErrorToastRef = useRef<string | null>(null);
-  const previousExportPhaseRef = useRef<ExportStatusState['phase']>('idle');
+  const previousExportPhaseRef = useRef<ExportStatusState["phase"]>("idle");
   const rendererRef = useRef<RendererHandle | null>(null);
 
   const currentScene: SceneState = {
@@ -580,13 +729,16 @@ function App() {
   }, [toast]);
 
   useEffect(() => {
-    if (exportStatus.phase === 'complete' && previousExportPhaseRef.current !== 'complete') {
+    if (
+      exportStatus.phase === "complete" &&
+      previousExportPhaseRef.current !== "complete"
+    ) {
       void confetti({
         particleCount: 90,
         spread: 70,
         startVelocity: 28,
         origin: { x: 0.85, y: 0.18 },
-        colors: ['#F2622F', '#FF9B5C', '#FFE3D2', '#FFFFFF'],
+        colors: ["#F2622F", "#FF9B5C", "#FFE3D2", "#FFFFFF"],
       });
     }
 
@@ -598,7 +750,7 @@ function App() {
 
     const step = ONBOARDING_STEPS[onboardingStep];
     const target = document.getElementById(step.targetId);
-    const panel = document.getElementById('panel');
+    const panel = document.getElementById("panel");
     if (!target || !panel) return;
 
     const targetRect = target.getBoundingClientRect();
@@ -609,15 +761,15 @@ function App() {
 
     panel.scrollTo({
       top: desiredTop,
-      behavior: 'smooth',
+      behavior: "smooth",
     });
   }, [onboardingStep]);
 
   useEffect(() => {
     if (!sharedSceneName) return;
-    recordRecentScene(initialScene, sharedSceneName, 'shared');
-    showToast('Shared scene loaded', sharedSceneName);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    recordRecentScene(initialScene, sharedSceneName, "shared");
+    showToast("Shared scene loaded", sharedSceneName);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -649,9 +801,16 @@ function App() {
     const startedAt = performance.now();
 
     const animate = (now: number) => {
-      const linearProgress = Math.min(1, (now - startedAt) / PALETTE_TRANSITION_MS);
+      const linearProgress = Math.min(
+        1,
+        (now - startedAt) / PALETTE_TRANSITION_MS,
+      );
       const easedProgress = easeInOutCubic(linearProgress);
-      const nextPalette = interpolatePalettes(startPalette, colors, easedProgress);
+      const nextPalette = interpolatePalettes(
+        startPalette,
+        colors,
+        easedProgress,
+      );
       renderColorsRef.current = nextPalette;
       setRenderColors(nextPalette);
 
@@ -694,7 +853,10 @@ function App() {
       if (modeTransitionTimeoutRef.current !== null) {
         window.clearTimeout(modeTransitionTimeoutRef.current);
       }
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      if (
+        mediaRecorderRef.current &&
+        mediaRecorderRef.current.state !== "inactive"
+      ) {
         mediaRecorderRef.current.stop();
       }
     };
@@ -715,7 +877,8 @@ function App() {
 
     const tick = (now: number) => {
       const elapsed = Math.min(durationMs, now - loopSafePreview.startedAt);
-      const mirroredElapsed = elapsed <= halfDurationMs ? elapsed : durationMs - elapsed;
+      const mirroredElapsed =
+        elapsed <= halfDurationMs ? elapsed : durationMs - elapsed;
       const seconds = (mirroredElapsed / 1000) * params.speed;
       setExternalRenderTime(seconds);
 
@@ -748,11 +911,17 @@ function App() {
 
   useEffect(() => {
     try {
-      localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(serializeSceneForPersistence(currentScene)));
+      localStorage.setItem(
+        SESSION_STORAGE_KEY,
+        JSON.stringify(serializeSceneForPersistence(currentScene)),
+      );
     } catch (error) {
-      if (storageErrorToastRef.current !== 'session') {
-        storageErrorToastRef.current = 'session';
-        showToast('Storage unavailable', 'Session changes could not be saved locally.');
+      if (storageErrorToastRef.current !== "session") {
+        storageErrorToastRef.current = "session";
+        showToast(
+          "Storage unavailable",
+          "Session changes could not be saved locally.",
+        );
       }
     }
   }, [animationType, params, colors]);
@@ -761,20 +930,25 @@ function App() {
     try {
       localStorage.setItem(
         PRESETS_STORAGE_KEY,
-        JSON.stringify(savedPresets.map(preset => ({
-          ...serializeSceneForPersistence(preset),
-          id: preset.id,
-          name: preset.name,
-          createdAt: preset.createdAt,
-        })))
+        JSON.stringify(
+          savedPresets.map((preset) => ({
+            ...serializeSceneForPersistence(preset),
+            id: preset.id,
+            name: preset.name,
+            createdAt: preset.createdAt,
+          })),
+        ),
       );
-      if (storageErrorToastRef.current === 'presets') {
+      if (storageErrorToastRef.current === "presets") {
         storageErrorToastRef.current = null;
       }
     } catch {
-      if (storageErrorToastRef.current !== 'presets') {
-        storageErrorToastRef.current = 'presets';
-        showToast('Preset save failed', 'Local storage is full or unavailable. Delete old presets and try again.');
+      if (storageErrorToastRef.current !== "presets") {
+        storageErrorToastRef.current = "presets";
+        showToast(
+          "Preset save failed",
+          "Local storage is full or unavailable. Delete old presets and try again.",
+        );
       }
     }
   }, [savedPresets]);
@@ -783,18 +957,23 @@ function App() {
     try {
       localStorage.setItem(
         RECENT_SCENES_STORAGE_KEY,
-        JSON.stringify(recentScenes.map(scene => ({
-          ...serializeSceneForPersistence(scene),
-          id: scene.id,
-          name: scene.name,
-          seenAt: scene.seenAt,
-          source: scene.source,
-        })))
+        JSON.stringify(
+          recentScenes.map((scene) => ({
+            ...serializeSceneForPersistence(scene),
+            id: scene.id,
+            name: scene.name,
+            seenAt: scene.seenAt,
+            source: scene.source,
+          })),
+        ),
       );
     } catch {
-      if (storageErrorToastRef.current !== 'recent-scenes') {
-        storageErrorToastRef.current = 'recent-scenes';
-        showToast('Storage unavailable', 'Recent scenes could not be stored locally.');
+      if (storageErrorToastRef.current !== "recent-scenes") {
+        storageErrorToastRef.current = "recent-scenes";
+        showToast(
+          "Storage unavailable",
+          "Recent scenes could not be stored locally.",
+        );
       }
     }
   }, [recentScenes]);
@@ -811,7 +990,10 @@ function App() {
       return;
     }
 
-    setPastScenes(prev => [...prev.slice(-(HISTORY_LIMIT - 1)), cloneScene(previousScene)]);
+    setPastScenes((prev) => [
+      ...prev.slice(-(HISTORY_LIMIT - 1)),
+      cloneScene(previousScene),
+    ]);
     setFutureScenes([]);
     previousSceneRef.current = cloneScene(currentScene);
   }, [currentScene]);
@@ -829,7 +1011,7 @@ function App() {
     const activeCanvas = rendererRef.current?.getCanvas();
     if (activeCanvas) {
       try {
-        const imageUrl = activeCanvas.toDataURL('image/png');
+        const imageUrl = activeCanvas.toDataURL("image/png");
         setModeTransition({
           id: Date.now(),
           imageUrl,
@@ -867,18 +1049,18 @@ function App() {
   const dismissOnboarding = () => {
     setOnboardingStep(null);
     try {
-      localStorage.setItem(ONBOARDING_STORAGE_KEY, 'true');
+      localStorage.setItem(ONBOARDING_STORAGE_KEY, "true");
     } catch {
       // Ignore storage failures and keep onboarding dismissible for the session.
     }
   };
 
   const advanceOnboarding = () => {
-    setOnboardingStep(current => {
+    setOnboardingStep((current) => {
       if (current === null) return null;
       if (current >= ONBOARDING_STEPS.length - 1) {
         try {
-          localStorage.setItem(ONBOARDING_STORAGE_KEY, 'true');
+          localStorage.setItem(ONBOARDING_STORAGE_KEY, "true");
         } catch {
           // Ignore storage failures and keep onboarding dismissible for the session.
         }
@@ -895,8 +1077,8 @@ function App() {
 
     exportResetTimeoutRef.current = window.setTimeout(() => {
       setExportStatus({
-        phase: 'idle',
-        label: 'Ready',
+        phase: "idle",
+        label: "Ready",
         progress: 0,
       });
       exportResetTimeoutRef.current = null;
@@ -904,7 +1086,9 @@ function App() {
   };
 
   const getSceneName = (scene: SceneState) => {
-    const matchingPreset = savedPresets.find(preset => sceneKey(cloneScene(preset)) === sceneKey(scene));
+    const matchingPreset = savedPresets.find(
+      (preset) => sceneKey(cloneScene(preset)) === sceneKey(scene),
+    );
     if (matchingPreset) {
       return matchingPreset.name;
     }
@@ -912,9 +1096,13 @@ function App() {
     return `${animationTypeLabel(scene.animationType)} Scene`;
   };
 
-  const recordRecentScene = (scene: SceneState, name: string, source: RecentScene['source']) => {
+  const recordRecentScene = (
+    scene: SceneState,
+    name: string,
+    source: RecentScene["source"],
+  ) => {
     const sceneSignature = sceneKey(scene);
-    setRecentScenes(prev => {
+    setRecentScenes((prev) => {
       const nextEntry: RecentScene = {
         ...cloneScene(scene),
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -925,26 +1113,30 @@ function App() {
 
       return [
         nextEntry,
-        ...prev.filter(entry => sceneKey(entry) !== sceneSignature).slice(0, RECENT_SCENES_LIMIT - 1),
+        ...prev
+          .filter((entry) => sceneKey(entry) !== sceneSignature)
+          .slice(0, RECENT_SCENES_LIMIT - 1),
       ];
     });
   };
 
   const handleDeleteRecentScene = (id: string) => {
-    const deletedScene = recentScenes.find(scene => scene.id === id);
-    setRecentScenes(prev => prev.filter(scene => scene.id !== id));
-    showToast('Recent scene removed', deletedScene?.name);
+    const deletedScene = recentScenes.find((scene) => scene.id === id);
+    setRecentScenes((prev) => prev.filter((scene) => scene.id !== id));
+    showToast("Recent scene removed", deletedScene?.name);
   };
 
   const handleSavePreset = () => {
-    const suggestedName = activeSceneName ?? `${animationTypeLabel(animationType)} ${new Date().toLocaleDateString()}`;
+    const suggestedName =
+      activeSceneName ??
+      `${animationTypeLabel(animationType)} ${new Date().toLocaleDateString()}`;
     setSavePresetName(suggestedName);
     setIsSavePresetOpen(true);
   };
 
   const closeSavePresetDialog = () => {
     setIsSavePresetOpen(false);
-    setSavePresetName('');
+    setSavePresetName("");
   };
 
   const submitSavePreset = (event?: FormEvent<HTMLFormElement>) => {
@@ -952,9 +1144,12 @@ function App() {
     const name = savePresetName.trim();
     if (!name) return;
 
-    const duplicateCount = savedPresets.filter(preset => preset.name.toLowerCase() === name.toLowerCase()).length;
-    const finalName = duplicateCount > 0 ? `${name} ${duplicateCount + 1}` : name;
-    setSavedPresets(prev => [
+    const duplicateCount = savedPresets.filter(
+      (preset) => preset.name.toLowerCase() === name.toLowerCase(),
+    ).length;
+    const finalName =
+      duplicateCount > 0 ? `${name} ${duplicateCount + 1}` : name;
+    setSavedPresets((prev) => [
       {
         ...currentScene,
         id: `${Date.now()}`,
@@ -964,55 +1159,71 @@ function App() {
       ...prev,
     ]);
     setActiveSceneName(finalName);
-    recordRecentScene(currentScene, finalName, 'preset');
+    recordRecentScene(currentScene, finalName, "preset");
     closeSavePresetDialog();
-    showToast('Preset saved', finalName);
+    showToast("Preset saved", finalName);
   };
 
   const handleLoadPreset = (preset: SavedPreset) => {
     applyScene(preset);
     setActiveSceneName(preset.name);
-    recordRecentScene(preset, preset.name, 'preset');
-    showToast('Preset loaded', preset.name);
+    recordRecentScene(preset, preset.name, "preset");
+    showToast("Preset loaded", preset.name);
   };
 
   const handleLoadRecentScene = (scene: RecentScene) => {
     applyScene(scene);
     setActiveSceneName(scene.name);
     recordRecentScene(scene, scene.name, scene.source);
-    showToast('Recent scene loaded', scene.name);
+    showToast("Recent scene loaded", scene.name);
   };
 
   const handleDeletePreset = (id: string) => {
-    const deletedPreset = savedPresets.find(preset => preset.id === id);
-    setSavedPresets(prev => prev.filter(preset => preset.id !== id));
+    const deletedPreset = savedPresets.find((preset) => preset.id === id);
+    setSavedPresets((prev) => prev.filter((preset) => preset.id !== id));
     if (deletedPreset && deletedPreset.name === activeSceneName) {
       setActiveSceneName(null);
     }
-    showToast('Preset deleted', deletedPreset?.name);
+    showToast("Preset deleted", deletedPreset?.name);
   };
 
   const handleShareScene = async () => {
     const url = new URL(window.location.href);
-    url.searchParams.set(SHARE_PARAM_KEY, serializeShareScene(currentScene, activeSceneName ?? getSceneName(currentScene)));
+    url.searchParams.set(
+      SHARE_PARAM_KEY,
+      serializeShareScene(
+        currentScene,
+        activeSceneName ?? getSceneName(currentScene),
+      ),
+    );
     url.searchParams.delete(SHARE_NAME_PARAM_KEY);
 
     try {
       await navigator.clipboard.writeText(url.toString());
-      recordRecentScene(currentScene, activeSceneName ?? getSceneName(currentScene), 'shared');
-      showToast('Share link copied', activeSceneName ?? getSceneName(currentScene));
+      recordRecentScene(
+        currentScene,
+        activeSceneName ?? getSceneName(currentScene),
+        "shared",
+      );
+      showToast(
+        "Share link copied",
+        activeSceneName ?? getSceneName(currentScene),
+      );
     } catch {
-      window.prompt('Copy this share link', url.toString());
+      window.prompt("Copy this share link", url.toString());
     }
   };
 
-  const captureCanvasBlob = (canvas: HTMLCanvasElement) => new Promise<Blob | null>(resolve => {
-    canvas.toBlob(resolve);
-  });
+  const captureCanvasBlob = (canvas: HTMLCanvasElement) =>
+    new Promise<Blob | null>((resolve) => {
+      canvas.toBlob(resolve);
+    });
 
   const waitForPaint = async (frames = 2) => {
     for (let i = 0; i < frames; i += 1) {
-      await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => resolve()),
+      );
     }
   };
 
@@ -1020,21 +1231,21 @@ function App() {
     const canvas = rendererRef.current?.getCanvas();
     if (!canvas) {
       setExportStatus({
-        phase: 'error',
-        label: 'Export failed',
-        detail: 'No active canvas found.',
+        phase: "error",
+        label: "Export failed",
+        detail: "No active canvas found.",
         progress: 0,
       });
       scheduleExportReset();
-      showToast('Export failed', 'No active canvas found to export.');
+      showToast("Export failed", "No active canvas found to export.");
       return;
     }
 
     try {
       setExportStatus({
-        phase: 'preparing',
-        label: scale > 1 ? `Preparing ${scale}x PNG` : 'Preparing PNG',
-        detail: 'Configuring canvas for capture.',
+        phase: "preparing",
+        label: scale > 1 ? `Preparing ${scale}x PNG` : "Preparing PNG",
+        detail: "Configuring canvas for capture.",
         progress: 15,
       });
 
@@ -1044,9 +1255,9 @@ function App() {
       }
 
       setExportStatus({
-        phase: 'capturing',
-        label: scale > 1 ? `Capturing ${scale}x PNG` : 'Capturing PNG',
-        detail: 'Rendering the current frame.',
+        phase: "capturing",
+        label: scale > 1 ? `Capturing ${scale}x PNG` : "Capturing PNG",
+        detail: "Rendering the current frame.",
         progress: 62,
         frameCount: 1,
         frameTotal: 1,
@@ -1056,30 +1267,30 @@ function App() {
       const blob = await captureCanvasBlob(exportCanvas);
       if (!blob) {
         setExportStatus({
-          phase: 'error',
-          label: 'Export failed',
-          detail: 'The browser could not encode the image.',
+          phase: "error",
+          label: "Export failed",
+          detail: "The browser could not encode the image.",
           progress: 0,
         });
         scheduleExportReset();
-        showToast('Export failed', 'Image export failed.');
+        showToast("Export failed", "Image export failed.");
         return;
       }
 
       const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
+      const link = document.createElement("a");
       link.href = url;
       link.download = `color-motion-${animationType}-${scale}x-${Date.now()}.png`;
       link.click();
       URL.revokeObjectURL(url);
       setExportStatus({
-        phase: 'complete',
-        label: scale > 1 ? `${scale}x PNG ready` : 'PNG ready',
-        detail: 'Download started.',
+        phase: "complete",
+        label: scale > 1 ? `${scale}x PNG ready` : "PNG ready",
+        detail: "Download started.",
         progress: 100,
       });
       scheduleExportReset();
-      showToast(scale > 1 ? `${scale}x PNG exported` : 'PNG exported');
+      showToast(scale > 1 ? `${scale}x PNG exported` : "PNG exported");
     } finally {
       if (scale > 1) {
         setRenderScale(1);
@@ -1089,53 +1300,77 @@ function App() {
 
   const downloadBlob = (blob: Blob, filename: string) => {
     const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
+    const link = document.createElement("a");
     link.href = url;
     link.download = filename;
     link.click();
     URL.revokeObjectURL(url);
   };
 
-  const handleRecordVideo = async (durationSeconds: number, loopSafe = false) => {
+  const handleRecordVideo = async (
+    durationSeconds: number,
+    loopSafe = false,
+  ) => {
     if (isRecording) {
-      showToast('Recording in progress');
+      showToast("Recording in progress");
       return;
     }
 
-    if (loopSafe && !(rendererRef.current?.supportsLoopSafeExport ?? supportsLoopSafeExport(animationType))) {
+    if (
+      loopSafe &&
+      !(
+        rendererRef.current?.supportsLoopSafeExport ??
+        supportsLoopSafeExport(animationType)
+      )
+    ) {
       setExportStatus({
-        phase: 'error',
-        label: 'Loop-safe export unavailable',
-        detail: 'Choose liquid, waves, voronoi, or blobs.',
+        phase: "error",
+        label: "Loop-safe export unavailable",
+        detail: "Choose liquid, waves, voronoi, or blobs.",
         progress: 0,
       });
       scheduleExportReset();
-      showToast('Loop-safe export unavailable', 'Use liquid, waves, voronoi, or blobs for seamless loop export.');
+      showToast(
+        "Loop-safe export unavailable",
+        "Use liquid, waves, voronoi, or blobs for seamless loop export.",
+      );
       return;
     }
 
     const canvas = rendererRef.current?.getCanvas();
-    if (!canvas || typeof canvas.captureStream !== 'function' || typeof MediaRecorder === 'undefined') {
+    if (
+      !canvas ||
+      typeof canvas.captureStream !== "function" ||
+      typeof MediaRecorder === "undefined"
+    ) {
       setExportStatus({
-        phase: 'error',
-        label: 'Recording unavailable',
-        detail: 'This browser cannot record canvas output.',
+        phase: "error",
+        label: "Recording unavailable",
+        detail: "This browser cannot record canvas output.",
         progress: 0,
       });
       scheduleExportReset();
-      showToast('Recording unavailable', 'This browser cannot record canvas output.');
+      showToast(
+        "Recording unavailable",
+        "This browser cannot record canvas output.",
+      );
       return;
     }
 
-    const preferredTypes = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
-    const mimeType = preferredTypes.find(type => MediaRecorder.isTypeSupported(type)) ?? '';
+    const preferredTypes = [
+      "video/webm;codecs=vp9",
+      "video/webm;codecs=vp8",
+      "video/webm",
+    ];
+    const mimeType =
+      preferredTypes.find((type) => MediaRecorder.isTypeSupported(type)) ?? "";
 
     try {
       setIsRecording(true);
       setExportStatus({
-        phase: 'preparing',
-        label: loopSafe ? 'Preparing loop-safe WebM' : 'Preparing WebM',
-        detail: 'Setting up recorder.',
+        phase: "preparing",
+        label: loopSafe ? "Preparing loop-safe WebM" : "Preparing WebM",
+        detail: "Setting up recorder.",
         progress: 8,
       });
       if (loopSafe) {
@@ -1147,11 +1382,14 @@ function App() {
       await waitForPaint(2);
 
       const stream = canvas.captureStream(60);
-      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      const recorder = new MediaRecorder(
+        stream,
+        mimeType ? { mimeType } : undefined,
+      );
       const chunks: Blob[] = [];
       mediaRecorderRef.current = recorder;
 
-      recorder.ondataavailable = event => {
+      recorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
           chunks.push(event.data);
         }
@@ -1160,19 +1398,19 @@ function App() {
       recorder.onerror = () => {
         setIsRecording(false);
         setLoopSafePreview(null);
-        stream.getTracks().forEach(track => track.stop());
+        stream.getTracks().forEach((track) => track.stop());
         setExportStatus({
-          phase: 'error',
-          label: 'Recording failed',
-          detail: 'The browser stopped the video export.',
+          phase: "error",
+          label: "Recording failed",
+          detail: "The browser stopped the video export.",
           progress: 0,
         });
         scheduleExportReset();
-        showToast('Recording failed', 'The browser stopped the video export.');
+        showToast("Recording failed", "The browser stopped the video export.");
       };
 
       recorder.onstop = () => {
-        stream.getTracks().forEach(track => track.stop());
+        stream.getTracks().forEach((track) => track.stop());
         mediaRecorderRef.current = null;
         if (recordingTimeoutRef.current !== null) {
           window.clearTimeout(recordingTimeoutRef.current);
@@ -1181,32 +1419,39 @@ function App() {
 
         if (chunks.length > 0) {
           setExportStatus({
-            phase: 'encoding',
-            label: 'Encoding WebM',
-            detail: 'Finalizing video file.',
+            phase: "encoding",
+            label: "Encoding WebM",
+            detail: "Finalizing video file.",
             progress: 96,
           });
           downloadBlob(
-            new Blob(chunks, { type: mimeType || 'video/webm' }),
-            `color-motion-${animationType}-${loopSafe ? 'loop-' : ''}${durationSeconds}s-${Date.now()}.webm`
+            new Blob(chunks, { type: mimeType || "video/webm" }),
+            `color-motion-${animationType}-${loopSafe ? "loop-" : ""}${durationSeconds}s-${Date.now()}.webm`,
           );
           setExportStatus({
-            phase: 'complete',
-            label: 'WebM ready',
-            detail: loopSafe ? 'Loop-safe clip downloaded.' : `${durationSeconds}s clip downloaded.`,
+            phase: "complete",
+            label: "WebM ready",
+            detail: loopSafe
+              ? "Loop-safe clip downloaded."
+              : `${durationSeconds}s clip downloaded.`,
             progress: 100,
           });
           scheduleExportReset();
-          showToast('WebM exported', loopSafe ? 'Loop-safe clip ready' : `${durationSeconds}s clip ready`);
+          showToast(
+            "WebM exported",
+            loopSafe
+              ? "Loop-safe clip ready"
+              : `${durationSeconds}s clip ready`,
+          );
         } else {
           setExportStatus({
-            phase: 'error',
-            label: 'Recording failed',
-            detail: 'No video frames were captured.',
+            phase: "error",
+            label: "Recording failed",
+            detail: "No video frames were captured.",
             progress: 0,
           });
           scheduleExportReset();
-          showToast('Recording failed', 'No video frames were captured.');
+          showToast("Recording failed", "No video frames were captured.");
         }
 
         setLoopSafePreview(null);
@@ -1217,11 +1462,15 @@ function App() {
       const startedAt = performance.now();
       const updateProgress = (now: number) => {
         const elapsed = Math.min(durationSeconds * 1000, now - startedAt);
-        const progress = 18 + Math.round((elapsed / (durationSeconds * 1000)) * 72);
-        const frameCount = Math.min(Math.round((elapsed / 1000) * 60), durationSeconds * 60);
+        const progress =
+          18 + Math.round((elapsed / (durationSeconds * 1000)) * 72);
+        const frameCount = Math.min(
+          Math.round((elapsed / 1000) * 60),
+          durationSeconds * 60,
+        );
         setExportStatus({
-          phase: 'recording',
-          label: loopSafe ? 'Recording loop-safe WebM' : 'Recording WebM',
+          phase: "recording",
+          label: loopSafe ? "Recording loop-safe WebM" : "Recording WebM",
           detail: `${Math.ceil((durationSeconds * 1000 - elapsed) / 1000)}s remaining`,
           progress,
           frameCount,
@@ -1229,7 +1478,8 @@ function App() {
         });
 
         if (elapsed < durationSeconds * 1000) {
-          exportProgressFrameRef.current = requestAnimationFrame(updateProgress);
+          exportProgressFrameRef.current =
+            requestAnimationFrame(updateProgress);
         } else {
           exportProgressFrameRef.current = null;
         }
@@ -1239,22 +1489,25 @@ function App() {
       }
       exportProgressFrameRef.current = requestAnimationFrame(updateProgress);
       recordingTimeoutRef.current = window.setTimeout(() => {
-        if (recorder.state !== 'inactive') {
+        if (recorder.state !== "inactive") {
           recorder.stop();
         }
       }, durationSeconds * 1000);
-      showToast('Recording started', loopSafe ? 'Loop-safe WebM clip' : `${durationSeconds}s WebM clip`);
+      showToast(
+        "Recording started",
+        loopSafe ? "Loop-safe WebM clip" : `${durationSeconds}s WebM clip`,
+      );
     } catch {
       setIsRecording(false);
       setLoopSafePreview(null);
       setExportStatus({
-        phase: 'error',
-        label: 'Recording failed',
-        detail: 'Unable to start video export.',
+        phase: "error",
+        label: "Recording failed",
+        detail: "Unable to start video export.",
         progress: 0,
       });
       scheduleExportReset();
-      showToast('Recording failed', 'Unable to start video export.');
+      showToast("Recording failed", "Unable to start video export.");
     }
   };
 
@@ -1262,77 +1515,83 @@ function App() {
     setParams(DEFAULT_PARAMS);
     setPaused(false);
     setActiveSceneName(null);
-    showToast('Mode reset', `Reset ${animationType} controls`);
+    showToast("Mode reset", `Reset ${animationType} controls`);
   };
 
   const handleResetPalette = () => {
     setColors(DEFAULT_COLORS);
     setActiveSceneName(null);
-    showToast('Palette reset');
+    showToast("Palette reset");
   };
 
   const handleResetScene = () => {
-    startModeTransition('liquid');
+    startModeTransition("liquid");
     setParams(DEFAULT_PARAMS);
     setColors(DEFAULT_COLORS);
     setPaused(false);
     setActiveSceneName(null);
-    showToast('Scene reset', 'Restored the default scene');
+    showToast("Scene reset", "Restored the default scene");
   };
 
   const handleUndo = () => {
     const previousScene = pastScenes[pastScenes.length - 1];
     if (!previousScene) return;
 
-    setPastScenes(prev => prev.slice(0, -1));
-    setFutureScenes(prev => [cloneScene(currentScene), ...prev]);
+    setPastScenes((prev) => prev.slice(0, -1));
+    setFutureScenes((prev) => [cloneScene(currentScene), ...prev]);
     applyScene(previousScene);
-    showToast('Undid last change');
+    showToast("Undid last change");
   };
 
   const handleRedo = () => {
     const nextScene = futureScenes[0];
     if (!nextScene) return;
 
-    setFutureScenes(prev => prev.slice(1));
-    setPastScenes(prev => [...prev.slice(-(HISTORY_LIMIT - 1)), cloneScene(currentScene)]);
+    setFutureScenes((prev) => prev.slice(1));
+    setPastScenes((prev) => [
+      ...prev.slice(-(HISTORY_LIMIT - 1)),
+      cloneScene(currentScene),
+    ]);
     applyScene(nextScene);
-    showToast('Redid change');
+    showToast("Redid change");
   };
 
   const toggleWorkflowLock = (key: keyof WorkflowLocks) => {
-    setWorkflowLocks(prev => ({ ...prev, [key]: !prev[key] }));
+    setWorkflowLocks((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
   const handleRandomizeMode = () => {
     if (workflowLocks.mode) {
-      showToast('Mode lock enabled', 'Unlock mode to randomize it.');
+      showToast("Mode lock enabled", "Unlock mode to randomize it.");
       return;
     }
 
     const nextMode = randomAnimationType();
     startModeTransition(nextMode);
-    showToast('Mode randomized');
+    showToast("Mode randomized");
   };
 
   const handleRandomizePalette = () => {
     if (workflowLocks.palette) {
-      showToast('Palette lock enabled', 'Unlock palette to randomize it.');
+      showToast("Palette lock enabled", "Unlock palette to randomize it.");
       return;
     }
 
     setColors(randomPaletteColors());
-    showToast('Palette randomized');
+    showToast("Palette randomized");
   };
 
   const handleRandomizeParams = () => {
     if (workflowLocks.motion && workflowLocks.seed) {
-      showToast('Parameter locks enabled', 'Unlock seed or motion controls to randomize them.');
+      showToast(
+        "Parameter locks enabled",
+        "Unlock seed or motion controls to randomize them.",
+      );
       return;
     }
 
-    setParams(prev => randomParams(prev, workflowLocks));
-    showToast('Parameters randomized');
+    setParams((prev) => randomParams(prev, workflowLocks));
+    showToast("Parameters randomized");
   };
 
   const handleRandomizeScene = () => {
@@ -1343,38 +1602,38 @@ function App() {
       setColors(randomPaletteColors());
     }
     if (!(workflowLocks.motion && workflowLocks.seed)) {
-      setParams(prev => randomParams(prev, workflowLocks));
+      setParams((prev) => randomParams(prev, workflowLocks));
     }
-    showToast('Scene randomized');
+    showToast("Scene randomized");
   };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (isSavePresetOpen && e.key === 'Escape') {
+      if (isSavePresetOpen && e.key === "Escape") {
         e.preventDefault();
         closeSavePresetDialog();
         return;
       }
 
-      if (isShortcutsOpen && e.key === 'Escape') {
+      if (isShortcutsOpen && e.key === "Escape") {
         e.preventDefault();
         setIsShortcutsOpen(false);
         return;
       }
 
-      if (onboardingStep !== null && e.key === 'Escape') {
+      if (onboardingStep !== null && e.key === "Escape") {
         e.preventDefault();
         dismissOnboarding();
         return;
       }
 
       const target = e.target as HTMLElement | null;
-      const isEditableTarget = !!target && (
-        target.tagName === 'INPUT'
-        || target.tagName === 'TEXTAREA'
-        || target.tagName === 'SELECT'
-        || target.isContentEditable
-      );
+      const isEditableTarget =
+        !!target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "SELECT" ||
+          target.isContentEditable);
 
       if (isEditableTarget) {
         return;
@@ -1383,56 +1642,139 @@ function App() {
       const modifierKey = e.ctrlKey || e.metaKey;
       const lowerKey = e.key.toLowerCase();
 
-      if (e.key === '?' || (e.shiftKey && e.key === '/')) {
+      if (e.key === "?" || (e.shiftKey && e.key === "/")) {
         e.preventDefault();
-        setIsShortcutsOpen(open => !open);
+        setIsShortcutsOpen((open) => !open);
         return;
       }
 
-      if (modifierKey && !e.shiftKey && lowerKey === 'z') {
+      if (modifierKey && !e.shiftKey && lowerKey === "z") {
         e.preventDefault();
         handleUndo();
         return;
       }
 
-      if (modifierKey && (lowerKey === 'y' || (e.shiftKey && lowerKey === 'z'))) {
+      if (
+        modifierKey &&
+        (lowerKey === "y" || (e.shiftKey && lowerKey === "z"))
+      ) {
         e.preventDefault();
         handleRedo();
         return;
       }
 
-      if (lowerKey === 'r') {
+      if (lowerKey === "r") {
         e.preventDefault();
         handleRandomizeScene();
         return;
       }
 
-      if (lowerKey === 's') {
+      if (lowerKey === "s") {
         e.preventDefault();
         handleSavePreset();
         return;
       }
 
-      if (lowerKey === 'h') setUiVisible(v => !v);
-      if (lowerKey === 'f') toggleFullscreen();
-      if (e.key === ' ') {
+      if (lowerKey === "h") setUiVisible((v) => !v);
+      if (lowerKey === "f") toggleFullscreen();
+      if (e.key === " ") {
         e.preventDefault();
-        setPaused(p => !p);
+        setPaused((p) => !p);
       }
     };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isSavePresetOpen, isShortcutsOpen, onboardingStep, handleRedo, handleRandomizeScene, handleSavePreset, handleUndo]);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [
+    isSavePresetOpen,
+    isShortcutsOpen,
+    onboardingStep,
+    handleRedo,
+    handleRandomizeScene,
+    handleSavePreset,
+    handleUndo,
+  ]);
 
   return (
     <>
-      <RendererBoundary resetKey={animationType} onError={handleRendererBoundaryError}>
-        {animationType === 'liquid' && <LiquidCanvas ref={rendererRef} params={params} colors={renderColors} paused={paused} onStatusChange={setRendererStatus} renderScale={renderScale} externalTime={externalRenderTime} />}
-        {animationType === 'waves' && <WavesCanvas ref={rendererRef} params={params} colors={renderColors} paused={paused} onStatusChange={setRendererStatus} renderScale={renderScale} externalTime={externalRenderTime} />}
-        {animationType === 'voronoi' && <VoronoiCanvas ref={rendererRef} params={params} colors={renderColors} paused={paused} onStatusChange={setRendererStatus} renderScale={renderScale} externalTime={externalRenderTime} />}
-        {animationType === 'turing' && <TuringCanvas ref={rendererRef} params={params} colors={renderColors} paused={paused} onStatusChange={setRendererStatus} renderScale={renderScale} />}
-        {animationType === 'particles' && <ParticlesCanvas ref={rendererRef} params={params} colors={renderColors} paused={paused} onStatusChange={setRendererStatus} renderScale={renderScale} />}
-        {animationType === 'blobs' && <BlobsCanvas ref={rendererRef} params={params} colors={renderColors} paused={paused} onStatusChange={setRendererStatus} renderScale={renderScale} externalTime={externalRenderTime} />}
+      <RendererBoundary
+        resetKey={animationType}
+        onError={handleRendererBoundaryError}
+      >
+        {animationType === "liquid" && (
+          <LiquidCanvas
+            ref={rendererRef}
+            params={params}
+            colors={renderColors}
+            paused={paused}
+            onStatusChange={setRendererStatus}
+            renderScale={renderScale}
+            externalTime={externalRenderTime}
+          />
+        )}
+        {animationType === "waves" && (
+          <WavesCanvas
+            ref={rendererRef}
+            params={params}
+            colors={renderColors}
+            paused={paused}
+            onStatusChange={setRendererStatus}
+            renderScale={renderScale}
+            externalTime={externalRenderTime}
+          />
+        )}
+        {animationType === "voronoi" && (
+          <VoronoiCanvas
+            ref={rendererRef}
+            params={params}
+            colors={renderColors}
+            paused={paused}
+            onStatusChange={setRendererStatus}
+            renderScale={renderScale}
+            externalTime={externalRenderTime}
+          />
+        )}
+        {animationType === "three" && (
+          <ThreeJSCanvas
+            ref={rendererRef}
+            params={params}
+            colors={renderColors}
+            paused={paused}
+            onStatusChange={setRendererStatus}
+            renderScale={renderScale}
+            externalTime={externalRenderTime}
+          />
+        )}
+        {animationType === "turing" && (
+          <TuringCanvas
+            ref={rendererRef}
+            params={params}
+            colors={renderColors}
+            paused={paused}
+            onStatusChange={setRendererStatus}
+            renderScale={renderScale}
+          />
+        )}
+        {animationType === "particles" && (
+          <ParticlesCanvas
+            ref={rendererRef}
+            params={params}
+            colors={renderColors}
+            paused={paused}
+            onStatusChange={setRendererStatus}
+            renderScale={renderScale}
+          />
+        )}
+        {animationType === "blobs" && (
+          <BlobsCanvas
+            ref={rendererRef}
+            params={params}
+            colors={renderColors}
+            paused={paused}
+            onStatusChange={setRendererStatus}
+            renderScale={renderScale}
+            externalTime={externalRenderTime}
+          />
+        )}
       </RendererBoundary>
 
       {modeTransition && (
@@ -1445,15 +1787,29 @@ function App() {
       )}
 
       {rendererStatus && (
-        <div className="renderer-fallback" role="dialog" aria-modal="false" aria-labelledby="renderer-fallback-title">
+        <div
+          className="renderer-fallback"
+          role="dialog"
+          aria-modal="false"
+          aria-labelledby="renderer-fallback-title"
+        >
           <span className="section-label">Renderer Status</span>
           <strong id="renderer-fallback-title">{rendererStatus.title}</strong>
           <p>{rendererStatus.message}</p>
           <div className="renderer-fallback-actions">
-            <a className="workspace-btn renderer-fallback-link" href={WEBGL_COMPATIBILITY_URL} target="_blank" rel="noreferrer">
+            <a
+              className="workspace-btn renderer-fallback-link"
+              href={WEBGL_COMPATIBILITY_URL}
+              target="_blank"
+              rel="noreferrer"
+            >
               Compatibility
             </a>
-            <button type="button" className="workspace-btn" onClick={() => startModeTransition('particles')}>
+            <button
+              type="button"
+              className="workspace-btn"
+              onClick={() => startModeTransition("particles")}
+            >
               Use Particles
             </button>
           </div>
@@ -1461,31 +1817,47 @@ function App() {
       )}
 
       {toast && (
-        <div key={toast.id} className="app-toast" role="status" aria-live="polite">
+        <div
+          key={toast.id}
+          className="app-toast"
+          role="status"
+          aria-live="polite"
+        >
           <strong>{toast.title}</strong>
           {toast.message && <p>{toast.message}</p>}
         </div>
       )}
 
       {isSavePresetOpen && (
-        <div className="dialog-overlay" role="presentation" onClick={closeSavePresetDialog}>
+        <div
+          className="dialog-overlay"
+          role="presentation"
+          onClick={closeSavePresetDialog}
+        >
           <div
             className="dialog-card"
             role="dialog"
             aria-modal="true"
             aria-labelledby="save-preset-title"
-            onClick={event => event.stopPropagation()}
+            onClick={(event) => event.stopPropagation()}
           >
             <div className="dialog-header">
               <span className="section-label">Save Preset</span>
-              <button className="dialog-close" onClick={closeSavePresetDialog} aria-label="Close save preset dialog">
+              <button
+                className="dialog-close"
+                onClick={closeSavePresetDialog}
+                aria-label="Close save preset dialog"
+              >
                 +
               </button>
             </div>
             <form className="dialog-form" onSubmit={submitSavePreset}>
               <div className="dialog-copy">
                 <strong id="save-preset-title">Name This Scene</strong>
-                <p>Save the current look into your preset library with a reusable title.</p>
+                <p>
+                  Save the current look into your preset library with a reusable
+                  title.
+                </p>
               </div>
               <label className="dialog-field">
                 <span>Preset name</span>
@@ -1493,16 +1865,24 @@ function App() {
                   ref={savePresetInputRef}
                   type="text"
                   value={savePresetName}
-                  onChange={event => setSavePresetName(event.target.value)}
+                  onChange={(event) => setSavePresetName(event.target.value)}
                   maxLength={80}
                   placeholder="Scene name"
                 />
               </label>
               <div className="dialog-actions">
-                <button type="button" className="workspace-btn" onClick={closeSavePresetDialog}>
+                <button
+                  type="button"
+                  className="workspace-btn"
+                  onClick={closeSavePresetDialog}
+                >
                   Cancel
                 </button>
-                <button type="submit" className="workspace-btn" disabled={!savePresetName.trim()}>
+                <button
+                  type="submit"
+                  className="workspace-btn"
+                  disabled={!savePresetName.trim()}
+                >
                   Save Preset
                 </button>
               </div>
@@ -1512,39 +1892,74 @@ function App() {
       )}
 
       {isShortcutsOpen && (
-        <div className="dialog-overlay" role="presentation" onClick={() => setIsShortcutsOpen(false)}>
+        <div
+          className="dialog-overlay"
+          role="presentation"
+          onClick={() => setIsShortcutsOpen(false)}
+        >
           <div
             className="dialog-card shortcuts-card"
             role="dialog"
             aria-modal="true"
             aria-labelledby="shortcuts-title"
-            onClick={event => event.stopPropagation()}
+            onClick={(event) => event.stopPropagation()}
           >
             <div className="dialog-header">
               <span className="section-label">Shortcuts</span>
-              <button className="dialog-close" onClick={() => setIsShortcutsOpen(false)} aria-label="Close shortcuts dialog">
+              <button
+                className="dialog-close"
+                onClick={() => setIsShortcutsOpen(false)}
+                aria-label="Close shortcuts dialog"
+              >
                 +
               </button>
             </div>
             <div className="dialog-copy">
               <strong id="shortcuts-title">Keyboard Shortcuts</strong>
-              <p>Shortcuts only run when a text field or search input is not focused.</p>
+              <p>
+                Shortcuts only run when a text field or search input is not
+                focused.
+              </p>
             </div>
             <div className="shortcuts-list">
-              <div className="shortcut-row"><kbd>?</kbd><span>Open or close this shortcuts panel</span></div>
-              <div className="shortcut-row"><kbd>Space</kbd><span>Pause or resume animation</span></div>
-              <div className="shortcut-row"><kbd>H</kbd><span>Hide or show the panel</span></div>
-              <div className="shortcut-row"><kbd>F</kbd><span>Toggle fullscreen</span></div>
-              <div className="shortcut-row"><kbd>R</kbd><span>Randomize the current scene</span></div>
-              <div className="shortcut-row"><kbd>S</kbd><span>Save the current scene as a preset</span></div>
-              <div className="shortcut-row"><kbd>Ctrl/⌘ + Z</kbd><span>Undo the last scene change</span></div>
-              <div className="shortcut-row"><kbd>Ctrl/⌘ + Y</kbd><span>Redo the next scene change</span></div>
+              <div className="shortcut-row">
+                <kbd>?</kbd>
+                <span>Open or close this shortcuts panel</span>
+              </div>
+              <div className="shortcut-row">
+                <kbd>Space</kbd>
+                <span>Pause or resume animation</span>
+              </div>
+              <div className="shortcut-row">
+                <kbd>H</kbd>
+                <span>Hide or show the panel</span>
+              </div>
+              <div className="shortcut-row">
+                <kbd>F</kbd>
+                <span>Toggle fullscreen</span>
+              </div>
+              <div className="shortcut-row">
+                <kbd>R</kbd>
+                <span>Randomize the current scene</span>
+              </div>
+              <div className="shortcut-row">
+                <kbd>S</kbd>
+                <span>Save the current scene as a preset</span>
+              </div>
+              <div className="shortcut-row">
+                <kbd>Ctrl/⌘ + Z</kbd>
+                <span>Undo the last scene change</span>
+              </div>
+              <div className="shortcut-row">
+                <kbd>Ctrl/⌘ + Y</kbd>
+                <span>Redo the next scene change</span>
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      <div id="panel" className={uiVisible ? '' : 'hidden'}>
+      <div id="panel" className={uiVisible ? "" : "hidden"}>
         <div className="panel-header">
           <span className="panel-title">{APP_TITLE}</span>
         </div>
@@ -1573,7 +1988,10 @@ function App() {
           recordVideo={handleRecordVideo}
           isRecording={isRecording}
           exportStatus={exportStatus}
-          canLoopSafeExport={rendererRef.current?.supportsLoopSafeExport ?? supportsLoopSafeExport(animationType)}
+          canLoopSafeExport={
+            rendererRef.current?.supportsLoopSafeExport ??
+            supportsLoopSafeExport(animationType)
+          }
           loopSafeDurationSeconds={LOOP_SAFE_DURATION_SECONDS}
           resetMode={handleResetMode}
           resetPalette={handleResetPalette}
@@ -1600,7 +2018,7 @@ function App() {
 
       <button
         id="toggle-ui"
-        className={uiVisible ? 'ui-visible' : ''}
+        className={uiVisible ? "ui-visible" : ""}
         onClick={() => setUiVisible(true)}
         title="Show controls"
         aria-label="Show controls"
@@ -1608,7 +2026,7 @@ function App() {
         +
       </button>
 
-      <div id="hint" className={hintVisible ? '' : 'fade'}>
+      <div id="hint" className={hintVisible ? "" : "fade"}>
         Press H to hide UI | F for fullscreen
       </div>
     </>
