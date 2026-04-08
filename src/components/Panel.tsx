@@ -13,6 +13,7 @@ import {
   Hexagon,
   Lock,
   LockOpen,
+  ChartLineIcon,
   Palette,
   PlayPause,
   Plus,
@@ -152,6 +153,10 @@ const MODE_DETAILS: Record<
     name: "3D Mesh",
     description:
       "Volumetric 3D surface with soft camera orbit and shader palette.",
+  },
+  topographic: {
+    name: "Topographic",
+    description: "Animated contour lines from a flowing noise field.",
   },
 };
 
@@ -501,6 +506,15 @@ export default function Panel({
       aperture: "Aperture",
       maxBlur: "Max Blur",
     },
+    topographic: {
+      seed: "Seed",
+      speed: "Anim Speed",
+      scale: "Cell Size",
+      amplitude: "Detail",
+      frequency: "Noise Density",
+      definition: "Contour Count",
+      blend: "Line Opacity",
+    },
   }[animationType];
 
   const renderOnboardingCard = (stepIndex: number) => {
@@ -729,6 +743,17 @@ export default function Panel({
               <Cube
                 size={16}
                 weight={animationType === "three" ? "fill" : "bold"}
+              />
+            </button>
+            <button
+              className={`mode-btn ${animationType === "topographic" ? "active" : ""}`}
+              onClick={() => setAnimationType("topographic")}
+              title="Topographic"
+              aria-label="Switch to Topographic mode"
+            >
+              <ChartLineIcon
+                size={16}
+                weight={animationType === "topographic" ? "fill" : "bold"}
               />
             </button>
           </div>

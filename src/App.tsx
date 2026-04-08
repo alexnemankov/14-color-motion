@@ -7,6 +7,7 @@ import TuringCanvas from "./components/TuringCanvas";
 import ParticlesCanvas from "./components/ParticlesCanvas";
 import BlobsCanvas from "./components/BlobsCanvas";
 import ThreeJSCanvas from "./components/ThreeJSCanvas";
+import TopographicCanvas from "./components/TopographicCanvas";
 import Panel from "./components/Panel";
 import RendererBoundary from "./components/RendererBoundary";
 import { RendererHandle } from "./components/rendererTypes";
@@ -24,7 +25,8 @@ export type AnimationType =
   | "turing"
   | "particles"
   | "blobs"
-  | "three";
+  | "three"
+  | "topographic";
 
 export interface GradientParams {
   seed: number;
@@ -140,6 +142,7 @@ const VALID_ANIMATION_TYPES: AnimationType[] = [
   "particles",
   "blobs",
   "three",
+  "topographic",
 ];
 const HISTORY_LIMIT = 40;
 const PALETTE_TRANSITION_MS = 1500;
@@ -277,6 +280,7 @@ function animationTypeLabel(type: AnimationType) {
     particles: "Particles",
     blobs: "Blobs",
     three: "3D Mesh",
+    topographic: "Topographic",
   }[type];
 }
 
@@ -1784,6 +1788,17 @@ function App() {
         )}
         {animationType === "blobs" && (
           <BlobsCanvas
+            ref={rendererRef}
+            params={params}
+            colors={renderColors}
+            paused={paused}
+            onStatusChange={setRendererStatus}
+            renderScale={renderScale}
+            externalTime={externalRenderTime}
+          />
+        )}
+        {animationType === "topographic" && (
+          <TopographicCanvas
             ref={rendererRef}
             params={params}
             colors={renderColors}
