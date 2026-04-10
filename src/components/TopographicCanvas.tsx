@@ -4,8 +4,6 @@ import { cloneParams, stepSmoothedParams } from './rendererMotion';
 import { RendererHandle, RendererProps, captureCanvasImageData } from './rendererTypes';
 
 // ─── Simplex Noise ────────────────────────────────────────────────────────────
-const F2 = 0.5 * (Math.sqrt(3) - 1);
-const G2 = (3 - Math.sqrt(3)) / 6;
 const F3 = 1 / 3;
 const G3 = 1 / 6;
 
