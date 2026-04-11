@@ -34,10 +34,13 @@ uniform float uBlend;       // shadow softness
 uniform int   uCloudType;   // 0–4 cloud type selector
 
 // Palette-driven color uniforms
-uniform vec3  uSkyColor;     // palette[0] — sky + horizon background
-uniform vec3  uCloudTint;    // palette[1] — lit cloud surface / top face
-uniform vec3  uSunColor;     // palette[2] — diffuse scatter + sun glare
-uniform vec3  uShadowColor;  // palette[3] — dark underside / shadowed faces
+uniform vec3      uSkyColor;    // palette[0] — sky + horizon background
+uniform vec3      uCloudTint;   // palette[1] — lit cloud surface / top face
+uniform vec3      uSunColor;    // palette[2] — diffuse scatter + sun glare
+uniform vec3      uShadowColor; // palette[3] — dark underside / shadowed faces
+
+// Blue noise 64×64 tiling texture (REPEAT-wrapped, single channel)
+uniform sampler2D uBlueNoise;
 
 out vec4 fragColor;
 
@@ -267,10 +270,30 @@ void main() {
   mat3 ca = setCamera(ro, ta, 0.07 * cos(0.25 * iTime));
   vec3 rd = ca * normalize(vec3(p, 1.5));
 
-  // Low-intensity dither: enough to break banding, small enough to avoid grain
-  float dither = fract(dot(gl_FragCoord.xy, vec2(0.75487766, 0.56984029)));
+  // Blue noise dither sampled from a precomputed tiling texture (REPEAT wrap)
+  float dither = texture(uBlueNoise, gl_FragCoord.xy / 64.0).r;
 
   fragColor = render(ro, rd, dither);
+}
+`;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Blit (upscale) shaders — draws the half-res FBO texture to the full canvas
+// ─────────────────────────────────────────────────────────────────────────────
+
+const BLIT_VERT = /* glsl */ `#version 300 es
+in vec2 a_pos;
+void main() { gl_Position = vec4(a_pos, 0.0, 1.0); }
+`;
+
+const BLIT_FRAG = /* glsl */ `#version 300 es
+precision mediump float;
+uniform sampler2D uTex;
+uniform vec2      uResolution;
+out vec4 fragColor;
+void main() {
+  // Bilinear filtering is provided automatically by LINEAR texture minification
+  fragColor = texture(uTex, gl_FragCoord.xy / uResolution);
 }
 `;
 
@@ -305,6 +328,52 @@ function linkProgram(
     throw new Error(`Program link:\n${gl.getProgramInfoLog(prog)}`);
   }
   return prog;
+}
+
+/**
+ * 64×64 single-channel blue noise texture using Interleaved Gradient Noise.
+ * IGN has excellent low-frequency spectral properties — far less perceptible
+ * grain than white noise, no structured banding of ordered Bayer matrices.
+ * REPEAT-wrapped so it tiles seamlessly over any resolution.
+ */
+function createBlueNoiseTexture(gl: WebGL2RenderingContext): WebGLTexture {
+  const SIZE = 64;
+  const data = new Uint8Array(SIZE * SIZE);
+  for (let y = 0; y < SIZE; y++) {
+    for (let x = 0; x < SIZE; x++) {
+      // Interleaved Gradient Noise (Jimenez 2014 / Destiny 2)
+      const v = (52.9829189 * (((0.06711056 * x + 0.00583715 * y) % 1.0 + 1.0) % 1.0)) % 1.0;
+      data[y * SIZE + x] = Math.floor(v * 255.99);
+    }
+  }
+  const tex = gl.createTexture()!;
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, SIZE, SIZE, 0, gl.RED, gl.UNSIGNED_BYTE, data);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+  return tex;
+}
+
+/** Create or resize the half-resolution FBO used for the raymarch pass. */
+function resizeFBO(
+  gl: WebGL2RenderingContext,
+  fbo: WebGLFramebuffer,
+  tex: WebGLTexture,
+  w: number,
+  h: number,
+) {
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.bindTexture(gl.TEXTURE_2D, null);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -359,40 +428,56 @@ const CloudsCanvas = forwardRef<RendererHandle, RendererProps>(function CloudsCa
     statusRef.current = null;
     onStatusChange?.(null);
 
-    // Compile shaders
-    let vert: WebGLShader, frag: WebGLShader, prog: WebGLProgram;
+    // ── Compile both programs ────────────────────────────────────────────────
+    let marchProg: WebGLProgram, blitProg: WebGLProgram;
     try {
-      vert = compileShader(gl, gl.VERTEX_SHADER, VERT_SRC);
-      frag = compileShader(gl, gl.FRAGMENT_SHADER, FRAG_SRC);
-      prog = linkProgram(gl, vert, frag);
+      marchProg = linkProgram(gl,
+        compileShader(gl, gl.VERTEX_SHADER,   VERT_SRC),
+        compileShader(gl, gl.FRAGMENT_SHADER, FRAG_SRC),
+      );
+      blitProg = linkProgram(gl,
+        compileShader(gl, gl.VERTEX_SHADER,   BLIT_VERT),
+        compileShader(gl, gl.FRAGMENT_SHADER, BLIT_FRAG),
+      );
     } catch (e) {
       statusRef.current = { title: "Shader error", message: String(e) };
       onStatusChange?.(statusRef.current);
       return;
     }
 
-    gl.useProgram(prog);
-
-    // Fullscreen quad
+    // ── Shared fullscreen-quad buffer ────────────────────────────────────────
     const buf = gl.createBuffer()!;
     gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
-    const loc = gl.getAttribLocation(prog, "a_pos");
-    gl.enableVertexAttribArray(loc);
-    gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
 
-    // Cache uniform locations
-    const U: Record<string, WebGLUniformLocation | null> = {};
+    // Bind the quad to the march program's a_pos
+    gl.useProgram(marchProg);
+    const marchLoc = gl.getAttribLocation(marchProg, "a_pos");
+    gl.enableVertexAttribArray(marchLoc);
+    gl.vertexAttribPointer(marchLoc, 2, gl.FLOAT, false, 0, 0);
+
+    // ── Cache march uniforms ─────────────────────────────────────────────────
+    const M: Record<string, WebGLUniformLocation | null> = {};
     for (const n of [
       "iResolution", "iTime", "iMouse",
       "uCloudDrift", "uCoverage", "uAmplitude", "uDefinition", "uBlend", "uCloudType",
-      "uSkyColor", "uCloudTint", "uSunColor", "uShadowColor",
-    ]) {
-      U[n] = gl.getUniformLocation(prog, n);
-    }
+      "uSkyColor", "uCloudTint", "uSunColor", "uShadowColor", "uBlueNoise",
+    ]) M[n] = gl.getUniformLocation(marchProg, n);
 
-    // Drag-to-orbit: accumulate delta from drag-start so angle never jumps
-    // orbitRef holds normalised (0–1) equivalents of mx/my in the shader
+    // ── Cache blit uniforms ──────────────────────────────────────────────────
+    const B: Record<string, WebGLUniformLocation | null> = {};
+    for (const n of ["uTex", "uResolution"])
+      B[n] = gl.getUniformLocation(blitProg, n);
+
+    // ── Textures ─────────────────────────────────────────────────────────────
+    const blueNoiseTex = createBlueNoiseTexture(gl);
+
+    // FBO color texture — resized alongside canvas
+    const fboTex = gl.createTexture()!;
+    const fbo    = gl.createFramebuffer()!;
+    let fboW = 2, fboH = 2;   // will be updated in resize()
+
+    // ── Drag-to-orbit ────────────────────────────────────────────────────────
     const orbitRef = { x: 0.18, y: 0.40 };
     let isDragging = false;
     let dragStartClient = { x: 0, y: 0 };
@@ -404,15 +489,12 @@ const CloudsCanvas = forwardRef<RendererHandle, RendererProps>(function CloudsCa
       orbitAtDragStart = { ...orbitRef };
       canvas.style.cursor = "grabbing";
     };
-    const onMouseUp = () => {
-      isDragging = false;
-      canvas.style.cursor = "grab";
-    };
+    const onMouseUp = () => { isDragging = false; canvas.style.cursor = "grab"; };
     const onMouseMove = (e: MouseEvent) => {
       if (!isDragging) return;
       const r = canvas.getBoundingClientRect();
       const dx =  (e.clientX - dragStartClient.x) / r.width;
-      const dy = -(e.clientY - dragStartClient.y) / r.height; // flip Y
+      const dy = -(e.clientY - dragStartClient.y) / r.height;
       orbitRef.x = Math.max(0.001, Math.min(0.999, orbitAtDragStart.x + dx));
       orbitRef.y = Math.max(0.001, Math.min(0.999, orbitAtDragStart.y + dy));
     };
@@ -420,11 +502,15 @@ const CloudsCanvas = forwardRef<RendererHandle, RendererProps>(function CloudsCa
     window.addEventListener("mouseup",   onMouseUp);
     canvas.addEventListener("mousemove", onMouseMove);
 
+    // ── Resize ───────────────────────────────────────────────────────────────
     const resize = () => {
       const px = window.devicePixelRatio * renderScale;
       canvas.width  = toEvenSize(window.innerWidth  * px);
       canvas.height = toEvenSize(window.innerHeight * px);
-      gl.viewport(0, 0, canvas.width, canvas.height);
+      // Half-res FBO — raymarch at 50%, bilinear blit to full canvas (~4x speedup)
+      fboW = Math.max(2, Math.floor(canvas.width  / 2));
+      fboH = Math.max(2, Math.floor(canvas.height / 2));
+      resizeFBO(gl, fbo, fboTex, fboW, fboH);
     };
     window.addEventListener("resize", resize);
     resize();
@@ -449,42 +535,57 @@ const CloudsCanvas = forwardRef<RendererHandle, RendererProps>(function CloudsCa
       const p = s.params;
       const c = s.colors;
 
-      gl.useProgram(prog);
-      gl.uniform2f(U.iResolution, canvas.width, canvas.height);
-      gl.uniform1f(U.iTime, s.animTime);
-      // Pass orbit as canvas-pixel coords so the shader's /iResolution gives 0–1
-      gl.uniform4f(U.iMouse, orbitRef.x * canvas.width, orbitRef.y * canvas.height, 0, 0);
+      // ── Pass 1: Raymarch → half-res FBO ─────────────────────────────────
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+      gl.viewport(0, 0, fboW, fboH);
+      gl.useProgram(marchProg);
 
-      // Drift vector computed once in JS — shader just subtracts it, no per-step math
+      gl.uniform2f(M.iResolution, fboW, fboH);
+      gl.uniform1f(M.iTime, s.animTime);
+      // Orbit passed as FBO-pixel coords; shader divides by iResolution → 0–1
+      gl.uniform4f(M.iMouse, orbitRef.x * fboW, orbitRef.y * fboH, 0, 0);
+
       const driftSpeed = 0.05 + p.speed * 0.55;
       const drift = s.animTime * driftSpeed;
-      gl.uniform3f(U.uCloudDrift, 0.0, 0.1 * drift, 1.0 * drift);
+      gl.uniform3f(M.uCloudDrift, 0.0, 0.1 * drift, 1.0 * drift);
 
-      // coverage: scale 0.01–2 → -0.6 to +0.6 density offset
-      gl.uniform1f(U.uCoverage, (p.scale - 1.0) * 0.6);
+      gl.uniform1f(M.uCoverage,   (p.scale - 1.0) * 0.6);
+      gl.uniform1f(M.uAmplitude,  1.2 + p.amplitude * 0.45);
+      gl.uniform1f(M.uDefinition, 2.0 + (p.definition - 1.0) / 11.0 * 3.0);
+      gl.uniform1f(M.uBlend,      p.blend);
+      gl.uniform1i(M.uCloudType,  Math.round(Math.max(0, Math.min(4, p.cloudType ?? 0))));
 
-      // amplitude: 0–2 → 1.2–2.1 FBM multiplier
-      gl.uniform1f(U.uAmplitude, 1.2 + p.amplitude * 0.45);
-
-      // definition: 1–12 → 2–5 octave budget for raymarch
-      gl.uniform1f(U.uDefinition, 2.0 + (p.definition - 1.0) / 11.0 * 3.0);
-
-      // blend: 0–1 → shadow softness
-      gl.uniform1f(U.uBlend, p.blend);
-
-      // cloud type from params
-      gl.uniform1i(U.uCloudType, Math.round(Math.max(0, Math.min(4, p.cloudType ?? 0))));
-
-      // Colors — palette[0..3] — fall back gracefully if fewer colors
       const sky    = c[0] ? [c[0][0]/255, c[0][1]/255, c[0][2]/255] : [0.6, 0.71, 0.75];
       const cloud  = c[1] ? [c[1][0]/255, c[1][1]/255, c[1][2]/255] : [1.0, 0.95, 0.88];
       const sun    = c[2] ? [c[2][0]/255, c[2][1]/255, c[2][2]/255] : [1.0, 0.6,  0.3 ];
       const shadow = c[3] ? [c[3][0]/255, c[3][1]/255, c[3][2]/255] : [0.25, 0.3, 0.35];
+      gl.uniform3fv(M.uSkyColor,    sky);
+      gl.uniform3fv(M.uCloudTint,   cloud);
+      gl.uniform3fv(M.uSunColor,    sun);
+      gl.uniform3fv(M.uShadowColor, shadow);
 
-      gl.uniform3fv(U.uSkyColor,    sky);
-      gl.uniform3fv(U.uCloudTint,   cloud);
-      gl.uniform3fv(U.uSunColor,    sun);
-      gl.uniform3fv(U.uShadowColor, shadow);
+      // Texture unit 0 — blue noise
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, blueNoiseTex);
+      gl.uniform1i(M.uBlueNoise, 0);
+
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+      // ── Pass 2: Bilinear blit → full canvas ─────────────────────────────
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.viewport(0, 0, canvas.width, canvas.height);
+      gl.useProgram(blitProg);
+
+      // Texture unit 1 — FBO result
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, fboTex);
+      gl.uniform1i(B.uTex, 1);
+      gl.uniform2f(B.uResolution, canvas.width, canvas.height);
+
+      // Re-bind the shared quad to the blit program's a_pos
+      const blitLoc = gl.getAttribLocation(blitProg, "a_pos");
+      gl.enableVertexAttribArray(blitLoc);
+      gl.vertexAttribPointer(blitLoc, 2, gl.FLOAT, false, 0, 0);
 
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     };
@@ -497,8 +598,12 @@ const CloudsCanvas = forwardRef<RendererHandle, RendererProps>(function CloudsCa
       canvas.removeEventListener("mousedown", onMouseDown);
       window.removeEventListener("mouseup",   onMouseUp);
       canvas.removeEventListener("mousemove", onMouseMove);
-      gl.deleteProgram(prog);
+      gl.deleteProgram(marchProg);
+      gl.deleteProgram(blitProg);
       gl.deleteBuffer(buf);
+      gl.deleteTexture(blueNoiseTex);
+      gl.deleteTexture(fboTex);
+      gl.deleteFramebuffer(fbo);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onStatusChange, renderScale]);
