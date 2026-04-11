@@ -337,7 +337,7 @@ canvas {
 
 .mode-switcher {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 0;
   flex-shrink: 0;
   padding: 4px;
@@ -396,6 +396,116 @@ canvas {
   font-family: var(--font-mono);
   font-size: 10px;
   line-height: 1.5;
+}
+
+/* CLOUD MOOD PRESETS */
+
+.cloud-mood-selector {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.cloud-mood-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  background: transparent;
+  border: 1px solid var(--panel-border);
+  border-radius: 7px;
+  cursor: pointer;
+  text-align: left;
+  transition: var(--transition);
+}
+
+.cloud-mood-btn:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.cloud-mood-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 5px;
+  flex-shrink: 0;
+}
+
+.cloud-mood-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.cloud-mood-text strong {
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+.cloud-mood-text span {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-dim);
+}
+
+/* CLOUD TYPE SELECTOR */
+
+.cloud-type-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.cloud-type-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: transparent;
+  border: 1px solid var(--panel-border);
+  border-radius: 7px;
+  cursor: pointer;
+  text-align: left;
+  color: var(--text-dim);
+  transition: var(--transition);
+}
+
+.cloud-type-btn strong {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text);
+  min-width: 110px;
+}
+
+.cloud-type-btn span {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+.cloud-type-btn:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+}
+
+.cloud-type-btn.active {
+  border-color: rgba(242, 98, 47, 0.4);
+  background: rgba(242, 98, 47, 0.08);
+  color: var(--text);
+}
+
+.cloud-type-btn.active strong {
+  color: var(--accent);
 }
 
 /* COLOR LIST */

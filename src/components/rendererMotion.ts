@@ -26,5 +26,6 @@ export function stepSmoothedParams(current: GradientParams, target: GradientPara
     dofEnabled: target.dofEnabled,
     topoLineWidth:
       current.topoLineWidth + (target.topoLineWidth - current.topoLineWidth) * alpha,
+    cloudType: target.cloudType,
   };
 }

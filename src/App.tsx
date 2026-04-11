@@ -9,6 +9,7 @@ import BlobsCanvas from "./components/BlobsCanvas";
 import ThreeJSCanvas from "./components/ThreeJSCanvas";
 import TopographicCanvas from "./components/TopographicCanvas";
 import NeonDripCanvas from "./components/NeonDripCanvas";
+import CloudsCanvas from "./components/CloudsCanvas";
 import Panel from "./components/Panel";
 import RendererBoundary from "./components/RendererBoundary";
 import { RendererHandle } from "./components/rendererTypes";
@@ -28,7 +29,8 @@ export type AnimationType =
   | "blobs"
   | "three"
   | "topographic"
-  | "neondrip";
+  | "neondrip"
+  | "clouds";
 
 export interface GradientParams {
   seed: number;
@@ -45,6 +47,7 @@ export interface GradientParams {
   maxBlur: number;
   dofEnabled: boolean;
   topoLineWidth: number;
+  cloudType: number;
 }
 
 export type ColorRgb = [number, number, number];
@@ -129,6 +132,7 @@ const DEFAULT_PARAMS: GradientParams = {
   maxBlur: 0.35,
   dofEnabled: false,
   topoLineWidth: 1,
+  cloudType: 0,
 };
 
 const SESSION_STORAGE_KEY = "color-motion-session";
@@ -148,6 +152,7 @@ const VALID_ANIMATION_TYPES: AnimationType[] = [
   "three",
   "topographic",
   "neondrip",
+  "clouds",
 ];
 const HISTORY_LIMIT = 40;
 const PALETTE_TRANSITION_MS = 1500;
@@ -224,11 +229,13 @@ function randomParams(
 ): GradientParams {
   const isTopo = animationType === "topographic";
   const isDrip = animationType === "neondrip";
+  const isClouds = animationType === "clouds";
   return {
     seed: locks.seed ? base.seed : randomInt(0, 9999),
     speed: locks.motion ? base.speed
       : isTopo ? randomBetween(0.01, 0.2, 2)
       : isDrip ? randomBetween(0.05, 1.0, 2)
+      : isClouds ? randomBetween(0.05, 0.8, 2)
       : randomBetween(0.2, 2.4),
     scale: locks.motion ? base.scale
       : isTopo ? randomBetween(0.01, 0.5, 2)
@@ -248,6 +255,7 @@ function randomParams(
     maxBlur: locks.motion ? base.maxBlur : randomBetween(0.1, 0.45),
     dofEnabled: locks.motion ? base.dofEnabled : true,
     topoLineWidth: base.topoLineWidth,
+    cloudType: base.cloudType,
   };
 }
 
@@ -300,6 +308,7 @@ function animationTypeLabel(type: AnimationType) {
     three: "3D Mesh",
     topographic: "Topographic",
     neondrip: "Neon Drip",
+    clouds: "Clouds",
   }[type];
 }
 
@@ -438,7 +447,8 @@ function supportsLoopSafeExport(type: AnimationType) {
     type === "waves" ||
     type === "voronoi" ||
     type === "blobs" ||
-    type === "three"
+    type === "three" ||
+    type === "clouds"
   );
 }
 
@@ -533,6 +543,10 @@ function normalizeSceneState(value: unknown): SceneState | null {
       typeof params.topoLineWidth === "number"
         ? params.topoLineWidth
         : DEFAULT_PARAMS.topoLineWidth,
+    cloudType:
+      typeof params.cloudType === "number"
+        ? params.cloudType
+        : DEFAULT_PARAMS.cloudType,
   };
 
   const colors = Array.isArray(candidate.colors)
@@ -1076,6 +1090,16 @@ function App() {
     }
 
     setAnimationType(nextType);
+
+    if (nextType === "clouds") {
+      // Noon sky defaults: blue sky, warm white clouds, golden sun, cool shadow
+      setColors([
+        [100, 168, 210],
+        [245, 240, 232],
+        [255, 195, 100],
+        [160, 172, 185],
+      ]);
+    }
   }
 
   const showToast = (title: string, message?: string) => {
@@ -1833,6 +1857,17 @@ function App() {
         )}
         {animationType === "neondrip" && (
           <NeonDripCanvas
+            ref={rendererRef}
+            params={params}
+            colors={renderColors}
+            paused={paused}
+            onStatusChange={setRendererStatus}
+            renderScale={renderScale}
+            externalTime={externalRenderTime}
+          />
+        )}
+        {animationType === "clouds" && (
+          <CloudsCanvas
             ref={rendererRef}
             params={params}
             colors={renderColors}

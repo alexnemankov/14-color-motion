@@ -5,6 +5,7 @@ import {
   CaretDown,
   CaretRight,
   ClockCounterClockwise,
+  Cloud,
   CornersOut,
   Cube,
   Drop,
@@ -162,6 +163,10 @@ const MODE_DETAILS: Record<
   neondrip: {
     name: "Neon Drip",
     description: "Metaball blobs rising upward through neon-lit liquid.",
+  },
+  clouds: {
+    name: "Clouds",
+    description: "Volumetric ray-marched sky with five switchable cloud types.",
   },
 };
 
@@ -452,6 +457,7 @@ export default function Panel({
       definition: "Definition",
       blend: "Blend",
       topoLineWidth: "",
+      cloudType: "",
     },
     waves: {
       seed: "Seed",
@@ -462,6 +468,7 @@ export default function Panel({
       definition: "Sources",
       blend: "Sharpness",
       topoLineWidth: "",
+      cloudType: "",
     },
     voronoi: {
       seed: "Seed",
@@ -472,6 +479,7 @@ export default function Panel({
       definition: "Morph",
       blend: "Contrast",
       topoLineWidth: "",
+      cloudType: "",
     },
     turing: {
       seed: "Reset Sim",
@@ -482,6 +490,7 @@ export default function Panel({
       definition: "Diffusion",
       blend: "Contrast",
       topoLineWidth: "",
+      cloudType: "",
     },
     particles: {
       seed: "Reseed",
@@ -492,6 +501,7 @@ export default function Panel({
       definition: "Count",
       blend: "Opacity",
       topoLineWidth: "",
+      cloudType: "",
     },
     blobs: {
       seed: "Flux Seed",
@@ -502,6 +512,7 @@ export default function Panel({
       definition: "Sharpness",
       blend: "Color Blend",
       topoLineWidth: "",
+      cloudType: "",
     },
     three: {
       seed: "Seed",
@@ -517,6 +528,7 @@ export default function Panel({
       aperture: "Aperture",
       maxBlur: "Max Blur",
       topoLineWidth: "",
+      cloudType: "",
     },
     topographic: {
       seed: "Seed",
@@ -527,6 +539,7 @@ export default function Panel({
       definition: "Contour Count",
       blend: "Line Opacity",
       topoLineWidth: "Line Width",
+      cloudType: "",
     },
     neondrip: {
       seed: "Seed",
@@ -537,6 +550,18 @@ export default function Panel({
       definition: "Blob Count",
       blend: "Glow",
       topoLineWidth: "",
+      cloudType: "",
+    },
+    clouds: {
+      seed: "Seed",
+      speed: "Drift Speed",
+      scale: "Coverage",
+      amplitude: "Detail Amp",
+      frequency: "Frequency",
+      definition: "Octaves",
+      blend: "Shadow Soft",
+      topoLineWidth: "",
+      cloudType: "",
     },
   }[animationType] ?? {
     seed: "Seed", speed: "Speed", scale: "Scale", amplitude: "Amplitude",
@@ -793,6 +818,17 @@ export default function Panel({
                 weight={animationType === "neondrip" ? "fill" : "bold"}
               />
             </button>
+            <button
+              className={`mode-btn ${animationType === "clouds" ? "active" : ""}`}
+              onClick={() => setAnimationType("clouds")}
+              title="Clouds"
+              aria-label="Switch to Clouds mode"
+            >
+              <Cloud
+                size={16}
+                weight={animationType === "clouds" ? "fill" : "bold"}
+              />
+            </button>
           </div>
           <div className="mode-summary">
             <strong>{MODE_DETAILS[animationType].name}</strong>
@@ -896,7 +932,7 @@ export default function Panel({
           Tune time, zoom, and movement feel for the active renderer.
         </div>
         {viewMode === "advanced" && renderParamRow("seed", 0, 9999, 1)}
-        {renderParamRow("speed", 0, animationType === "topographic" ? 0.2 : animationType === "neondrip" ? 1 : 10, animationType === "topographic" || animationType === "neondrip" ? 0.01 : 0.1)}
+        {renderParamRow("speed", 0, animationType === "topographic" ? 0.2 : animationType === "neondrip" ? 1 : animationType === "clouds" ? 1 : 10, animationType === "topographic" || animationType === "neondrip" || animationType === "clouds" ? 0.01 : 0.1)}
         {renderParamRow("scale", 0.01, animationType === "topographic" ? 0.5 : 2, 0.01)}
         {viewMode === "advanced" && renderParamRow("amplitude", 0, 2, 0.01)}
       </div>
@@ -955,6 +991,112 @@ export default function Panel({
           {renderParamRow("definition", 1, animationType === "topographic" ? 3 : 12, 1)}
           {renderParamRow("blend", 0, 1, 0.01)}
           {animationType === "topographic" && renderParamRow("topoLineWidth", 0.2, 4, 0.1)}
+        </div>
+      )}
+
+      {animationType === "clouds" && (
+        <div className="panel-section">
+          <span className="section-label">Sky Mood</span>
+          <div className="section-copy">
+            Load a palette tuned for this lighting condition.
+          </div>
+          <div className="cloud-mood-selector">
+            {(
+              [
+                {
+                  label: "Noon",
+                  sub: "clear blue sky",
+                  colors: [
+                    [100, 168, 210] as ColorRgb,
+                    [245, 240, 232] as ColorRgb,
+                    [255, 195, 100] as ColorRgb,
+                    [160, 172, 185] as ColorRgb,
+                  ],
+                },
+                {
+                  label: "Dusk",
+                  sub: "golden hour",
+                  colors: [
+                    [80, 100, 160] as ColorRgb,
+                    [255, 200, 160] as ColorRgb,
+                    [255, 110, 50] as ColorRgb,
+                    [55, 45, 80] as ColorRgb,
+                  ],
+                },
+                {
+                  label: "Dawn",
+                  sub: "soft morning glow",
+                  colors: [
+                    [230, 140, 110] as ColorRgb,
+                    [255, 225, 205] as ColorRgb,
+                    [255, 190, 130] as ColorRgb,
+                    [170, 105, 90] as ColorRgb,
+                  ],
+                },
+                {
+                  label: "Storm",
+                  sub: "overcast, heavy",
+                  colors: [
+                    [55, 65, 78] as ColorRgb,
+                    [110, 118, 128] as ColorRgb,
+                    [90, 105, 115] as ColorRgb,
+                    [35, 40, 48] as ColorRgb,
+                  ],
+                },
+              ]
+            ).map(({ label, sub, colors }) => (
+              <button
+                key={label}
+                type="button"
+                className="cloud-mood-btn"
+                onClick={() => setColors(colors)}
+              >
+                <div
+                  className="cloud-mood-swatch"
+                  style={{
+                    background: `linear-gradient(135deg,
+                      rgb(${colors[0].join(",")}) 0%,
+                      rgb(${colors[1].join(",")}) 50%,
+                      rgb(${colors[2].join(",")}) 100%)`,
+                  }}
+                />
+                <div className="cloud-mood-text">
+                  <strong>{label}</strong>
+                  <span>{sub}</span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {animationType === "clouds" && (
+        <div className="panel-section">
+          <span className="section-label">Cloud Type</span>
+          <div className="section-copy">
+            Switch between five distinct cloud formations.
+          </div>
+          <div className="cloud-type-selector">
+            {(
+              [
+                { id: 0, label: "Cumulus",       sub: "puffy, flat base" },
+                { id: 1, label: "Stratus",        sub: "flat layer" },
+                { id: 2, label: "Cirrus",         sub: "wispy, high alt." },
+                { id: 3, label: "Cumulonimbus",   sub: "storm tower" },
+                { id: 4, label: "Mammatus",       sub: "bumpy underside" },
+              ] as const
+            ).map(({ id, label, sub }) => (
+              <button
+                key={id}
+                type="button"
+                className={`cloud-type-btn ${(params.cloudType ?? 0) === id ? "active" : ""}`}
+                onClick={() => setParams((prev) => ({ ...prev, cloudType: id }))}
+              >
+                <strong>{label}</strong>
+                <span>{sub}</span>
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
