@@ -4,16 +4,16 @@ Based on an analysis of the current `CloudsCanvas.tsx` implementation, here are 
 
 ## Execution Priority Plan
 
-### 1. The "Free" Wins (Do these immediately)
-* **Hoist the Drift Math:** Calculating `cloudOffset()` inside `mapN()` forces the shader to do redundant vector math on every single ray step. Calculating `vec3 uCloudDrift` in JavaScript and passing it as a uniform is free performance.
-* **AABB Early-Out:** Blindly stepping forward from the camera and checking `pos.y` limits on every iteration is wasteful. Implementing the ray-slab intersection math before the loop starts to skip empty air is a trivial addition that offers a ~1.5x speedup.
+### 1. The "Free" Wins ✅ DONE
+* ✅ **Hoist the Drift Math:** `uCloudDrift` uniform computed once in JS per frame; no per-step vector math inside the FBM loop.
+* ✅ **AABB Early-Out:** Ray-slab intersection (`y ∈ [-3, 2]`) computed before the march loop; `t` starts at `tMin` skipping all empty air.
 
-### 2. The High-Impact structural changes
-* **Half-res + Upscale:** Native raymarching on retina screens is brutal. Rendering to an FBO at 50% resolution and upscaling with bilinear filtering is relatively easy to implement and will yield a ~4x performance boost. Because clouds are naturally soft, the resolution drop will be barely noticeable.
-* **Blue Noise Dithering:** You currently use a low-intensity `fract(dot(...))` white noise to break up banding. Replacing this with a pre-computed 2D Blue Noise texture lookup will vastly reduce perceptive grain and temporal flicker.
+### 2. The High-Impact structural changes ✅ DONE
+* ✅ **Half-res + Upscale:** Raymarch renders to a half-res FBO (`marchFbo`); bilinear blit shader upscales to full canvas (~4x speedup).
+* ✅ **Blue Noise Dithering:** 64×64 IGN texture (`createBlueNoiseTexture`) replaces `fract(dot(...))` white noise; REPEAT-wrapped, sampled via `texture(uBlueNoise, gl_FragCoord.xy / 64.0).r`.
 
-### 3. Advanced Volumetric Rendering
-* **Temporal Accumulation:** Once your baseline performance is stable, setting up a ping-pong FBO to blend 80% of the previous frame with 20% of the new frame is the industry standard. This allows you to drastically reduce your raymarching steps.
+### 3. Advanced Volumetric Rendering ✅ DONE
+* ✅ **Temporal Accumulation:** Ping-pong FBO pair (`accumFbo[0/1]`) blends 80% history + 20% new frame each tick (ACCUM_FRAG shader). Adaptive alpha: 1.0 on first frame/resize, 0.7 while dragging (fast ghost clear), 0.2 when still (smooth noise reduction). Three-pass pipeline: march → accumulate → blit.
 
 ---
 

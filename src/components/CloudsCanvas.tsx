@@ -298,6 +298,29 @@ void main() {
 `;
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Temporal accumulation shader — blends history with current frame.
+// Runs at half-res (same as march pass) using a ping-pong FBO pair.
+//
+// uAlpha controls how much of the *new* frame contributes:
+//   1.0 = full current frame (reset / first frame)
+//   0.7 = 70% new, 30% history  (camera moving — clears ghosts quickly)
+//   0.2 = 20% new, 80% history  (camera still  — smooth noise reduction)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const ACCUM_FRAG = /* glsl */ `#version 300 es
+precision mediump float;
+uniform sampler2D uCurrent;    // freshly raymarched frame (half-res)
+uniform sampler2D uHistory;    // previous accumulated result (half-res)
+uniform vec2      uResolution; // half-res dimensions for UV derivation
+uniform float     uAlpha;      // blend weight for new frame (0–1)
+out vec4 fragColor;
+void main() {
+  vec2 uv = gl_FragCoord.xy / uResolution;
+  fragColor = mix(texture(uHistory, uv), texture(uCurrent, uv), uAlpha);
+}
+`;
+
+// ─────────────────────────────────────────────────────────────────────────────
 // WebGL helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -356,7 +379,7 @@ function createBlueNoiseTexture(gl: WebGL2RenderingContext): WebGLTexture {
   return tex;
 }
 
-/** Create or resize the half-resolution FBO used for the raymarch pass. */
+/** Allocate or resize an RGBA8 FBO texture at (w × h). */
 function resizeFBO(
   gl: WebGL2RenderingContext,
   fbo: WebGLFramebuffer,
@@ -428,12 +451,16 @@ const CloudsCanvas = forwardRef<RendererHandle, RendererProps>(function CloudsCa
     statusRef.current = null;
     onStatusChange?.(null);
 
-    // ── Compile both programs ────────────────────────────────────────────────
-    let marchProg: WebGLProgram, blitProg: WebGLProgram;
+    // ── Compile all three programs ───────────────────────────────────────────
+    let marchProg: WebGLProgram, accumProg: WebGLProgram, blitProg: WebGLProgram;
     try {
       marchProg = linkProgram(gl,
         compileShader(gl, gl.VERTEX_SHADER,   VERT_SRC),
         compileShader(gl, gl.FRAGMENT_SHADER, FRAG_SRC),
+      );
+      accumProg = linkProgram(gl,
+        compileShader(gl, gl.VERTEX_SHADER,   VERT_SRC),
+        compileShader(gl, gl.FRAGMENT_SHADER, ACCUM_FRAG),
       );
       blitProg = linkProgram(gl,
         compileShader(gl, gl.VERTEX_SHADER,   BLIT_VERT),
@@ -450,13 +477,7 @@ const CloudsCanvas = forwardRef<RendererHandle, RendererProps>(function CloudsCa
     gl.bindBuffer(gl.ARRAY_BUFFER, buf);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
 
-    // Bind the quad to the march program's a_pos
-    gl.useProgram(marchProg);
-    const marchLoc = gl.getAttribLocation(marchProg, "a_pos");
-    gl.enableVertexAttribArray(marchLoc);
-    gl.vertexAttribPointer(marchLoc, 2, gl.FLOAT, false, 0, 0);
-
-    // ── Cache march uniforms ─────────────────────────────────────────────────
+    // ── Cache uniforms ───────────────────────────────────────────────────────
     const M: Record<string, WebGLUniformLocation | null> = {};
     for (const n of [
       "iResolution", "iTime", "iMouse",
@@ -464,7 +485,10 @@ const CloudsCanvas = forwardRef<RendererHandle, RendererProps>(function CloudsCa
       "uSkyColor", "uCloudTint", "uSunColor", "uShadowColor", "uBlueNoise",
     ]) M[n] = gl.getUniformLocation(marchProg, n);
 
-    // ── Cache blit uniforms ──────────────────────────────────────────────────
+    const A: Record<string, WebGLUniformLocation | null> = {};
+    for (const n of ["uCurrent", "uHistory", "uResolution", "uAlpha"])
+      A[n] = gl.getUniformLocation(accumProg, n);
+
     const B: Record<string, WebGLUniformLocation | null> = {};
     for (const n of ["uTex", "uResolution"])
       B[n] = gl.getUniformLocation(blitProg, n);
@@ -472,16 +496,25 @@ const CloudsCanvas = forwardRef<RendererHandle, RendererProps>(function CloudsCa
     // ── Textures ─────────────────────────────────────────────────────────────
     const blueNoiseTex = createBlueNoiseTexture(gl);
 
-    // FBO color texture — resized alongside canvas
-    const fboTex = gl.createTexture()!;
-    const fbo    = gl.createFramebuffer()!;
-    let fboW = 2, fboH = 2;   // will be updated in resize()
+    // marchFbo  — holds the freshly raymarched half-res frame
+    const marchTex = gl.createTexture()!;
+    const marchFbo = gl.createFramebuffer()!;
+
+    // accumFbo[0/1] — ping-pong temporal accumulation buffers (half-res)
+    const accumTex = [gl.createTexture()!, gl.createTexture()!];
+    const accumFbo = [gl.createFramebuffer()!, gl.createFramebuffer()!];
+
+    let fboW = 2, fboH = 2;   // updated in resize()
+    let pingIdx  = 0;          // which accumFbo is "current" this frame
+    let needsReset = true;     // true on first frame and after resize — skip history blend
 
     // ── Drag-to-orbit ────────────────────────────────────────────────────────
     const orbitRef = { x: 0.18, y: 0.40 };
     let isDragging = false;
     let dragStartClient = { x: 0, y: 0 };
     let orbitAtDragStart = { x: 0.18, y: 0.40 };
+    let prevOrbitX = orbitRef.x;
+    let prevOrbitY = orbitRef.y;
 
     const onMouseDown = (e: MouseEvent) => {
       isDragging = true;
@@ -510,7 +543,11 @@ const CloudsCanvas = forwardRef<RendererHandle, RendererProps>(function CloudsCa
       // Half-res FBO — raymarch at 50%, bilinear blit to full canvas (~4x speedup)
       fboW = Math.max(2, Math.floor(canvas.width  / 2));
       fboH = Math.max(2, Math.floor(canvas.height / 2));
-      resizeFBO(gl, fbo, fboTex, fboW, fboH);
+      resizeFBO(gl, marchFbo, marchTex, fboW, fboH);
+      resizeFBO(gl, accumFbo[0], accumTex[0], fboW, fboH);
+      resizeFBO(gl, accumFbo[1], accumTex[1], fboW, fboH);
+      // History is now a different size — must re-seed on next frame
+      needsReset = true;
     };
     window.addEventListener("resize", resize);
     resize();
@@ -535,10 +572,26 @@ const CloudsCanvas = forwardRef<RendererHandle, RendererProps>(function CloudsCa
       const p = s.params;
       const c = s.colors;
 
-      // ── Pass 1: Raymarch → half-res FBO ─────────────────────────────────
-      gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+      // ── Adaptive temporal blend weight ────────────────────────────────────
+      // Camera motion → blend more of the new frame so ghosts clear quickly.
+      // Static camera → blend mostly history to smooth out per-frame noise.
+      const isMoving = orbitRef.x !== prevOrbitX || orbitRef.y !== prevOrbitY;
+      prevOrbitX = orbitRef.x;
+      prevOrbitY = orbitRef.y;
+      const alpha = needsReset ? 1.0 : (isMoving ? 0.7 : 0.2);
+      needsReset = false;
+
+      const currIdx = pingIdx;
+      const prevIdx = 1 - pingIdx;
+
+      // ── Pass 1: Raymarch → marchFbo (half-res) ───────────────────────────
+      gl.bindFramebuffer(gl.FRAMEBUFFER, marchFbo);
       gl.viewport(0, 0, fboW, fboH);
       gl.useProgram(marchProg);
+
+      const marchLoc = gl.getAttribLocation(marchProg, "a_pos");
+      gl.enableVertexAttribArray(marchLoc);
+      gl.vertexAttribPointer(marchLoc, 2, gl.FLOAT, false, 0, 0);
 
       gl.uniform2f(M.iResolution, fboW, fboH);
       gl.uniform1f(M.iTime, s.animTime);
@@ -571,23 +624,51 @@ const CloudsCanvas = forwardRef<RendererHandle, RendererProps>(function CloudsCa
 
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
-      // ── Pass 2: Bilinear blit → full canvas ─────────────────────────────
+      // ── Pass 2: Temporal accumulation (ping-pong, half-res) ──────────────
+      // Mix marchTex (20% new) with accumTex[prevIdx] (80% history) →
+      // accumFbo[currIdx]. Alpha adapts to camera motion for ghost-free dragging.
+      gl.bindFramebuffer(gl.FRAMEBUFFER, accumFbo[currIdx]);
+      gl.viewport(0, 0, fboW, fboH);
+      gl.useProgram(accumProg);
+
+      const accumLoc = gl.getAttribLocation(accumProg, "a_pos");
+      gl.enableVertexAttribArray(accumLoc);
+      gl.vertexAttribPointer(accumLoc, 2, gl.FLOAT, false, 0, 0);
+
+      // Texture unit 1 — current raw march frame
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, marchTex);
+      gl.uniform1i(A.uCurrent, 1);
+
+      // Texture unit 2 — previous accumulated frame
+      gl.activeTexture(gl.TEXTURE2);
+      gl.bindTexture(gl.TEXTURE_2D, accumTex[prevIdx]);
+      gl.uniform1i(A.uHistory, 2);
+
+      gl.uniform2f(A.uResolution, fboW, fboH);
+      gl.uniform1f(A.uAlpha, alpha);
+
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+      // ── Pass 3: Bilinear blit → full canvas ─────────────────────────────
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       gl.viewport(0, 0, canvas.width, canvas.height);
       gl.useProgram(blitProg);
 
-      // Texture unit 1 — FBO result
-      gl.activeTexture(gl.TEXTURE1);
-      gl.bindTexture(gl.TEXTURE_2D, fboTex);
-      gl.uniform1i(B.uTex, 1);
-      gl.uniform2f(B.uResolution, canvas.width, canvas.height);
-
-      // Re-bind the shared quad to the blit program's a_pos
       const blitLoc = gl.getAttribLocation(blitProg, "a_pos");
       gl.enableVertexAttribArray(blitLoc);
       gl.vertexAttribPointer(blitLoc, 2, gl.FLOAT, false, 0, 0);
 
+      // Texture unit 1 — accumulated half-res result
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, accumTex[currIdx]);
+      gl.uniform1i(B.uTex, 1);
+      gl.uniform2f(B.uResolution, canvas.width, canvas.height);
+
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+      // Advance ping-pong index for next frame
+      pingIdx = 1 - pingIdx;
     };
 
     rafId = requestAnimationFrame(render);
@@ -599,11 +680,16 @@ const CloudsCanvas = forwardRef<RendererHandle, RendererProps>(function CloudsCa
       window.removeEventListener("mouseup",   onMouseUp);
       canvas.removeEventListener("mousemove", onMouseMove);
       gl.deleteProgram(marchProg);
+      gl.deleteProgram(accumProg);
       gl.deleteProgram(blitProg);
       gl.deleteBuffer(buf);
       gl.deleteTexture(blueNoiseTex);
-      gl.deleteTexture(fboTex);
-      gl.deleteFramebuffer(fbo);
+      gl.deleteTexture(marchTex);
+      gl.deleteTexture(accumTex[0]);
+      gl.deleteTexture(accumTex[1]);
+      gl.deleteFramebuffer(marchFbo);
+      gl.deleteFramebuffer(accumFbo[0]);
+      gl.deleteFramebuffer(accumFbo[1]);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onStatusChange, renderScale]);
