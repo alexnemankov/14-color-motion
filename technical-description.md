@@ -8,7 +8,7 @@ Color Motion Lab is a fullscreen generative motion app with a single active rend
 
 The shipped product currently includes:
 
-- six rendering modes
+- ten rendering modes
 - a floating desktop panel and mobile bottom-sheet UI
 - palette library browsing with favorites and recents
 - local preset storage and recent scene tracking
@@ -53,14 +53,18 @@ src/
     RendererBoundary.tsx        Renderer error boundary
     rendererTypes.ts            Shared renderer interfaces
     rendererMotion.ts           Shared parameter smoothing helpers
-    LiquidCanvas.tsx            Canvas renderer with external time support
-    WavesCanvas.tsx             Canvas renderer with external time support
-    VoronoiCanvas.tsx           Canvas renderer with external time support
-    BlobsCanvas.tsx             Canvas renderer with external time support
-    ParticlesCanvas.tsx         Canvas renderer with worker-backed simulation
-    TuringCanvas.tsx            Wrapper choosing WebGPU or WebGL2 implementation
+    LiquidCanvas.tsx            WebGL2 renderer, external time support
+    WavesCanvas.tsx             WebGL2 renderer, external time support
+    VoronoiCanvas.tsx           WebGL2 renderer, external time support
+    BlobsCanvas.tsx             Canvas 2D renderer, external time support
+    ParticlesCanvas.tsx         Canvas 2D renderer, worker-backed simulation
+    TuringCanvas.tsx            Wrapper choosing WebGPU or WebGL2
     TuringWebGLCanvas.tsx       WebGL2 reaction-diffusion implementation
     TuringWebGPUCanvas.tsx      WebGPU reaction-diffusion implementation
+    ThreeJSCanvas.tsx           Three.js 3D mesh, external time support
+    TopographicCanvas.tsx       Canvas 2D topographic contours, external time support
+    NeonDripCanvas.tsx          Canvas 2D metaball drip blobs, external time support
+    CloudsCanvas.tsx            WebGL2 volumetric ray-marched clouds, external time support
 ```
 
 ## 4. Core Domain Model
@@ -77,16 +81,36 @@ src/
 - `turing`
 - `particles`
 - `blobs`
+- `three`
+- `topographic`
+- `neondrip`
+- `clouds`
 
 `GradientParams`
 
-- `seed`
-- `speed`
-- `scale`
-- `amplitude`
-- `frequency`
-- `definition`
-- `blend`
+Universal fields (all renderers):
+
+- `seed` — random seed / reseed trigger
+- `speed` — animation speed
+- `scale` — zoom / density
+- `amplitude` — FBM amplitude or wander strength
+- `frequency` — noise / cell frequency
+- `definition` — octave count / detail level
+- `blend` — color blend, contrast, or softness
+
+3D Mesh specific:
+
+- `morphSpeed` — terrain drift speed
+- `morphAmount` — terrain drift height
+- `focusDistance` — depth-of-field focus
+- `aperture` — depth-of-field aperture
+- `maxBlur` — depth-of-field max blur
+- `dofEnabled` — depth-of-field toggle
+
+Mode-specific:
+
+- `topoLineWidth` — contour line width (Topographic only)
+- `cloudType` — cloud formation 0–4 (Clouds only)
 
 `SceneState`
 
@@ -110,6 +134,7 @@ The application keeps one normalized scene model and lets each renderer interpre
 - maintaining active scene state and scene history
 - driving palette interpolation during palette changes
 - handling mode transition crossfades
+- injecting mode-specific default colors on mode switch (e.g. Noon palette when entering Clouds)
 - saving presets and recent scenes
 - copying share links to the clipboard
 - coordinating PNG and WebM export
@@ -132,7 +157,7 @@ Current behavior:
 
 - `CURRENT_SCENE_VERSION` is `1`
 - legacy payloads without a version are treated as version `0`
-- `migratePersistedScene()` normalizes older payloads before use
+- `migratePersistedScene()` normalizes older payloads before use, filling missing fields from `DEFAULT_PARAMS`
 - `serializeSceneForPersistence()` writes versioned scene payloads back to storage
 
 `localStorage` keys currently used:
@@ -170,8 +195,6 @@ The share format is compact, but it is not compressed with gzip or an external l
 - `captureFrame()`
 - status reporting through `onStatusChange`
 
-This is the formalized renderer contract the roadmap previously called for.
-
 `src/components/rendererMotion.ts` provides shared param smoothing:
 
 - `cloneParams()`
@@ -181,12 +204,12 @@ This smoothing is used inside render loops so parameter edits feel continuous in
 
 ## 9. Rendering Architecture
 
-### Deterministic Canvas renderers
+### Deterministic renderers (support loop-safe export)
 
-`LiquidCanvas`, `WavesCanvas`, `VoronoiCanvas`, and `BlobsCanvas`:
+`LiquidCanvas`, `WavesCanvas`, `VoronoiCanvas`, `BlobsCanvas`, `ThreeJSCanvas`, `CloudsCanvas`:
 
 - render to fullscreen canvas elements
-- support parameter smoothing
+- support parameter smoothing via `rendererMotion`
 - support even-dimension sizing during export
 - implement `externalTime`
 - expose `supportsLoopSafeExport: true`
@@ -205,8 +228,6 @@ Current worker design:
 - link and node drawing remains on the main thread canvas
 - pointer interaction is forwarded into the worker simulation
 
-This is already the worker migration that earlier planning documents identified as future work.
-
 ### Turing renderer
 
 `TuringCanvas` is a wrapper that prefers WebGPU when `navigator.gpu` exists and otherwise falls back to WebGL2.
@@ -224,7 +245,37 @@ This is already the worker migration that earlier planning documents identified 
 - uses ping-pong textures for reaction-diffusion state
 - handles palette mapping in a render shader
 
-Turing does not currently support `externalTime` or loop-safe export because it is simulation-driven.
+Turing does not support `externalTime` or loop-safe export because it is simulation-driven.
+
+### Clouds renderer
+
+`CloudsCanvas` is a WebGL2 volumetric ray-marcher. Key design points:
+
+**Shader:**
+- Procedural gradient noise (no textures; 3D → float via vec3 hash + trilinear interpolation)
+- `qualityOctaves(tier)` maps `uDefinition` (1–12) to an octave budget (1–5) and clamps each pass's FBM call to `min(tier, budget)` — definition slider scales quality without toggling passes on/off
+- Four progressive raymarch passes (tiers 5→4→3→2 octaves), all always sampling; t advances alongside sampling so no cloud layer is skipped at low definition values
+- Five cloud density functions via `uniform int uCloudType`: Cumulus, Stratus, Cirrus, Cumulonimbus, Mammatus — each modifies the density field shape (y-banding, amplitude, threshold, sine subtraction)
+- Three-layer sun: wide haze (`pow(sun,4)`), corona (`pow(sun,22)`), sharp disk (`pow(sun,800)`)
+- Low-intensity golden-ratio dither (`dot(coord, vec2(0.755, 0.570))`) for banding reduction without visible grain
+- Raymarch start jitter `0.02 * dither` (small enough to avoid grain)
+
+**Palette mapping (colors[0..3]):**
+- `colors[0]` → `uSkyColor` (sky gradient, horizon fog)
+- `colors[1]` → `uCloudTint` (lit cloud surface)
+- `colors[2]` → `uSunColor` (scatter, corona, glare)
+- `colors[3]` → `uShadowColor` (dark underside, shadowed faces)
+
+**Camera / interaction:**
+- Drag-to-orbit: `orbitRef` holds normalized (0–1) orbit angles, initialized to `(0.18, 0.40)`
+- `mousedown` saves `dragStartClient` and `orbitAtDragStart`; `mousemove` computes client-pixel delta / display size and adds to `orbitAtDragStart` — angle never jumps on new drag start
+- `mouseup` on `window` so releasing outside canvas still ends drag
+- Orbit values passed to shader as canvas-pixel coords; shader normalizes with `/iResolution`
+
+**Panel integration:**
+- Cloud Type section: 5 buttons setting `params.cloudType`
+- Sky Mood section: 4 preset buttons (Noon, Dusk, Dawn, Storm) each calling `setColors([...])` with a full 4-color palette
+- Entering Clouds mode via `startModeTransition` auto-applies the Noon palette
 
 ## 10. UI Architecture
 
@@ -233,9 +284,10 @@ Turing does not currently support `externalTime` or loop-safe export because it 
 `src/components/Panel.tsx` is the main workspace surface. It contains:
 
 - workflow tools
-- mode selection
+- mode selection (10 modes with icons)
 - palette editing
 - motion and structure controls
+- mode-specific sections (Topographic line width; Clouds type selector and sky mood presets)
 - workspace actions
 - export controls
 - reset actions
@@ -262,11 +314,11 @@ Current workflow features exposed in the panel:
 - active selection preview
 - surprise/random selection
 
-The palette library currently ships with 67 palette descriptors from `src/data/palettes.ts`.
+The palette library ships with 67 palette descriptors from `src/data/palettes.ts`.
 
 ### Onboarding and dialogs
 
-The app now includes:
+The app includes:
 
 - a three-step onboarding flow persisted in local storage
 - a save-preset dialog
@@ -288,11 +340,11 @@ The export system is entirely browser-side.
 
 - `MediaRecorder`-based WebM capture
 - standard `5s` and `10s` recordings
-- loop-safe recording for deterministic renderers
+- loop-safe recording for deterministic renderers (liquid, waves, voronoi, blobs, three, clouds)
 - progress state transitions through `preparing`, `recording`, `encoding`, and `complete`
 - progress arc and frame counter UI in the panel
 
-Loop-safe export currently works by mirroring time across the clip duration and assigning the result to `externalRenderTime`.
+Loop-safe export works by mirroring time across the clip duration and assigning the result to `externalRenderTime`.
 
 ## 12. Error Handling and Fallbacks
 
@@ -339,6 +391,9 @@ Several features previously listed as future improvements are already implemente
 - persistence migrations
 - worker-backed particle simulation
 - WebGPU progressive enhancement for Turing
+- topographic contour renderer
+- neon drip metaball renderer
+- volumetric cloud renderer with 5 cloud types, sky mood presets, and drag-to-orbit camera
 
 Not implemented in the current codebase:
 

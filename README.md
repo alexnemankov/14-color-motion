@@ -4,13 +4,17 @@ Color Motion Lab is a browser-based motion design playground for building animat
 
 ## Current Feature Set
 
-- Six renderers:
+- Ten renderers:
   - Fluid FBM
   - Interference Waves
   - Cellular Voronoi
   - Reaction-Diffusion
   - Particle Web
   - Molten Blobs
+  - 3D Mesh
+  - Topographic
+  - Neon Drip
+  - Clouds
 - Shared scene controls:
   - `seed`
   - `speed`
@@ -19,6 +23,16 @@ Color Motion Lab is a browser-based motion design playground for building animat
   - `frequency`
   - `definition`
   - `blend`
+- Mode-specific controls:
+  - `topoLineWidth` — contour line width (Topographic)
+  - `cloudType` — cloud formation selector 0–4 (Clouds)
+  - DOF controls: `focusDistance`, `aperture`, `maxBlur`, `dofEnabled` (3D Mesh)
+  - Terrain drift: `morphSpeed`, `morphAmount` (3D Mesh)
+- Clouds mode extras:
+  - 5 cloud formations: Cumulus, Stratus, Cirrus, Cumulonimbus, Mammatus
+  - Sky Mood presets: Noon, Dusk, Dawn, Storm (sets full 4-color palette)
+  - Drag-to-orbit camera — angle persists across drags, never jumps
+  - Auto-applies Noon palette on mode entry
 - Palette workflow:
   - 67 curated palettes
   - search and category filters
@@ -37,7 +51,7 @@ Color Motion Lab is a browser-based motion design playground for building animat
   - PNG export
   - 2x PNG export
   - 5s and 10s WebM recording
-  - loop-safe WebM export for deterministic renderers
+  - loop-safe WebM export for deterministic renderers (liquid, waves, voronoi, blobs, three, clouds)
   - compact shareable URLs with encoded scene state
 - UX:
   - first-run onboarding
@@ -63,9 +77,10 @@ Shortcuts are ignored while typing in editable fields.
 
 ## Renderer Notes
 
-- `liquid`, `waves`, `voronoi`, and `blobs` support deterministic `externalTime` playback and loop-safe export.
+- `liquid`, `waves`, `voronoi`, `blobs`, `three`, and `clouds` support deterministic `externalTime` playback and loop-safe export.
 - `particles` runs its simulation in a Web Worker.
 - `turing` prefers WebGPU when available and falls back to WebGL2.
+- `clouds` uses a WebGL2 volumetric ray-marcher with procedural gradient noise and a drag-to-orbit camera.
 - A renderer boundary and status overlay handle unsupported or failed rendering paths.
 
 ## Tech Stack
@@ -99,4 +114,4 @@ The app stores the current session, saved presets, recent scenes, palette favori
 
 ## Status
 
-This repository already includes several items that were previously roadmap ideas, including onboarding, keyboard shortcut discovery, renderer transition crossfades, palette interpolation, typed renderer handles, persistence migrations, a worker-backed particles renderer, and WebGPU enhancement for Turing mode.
+This repository already includes several items that were previously roadmap ideas, including onboarding, keyboard shortcut discovery, renderer transition crossfades, palette interpolation, typed renderer handles, persistence migrations, a worker-backed particles renderer, WebGPU enhancement for Turing mode, topographic contour rendering, neon drip blobs, and volumetric cloud rendering with cloud type switching and sky mood presets.
