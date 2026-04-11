@@ -8,6 +8,7 @@ import ParticlesCanvas from "./components/ParticlesCanvas";
 import BlobsCanvas from "./components/BlobsCanvas";
 import ThreeJSCanvas from "./components/ThreeJSCanvas";
 import TopographicCanvas from "./components/TopographicCanvas";
+import NeonDripCanvas from "./components/NeonDripCanvas";
 import Panel from "./components/Panel";
 import RendererBoundary from "./components/RendererBoundary";
 import { RendererHandle } from "./components/rendererTypes";
@@ -26,7 +27,8 @@ export type AnimationType =
   | "particles"
   | "blobs"
   | "three"
-  | "topographic";
+  | "topographic"
+  | "neondrip";
 
 export interface GradientParams {
   seed: number;
@@ -145,6 +147,7 @@ const VALID_ANIMATION_TYPES: AnimationType[] = [
   "blobs",
   "three",
   "topographic",
+  "neondrip",
 ];
 const HISTORY_LIMIT = 40;
 const PALETTE_TRANSITION_MS = 1500;
@@ -217,14 +220,26 @@ function randomPaletteColors(): ColorRgb[] {
 function randomParams(
   base: GradientParams,
   locks: Pick<WorkflowLocks, "seed" | "motion">,
+  animationType: AnimationType,
 ): GradientParams {
+  const isTopo = animationType === "topographic";
+  const isDrip = animationType === "neondrip";
   return {
     seed: locks.seed ? base.seed : randomInt(0, 9999),
-    speed: locks.motion ? base.speed : randomBetween(0.2, 2.4),
-    scale: locks.motion ? base.scale : randomBetween(0.2, 1.4),
+    speed: locks.motion ? base.speed
+      : isTopo ? randomBetween(0.01, 0.2, 2)
+      : isDrip ? randomBetween(0.05, 1.0, 2)
+      : randomBetween(0.2, 2.4),
+    scale: locks.motion ? base.scale
+      : isTopo ? randomBetween(0.01, 0.5, 2)
+      : randomBetween(0.2, 1.4),
     amplitude: locks.motion ? base.amplitude : randomBetween(0.2, 1.6),
-    frequency: locks.motion ? base.frequency : randomBetween(0.3, 2.6),
-    definition: locks.motion ? base.definition : randomInt(1, 8),
+    frequency: locks.motion ? base.frequency
+      : isTopo ? randomBetween(0.01, 0.3, 2)
+      : randomBetween(0.3, 2.6),
+    definition: locks.motion ? base.definition
+      : isTopo ? randomInt(1, 3)
+      : randomInt(1, 8),
     blend: locks.motion ? base.blend : randomBetween(0.15, 1, 2),
     morphSpeed: locks.motion ? base.morphSpeed : randomBetween(0.05, 1.2),
     morphAmount: locks.motion ? base.morphAmount : randomBetween(0, 1.2),
@@ -284,6 +299,7 @@ function animationTypeLabel(type: AnimationType) {
     blobs: "Blobs",
     three: "3D Mesh",
     topographic: "Topographic",
+    neondrip: "Neon Drip",
   }[type];
 }
 
@@ -1619,7 +1635,7 @@ function App() {
       return;
     }
 
-    setParams((prev) => randomParams(prev, workflowLocks));
+    setParams((prev) => randomParams(prev, workflowLocks, animationType));
     showToast("Parameters randomized");
   };
 
@@ -1631,7 +1647,7 @@ function App() {
       setColors(randomPaletteColors());
     }
     if (!(workflowLocks.motion && workflowLocks.seed)) {
-      setParams((prev) => randomParams(prev, workflowLocks));
+      setParams((prev) => randomParams(prev, workflowLocks, animationType));
     }
     showToast("Scene randomized");
   };
@@ -1806,6 +1822,17 @@ function App() {
         )}
         {animationType === "topographic" && (
           <TopographicCanvas
+            ref={rendererRef}
+            params={params}
+            colors={renderColors}
+            paused={paused}
+            onStatusChange={setRendererStatus}
+            renderScale={renderScale}
+            externalTime={externalRenderTime}
+          />
+        )}
+        {animationType === "neondrip" && (
+          <NeonDripCanvas
             ref={rendererRef}
             params={params}
             colors={renderColors}

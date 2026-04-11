@@ -14,6 +14,7 @@ import {
   Lock,
   LockOpen,
   ChartLineIcon,
+  Flame,
   Palette,
   PlayPause,
   Plus,
@@ -157,6 +158,10 @@ const MODE_DETAILS: Record<
   topographic: {
     name: "Topographic",
     description: "Animated contour lines from a flowing noise field.",
+  },
+  neondrip: {
+    name: "Neon Drip",
+    description: "Metaball blobs rising upward through neon-lit liquid.",
   },
 };
 
@@ -523,7 +528,20 @@ export default function Panel({
       blend: "Line Opacity",
       topoLineWidth: "Line Width",
     },
-  }[animationType];
+    neondrip: {
+      seed: "Seed",
+      speed: "Drip Speed",
+      scale: "Zoom",
+      amplitude: "Wobble",
+      frequency: "Tendrils",
+      definition: "Blob Count",
+      blend: "Glow",
+      topoLineWidth: "",
+    },
+  }[animationType] ?? {
+    seed: "Seed", speed: "Speed", scale: "Scale", amplitude: "Amplitude",
+    frequency: "Frequency", definition: "Definition", blend: "Blend", topoLineWidth: "",
+  };
 
   const renderOnboardingCard = (stepIndex: number) => {
     if (onboardingStep !== stepIndex) return null;
@@ -764,6 +782,17 @@ export default function Panel({
                 weight={animationType === "topographic" ? "fill" : "bold"}
               />
             </button>
+            <button
+              className={`mode-btn ${animationType === "neondrip" ? "active" : ""}`}
+              onClick={() => setAnimationType("neondrip")}
+              title="Neon Drip"
+              aria-label="Switch to Neon Drip mode"
+            >
+              <Flame
+                size={16}
+                weight={animationType === "neondrip" ? "fill" : "bold"}
+              />
+            </button>
           </div>
           <div className="mode-summary">
             <strong>{MODE_DETAILS[animationType].name}</strong>
@@ -867,7 +896,7 @@ export default function Panel({
           Tune time, zoom, and movement feel for the active renderer.
         </div>
         {viewMode === "advanced" && renderParamRow("seed", 0, 9999, 1)}
-        {renderParamRow("speed", 0, animationType === "topographic" ? 0.2 : 10, animationType === "topographic" ? 0.01 : 0.1)}
+        {renderParamRow("speed", 0, animationType === "topographic" ? 0.2 : animationType === "neondrip" ? 1 : 10, animationType === "topographic" || animationType === "neondrip" ? 0.01 : 0.1)}
         {renderParamRow("scale", 0.01, animationType === "topographic" ? 0.5 : 2, 0.01)}
         {viewMode === "advanced" && renderParamRow("amplitude", 0, 2, 0.01)}
       </div>
