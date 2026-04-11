@@ -50,20 +50,26 @@ mat3 setCamera(vec3 ro, vec3 ta, float cr) {
   return mat3(cu, cv, cw);
 }
 
-// ── Value noise (procedural, no texture needed) ──────────────────────────────
-float hash(float n) { return fract(sin(n) * 43758.5453123); }
+// ── Gradient noise (smoother than value noise, no banding) ───────────────────
+vec3 _h3(vec3 p) {
+  p = vec3(dot(p, vec3(127.1, 311.7,  74.7)),
+           dot(p, vec3(269.5, 183.3, 246.1)),
+           dot(p, vec3(113.5, 271.9, 124.6)));
+  return -1.0 + 2.0 * fract(sin(p) * 43758.5453123);
+}
 
-float noise3(vec3 x) {
-  vec3 p = floor(x);
-  vec3 f = fract(x);
-  f = f * f * (3.0 - 2.0 * f);
-  float n = p.x + p.y * 57.0 + p.z * 113.0;
-  return mix(
-    mix(mix(hash(n +   0.0), hash(n +   1.0), f.x),
-        mix(hash(n +  57.0), hash(n +  58.0), f.x), f.y),
-    mix(mix(hash(n + 113.0), hash(n + 114.0), f.x),
-        mix(hash(n + 170.0), hash(n + 171.0), f.x), f.y),
-    f.z) * 2.0 - 1.0;
+float noise3(vec3 p) {
+  vec3 i = floor(p);
+  vec3 f = fract(p);
+  vec3 u = f * f * (3.0 - 2.0 * f);
+  return mix(mix(mix(dot(_h3(i + vec3(0,0,0)), f - vec3(0,0,0)),
+                     dot(_h3(i + vec3(1,0,0)), f - vec3(1,0,0)), u.x),
+                 mix(dot(_h3(i + vec3(0,1,0)), f - vec3(0,1,0)),
+                     dot(_h3(i + vec3(1,1,0)), f - vec3(1,1,0)), u.x), u.y),
+             mix(mix(dot(_h3(i + vec3(0,0,1)), f - vec3(0,0,1)),
+                     dot(_h3(i + vec3(1,0,1)), f - vec3(1,0,1)), u.x),
+                 mix(dot(_h3(i + vec3(0,1,1)), f - vec3(0,1,1)),
+                     dot(_h3(i + vec3(1,1,1)), f - vec3(1,1,1)), u.x), u.y), u.z);
 }
 
 // ── Cloud drift offset ───────────────────────────────────────────────────────
@@ -158,7 +164,7 @@ vec4 marchStep(vec3 pos, vec3 bgcol, float t, float den, float denShadow) {
 vec4 raymarch(vec3 ro, vec3 rd, vec3 bgcol, float dither) {
   const vec3 sundir = vec3(-0.7071, 0.0, -0.7071);
   vec4 sum = vec4(0.0);
-  float t = 0.05 * dither;
+  float t = 0.02 * dither;  // smaller start jitter = less grain
 
   // Pass 1 — high-detail near range (40 steps)
   for (int i = 0; i < 40; i++) {
@@ -209,19 +215,24 @@ vec4 raymarch(vec3 ro, vec3 rd, vec3 bgcol, float dither) {
 
 // ── Final composite ──────────────────────────────────────────────────────────
 vec4 render(vec3 ro, vec3 rd, float dither) {
-  const vec3 sundir = vec3(-0.7071, 0.0, -0.7071);
+  // Sun slightly above horizon, left-forward so it's visible in default view
+  const vec3 sundir = normalize(vec3(-0.5, 0.28, -0.82));
   float sun = clamp(dot(sundir, rd), 0.0, 1.0);
 
   // Sky gradient: uSkyColor fades with altitude
   vec3 col = uSkyColor - rd.y * 0.2 * vec3(1.0, 0.5, 1.0) + 0.075;
-  col += 0.2 * uSunColor * pow(sun, 8.0);
+
+  // Wide atmospheric scatter
+  col += uSunColor * 0.18 * pow(sun, 4.0);
 
   // Composite clouds
   vec4 res = raymarch(ro, rd, col, dither);
   col = col * (1.0 - res.w) + res.xyz;
 
-  // Sun glare disk
-  col += uSunColor * 0.06 * pow(sun, 3.0);
+  // Sun corona (medium glow visible through thin cloud edges)
+  col += uSunColor * 0.55 * pow(sun, 22.0);
+  // Sun disk (bright tight point)
+  col += vec3(1.0) * pow(sun, 800.0) * 2.5;
 
   // Subtle vignette
   vec2 uv = gl_FragCoord.xy / iResolution;
@@ -233,19 +244,16 @@ vec4 render(vec3 ro, vec3 rd, float dither) {
 
 void main() {
   vec2 p = (2.0 * gl_FragCoord.xy - iResolution) / iResolution.y;
-  vec2 m = iMouse.xy / max(iResolution, vec2(1.0));
+  vec2 m = iMouse.xy / max(iResolution, vec2(1.0));  // always 0–1 from orbitRef
 
-  float mx = (m.x < 0.001 && m.y < 0.001) ? 0.18 : m.x;
-  float my = (m.x < 0.001 && m.y < 0.001) ? 0.40 : m.y;
-
-  vec3 ro = 4.0 * normalize(vec3(sin(3.0 * mx), 0.8 * my, cos(3.0 * mx)))
+  vec3 ro = 4.0 * normalize(vec3(sin(3.0 * m.x), 0.8 * m.y, cos(3.0 * m.x)))
            - vec3(0.0, 0.1, 0.0);
   vec3 ta = vec3(0.0, -1.0, 0.0);
   mat3 ca = setCamera(ro, ta, 0.07 * cos(0.25 * iTime));
   vec3 rd = ca * normalize(vec3(p, 1.5));
 
-  // Per-pixel hash dither for banding reduction
-  float dither = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);
+  // Low-intensity dither: enough to break banding, small enough to avoid grain
+  float dither = fract(dot(gl_FragCoord.xy, vec2(0.75487766, 0.56984029)));
 
   fragColor = render(ro, rd, dither);
 }
@@ -368,14 +376,34 @@ const CloudsCanvas = forwardRef<RendererHandle, RendererProps>(function CloudsCa
       U[n] = gl.getUniformLocation(prog, n);
     }
 
-    // Mouse tracking
-    const mouseRef = { x: 0, y: 0 };
-    const onMouse = (e: MouseEvent) => {
-      const r = canvas.getBoundingClientRect();
-      mouseRef.x = e.clientX - r.left;
-      mouseRef.y = r.height - (e.clientY - r.top);
+    // Drag-to-orbit: accumulate delta from drag-start so angle never jumps
+    // orbitRef holds normalised (0–1) equivalents of mx/my in the shader
+    const orbitRef = { x: 0.18, y: 0.40 };
+    let isDragging = false;
+    let dragStartClient = { x: 0, y: 0 };
+    let orbitAtDragStart = { x: 0.18, y: 0.40 };
+
+    const onMouseDown = (e: MouseEvent) => {
+      isDragging = true;
+      dragStartClient = { x: e.clientX, y: e.clientY };
+      orbitAtDragStart = { ...orbitRef };
+      canvas.style.cursor = "grabbing";
     };
-    canvas.addEventListener("mousemove", onMouse);
+    const onMouseUp = () => {
+      isDragging = false;
+      canvas.style.cursor = "grab";
+    };
+    const onMouseMove = (e: MouseEvent) => {
+      if (!isDragging) return;
+      const r = canvas.getBoundingClientRect();
+      const dx =  (e.clientX - dragStartClient.x) / r.width;
+      const dy = -(e.clientY - dragStartClient.y) / r.height; // flip Y
+      orbitRef.x = Math.max(0.001, Math.min(0.999, orbitAtDragStart.x + dx));
+      orbitRef.y = Math.max(0.001, Math.min(0.999, orbitAtDragStart.y + dy));
+    };
+    canvas.addEventListener("mousedown", onMouseDown);
+    window.addEventListener("mouseup",   onMouseUp);
+    canvas.addEventListener("mousemove", onMouseMove);
 
     const resize = () => {
       const px = window.devicePixelRatio * renderScale;
@@ -409,7 +437,8 @@ const CloudsCanvas = forwardRef<RendererHandle, RendererProps>(function CloudsCa
       gl.useProgram(prog);
       gl.uniform2f(U.iResolution, canvas.width, canvas.height);
       gl.uniform1f(U.iTime, s.animTime);
-      gl.uniform4f(U.iMouse, mouseRef.x, mouseRef.y, 0, 0);
+      // Pass orbit as canvas-pixel coords so the shader's /iResolution gives 0–1
+      gl.uniform4f(U.iMouse, orbitRef.x * canvas.width, orbitRef.y * canvas.height, 0, 0);
 
       // speed: 0–1 → 0.05–0.6 (slow drift feel)
       gl.uniform1f(U.uSpeed, 0.05 + p.speed * 0.55);
@@ -448,7 +477,9 @@ const CloudsCanvas = forwardRef<RendererHandle, RendererProps>(function CloudsCa
     return () => {
       cancelAnimationFrame(rafId);
       window.removeEventListener("resize", resize);
-      canvas.removeEventListener("mousemove", onMouse);
+      canvas.removeEventListener("mousedown", onMouseDown);
+      window.removeEventListener("mouseup",   onMouseUp);
+      canvas.removeEventListener("mousemove", onMouseMove);
       gl.deleteProgram(prog);
       gl.deleteBuffer(buf);
     };
@@ -458,7 +489,7 @@ const CloudsCanvas = forwardRef<RendererHandle, RendererProps>(function CloudsCa
   return (
     <canvas
       ref={canvasRef}
-      style={{ display: "block", width: "100%", height: "100%" }}
+      style={{ display: "block", width: "100%", height: "100%", cursor: "grab" }}
     />
   );
 });
