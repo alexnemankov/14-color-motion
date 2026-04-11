@@ -42,6 +42,7 @@ export interface GradientParams {
   aperture: number;
   maxBlur: number;
   dofEnabled: boolean;
+  topoLineWidth: number;
 }
 
 export type ColorRgb = [number, number, number];
@@ -125,6 +126,7 @@ const DEFAULT_PARAMS: GradientParams = {
   aperture: 0.0125,
   maxBlur: 0.35,
   dofEnabled: false,
+  topoLineWidth: 1,
 };
 
 const SESSION_STORAGE_KEY = "color-motion-session";
@@ -230,6 +232,7 @@ function randomParams(
     aperture: locks.motion ? base.aperture : randomBetween(0.005, 0.04),
     maxBlur: locks.motion ? base.maxBlur : randomBetween(0.1, 0.45),
     dofEnabled: locks.motion ? base.dofEnabled : true,
+    topoLineWidth: base.topoLineWidth,
   };
 }
 
@@ -510,6 +513,10 @@ function normalizeSceneState(value: unknown): SceneState | null {
       typeof params.dofEnabled === "boolean"
         ? params.dofEnabled
         : DEFAULT_PARAMS.dofEnabled,
+    topoLineWidth:
+      typeof params.topoLineWidth === "number"
+        ? params.topoLineWidth
+        : DEFAULT_PARAMS.topoLineWidth,
   };
 
   const colors = Array.isArray(candidate.colors)

@@ -446,6 +446,7 @@ export default function Panel({
       frequency: "Frequency",
       definition: "Definition",
       blend: "Blend",
+      topoLineWidth: "",
     },
     waves: {
       seed: "Seed",
@@ -455,6 +456,7 @@ export default function Panel({
       frequency: "Base Freq",
       definition: "Sources",
       blend: "Sharpness",
+      topoLineWidth: "",
     },
     voronoi: {
       seed: "Seed",
@@ -464,6 +466,7 @@ export default function Panel({
       frequency: "Cell Density",
       definition: "Morph",
       blend: "Contrast",
+      topoLineWidth: "",
     },
     turing: {
       seed: "Reset Sim",
@@ -473,6 +476,7 @@ export default function Panel({
       frequency: "Kill Factor",
       definition: "Diffusion",
       blend: "Contrast",
+      topoLineWidth: "",
     },
     particles: {
       seed: "Reseed",
@@ -482,6 +486,7 @@ export default function Panel({
       frequency: "Wander Freq",
       definition: "Count",
       blend: "Opacity",
+      topoLineWidth: "",
     },
     blobs: {
       seed: "Flux Seed",
@@ -491,6 +496,7 @@ export default function Panel({
       frequency: "Blob Count",
       definition: "Sharpness",
       blend: "Color Blend",
+      topoLineWidth: "",
     },
     three: {
       seed: "Seed",
@@ -505,6 +511,7 @@ export default function Panel({
       focusDistance: "Focus Dist",
       aperture: "Aperture",
       maxBlur: "Max Blur",
+      topoLineWidth: "",
     },
     topographic: {
       seed: "Seed",
@@ -514,6 +521,7 @@ export default function Panel({
       frequency: "Noise Density",
       definition: "Contour Count",
       blend: "Line Opacity",
+      topoLineWidth: "Line Width",
     },
   }[animationType];
 
@@ -859,8 +867,8 @@ export default function Panel({
           Tune time, zoom, and movement feel for the active renderer.
         </div>
         {viewMode === "advanced" && renderParamRow("seed", 0, 9999, 1)}
-        {renderParamRow("speed", 0, 10, 0.1)}
-        {renderParamRow("scale", 0.01, 2, 0.01)}
+        {renderParamRow("speed", 0, animationType === "topographic" ? 0.2 : 10, animationType === "topographic" ? 0.01 : 0.1)}
+        {renderParamRow("scale", 0.01, animationType === "topographic" ? 0.5 : 2, 0.01)}
         {viewMode === "advanced" && renderParamRow("amplitude", 0, 2, 0.01)}
       </div>
 
@@ -914,9 +922,10 @@ export default function Panel({
             Adjust density, complexity, and edge behavior of the current visual
             system.
           </div>
-          {renderParamRow("frequency", 0.01, 4, 0.01)}
-          {renderParamRow("definition", 1, 12, 1)}
+          {renderParamRow("frequency", 0.01, animationType === "topographic" ? 0.3 : 4, 0.01)}
+          {renderParamRow("definition", 1, animationType === "topographic" ? 3 : 12, 1)}
           {renderParamRow("blend", 0, 1, 0.01)}
+          {animationType === "topographic" && renderParamRow("topoLineWidth", 0.2, 4, 0.1)}
         </div>
       )}
 

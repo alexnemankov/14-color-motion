@@ -24,5 +24,7 @@ export function stepSmoothedParams(current: GradientParams, target: GradientPara
     aperture: current.aperture + (target.aperture - current.aperture) * alpha,
     maxBlur: current.maxBlur + (target.maxBlur - current.maxBlur) * alpha,
     dofEnabled: target.dofEnabled,
+    topoLineWidth:
+      current.topoLineWidth + (target.topoLineWidth - current.topoLineWidth) * alpha,
   };
 }

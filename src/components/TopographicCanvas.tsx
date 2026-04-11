@@ -228,10 +228,10 @@ const TopographicCanvas = forwardRef<RendererHandle, RendererProps>(function Top
       const dp = s.displayParams;
 
       // Map GradientParams → topographic config
-      const CELL_SIZE    = 7;                                             // fixed grid resolution (px)
-      const NUM_CONTOURS = Math.max(3, Math.round(dp.definition * 2.5)); // definition → contour count
-      const NOISE_SCALE  = 0.0004 + dp.scale * 0.005;                   // scale → zoom (more = denser features)
-      const BASE_FREQ    = 0.5 + dp.frequency * 1.5;                     // frequency → FBM base frequency
+      const CELL_SIZE    = Math.round(20 - Math.min(dp.scale, 0.5) * 28); // scale → grid resolution: 0=20px coarse, 0.5=6px fine
+      const NUM_CONTOURS = Math.min(3, Math.max(1, Math.round(dp.definition))); // definition → contour count (1–3)
+      const NOISE_SCALE  = 0.0004 + Math.min(dp.scale, 0.5) * 0.005;    // scale also affects noise zoom
+      const BASE_FREQ    = 0.5 + Math.min(dp.frequency, 0.3) * 5;       // frequency → FBM base frequency
       const WARP_STR     = dp.amplitude * 0.5;                           // amplitude → domain warp strength
       const seedOffset   = s.params.seed * 0.01;                         // seed shifts the noise field
 
@@ -284,8 +284,9 @@ const TopographicCanvas = forwardRef<RendererHandle, RendererProps>(function Top
         const baseAlpha = dp.blend * (0.25 + (1 - distFromCenter) * 0.5);
 
         const isMajor = (c % 5 === 0);
-        const glowWidth  = isMajor ? 5 : 2.5;
-        const sharpWidth = isMajor ? 1.3 : 0.65;
+        const lw = Math.max(0.1, dp.topoLineWidth);
+        const glowWidth  = (isMajor ? 5 : 2.5) * lw;
+        const sharpWidth = (isMajor ? 1.3 : 0.65) * lw;
         const glowAlpha  = baseAlpha * 0.22;
         const sharpAlpha = baseAlpha * (isMajor ? 1.0 : 0.75);
 
