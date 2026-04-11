@@ -131,6 +131,9 @@ Looking at the broader application ecosystem around out rendering logic, here ar
 * **Real-World Weather Hook:** Establish an integration with an API (like OpenWeatherMap). Read the user's local IP data and automatically force the cloud density, rain overlays, and exact time-of-day math (sun angle) to precisely mirror the sky sitting directly outside their physical window.
 * **WebRTC Live Sync:** Create a network mode using WebRTC where one person acts as the "Weather Deity" altering settings on their phone, and an entire room/website of attached viewers sees the atmosphere morph perfectly in sync.
 * **Interactive Wind Particles:** Mount a compute-shader or logic loop running millions of tiny, glowing GPU particles surfing through the "empty" spaces of the noise function, acting as a visualizer for wind and turbulence.
+* **WebXR (VR/AR) Integration:** Introduce a stereoscopic rendering loop where users can physically stand inside the clouds in a VR headset, using physical hand controllers to sweep away volumetric density like wiping away fog.
+* **Image-to-Cloud (Custom Masking):** Allow an image upload (black and white mask) that acts as a localized density multiplier. You can mathematically force the drifting clouds to naturally clump together into a specific logo, text shape, or silhouette.
+* **Procedural Audio Generation:** Instead of just reacting to audio, generate it. Use the raw FBM cloud coverage data to drive a Web Audio frequency synthesizer, generating generative synth hums, deep rumbles, and ambient wind soundscapes exactly matching the visuals on screen.
 
 ## 18. Aesthetic Style Filters
 * **8-bit / EGA Dithered Retro:** Skip bilinear scaling altogether, down-res heavily, and use Bayer matrix dithering in the post-process shader to restrict the entire palette to just 8 or 16 rigid retro colors (Gameboy or DOS aesthetic).
@@ -142,3 +145,21 @@ Looking at the broader application ecosystem around out rendering logic, here ar
 * **Pointillism (Seurat / Stippling):** Distill the volumetric brightness thresholds into a pattern of uniformly placed, tiny colored circles intersecting on a raw canvas background. The cloud formations become visible only as a painting made entirely of dots.
 * **Holographic / Iridescent Prisms:** Swap the diffuse calculation `dif` fundamentally. Instead of returning shadow values, map normal approximations across a sweeping rainbow spectrum, rendering the clouds as shimmering, oily soap bubbles or solid Bismuth crystals.
 * **Stained Glass Window / Voronoi Fracture:** Drop a post-processing cellular fracture that divides the canvas into irregular geometric polygons. Fill each randomly generated chunk with the localized average cloud tint, and trace thick, black "lead lines" along the cell borders.
+* **Origami / Low-Poly Shading:** Aggressively quantize the raymarch distances and derive faceted flat-shaded normals. Instead of soft vapor, the clouds look like they are folded from thousands of rigid, geometric pieces of colored paper.
+* **Cyberpunk Overload:** Combine rain streaks with an electric palette—deep black shadows combined with violent neon greens, cyan highlights, and harsh lens flares piercing out from the localized storm centers.
+* **Blueprint / CAD Rendering:** Ignore volumetric light entirely. Use edge detection and concentric contour math to map the topography of the cloud layer, rendering it entirely via thin, geometric white lines floating over a dark architectural blue grid background.
+* **Microscopic Biological Membrane:** Shift the visual cues to replicate an electron microscope. The clouds act as translucent, glowing amoeba or cellular membranes with dense, brightly lit organic nuclei scattered deep inside the volume.
+
+# Crafting Picturesque Sunsets
+
+To execute those truly breathtaking, hyper-realistic "Golden Hour" skies, the core math underlying light interaction and volumetric shapes must change.
+
+## 19. Light / Bouncing Dynamics
+* **The "Powder Effect" (Internal Light Bounce):** Strict algorithms using Beer's Law (`exp(-density)`) make thick clouds turn completely pitch-black extremely fast. By inverting an exponential curve on the density (e.g., `(1.0 - exp(-density * 2.0)) * exp(-density)`), we successfully spoof secondary un-directed photon bounces. This creates the breathtaking phenomenon where low sunlights make the 'bellies' of massive storm clouds glow with deep, soft, inner-illuminated orange.
+* **Henyey-Greenstein (Phase Functions):** Real clouds glow viciously around their rim when the sun is right behind them ("Silver Linings"). Swapping static shadow calculations for a Dual-lobe Phase Function evaluates light scattered intensely towards the viewer vs. bouncing backward. This makes sunsets piercingly bright at the edges without bloating the colors elsewhere.
+* **Vertical Penumbra Gradients:** Because the earth casts a shadow upward as the sun sets, sunset clouds are never one color. Mapping a manual gradient directly against the ray's vertical height (`p.y`) forces the belly of the clouds into cold, dark purples while leaving the fluffy high-altitude caps saturated with bright pink and molten gold.
+
+## 20. Sculpting Cloud Forms
+* **Ridged "Cauliflower" Noise:** Wispy FBM smoke doesn't trap light beautifully. Switching the standard gradient noise to Ridged Multifractal Noise (`1.0 - abs(noise)`) mathematically erodes the volume. It builds sharp, bubbly, cauliflower-like storm cells. These hard ridges are the exact shapes necessary to catch and trap long-angle sunset rays.
+* **Altimetry Profiling:** Using an altitude bell curve (`smoothstep` based on `p.y`), flatten out the bottom layer of the cloud perfectly horizontally while letting the tops billow upward. A flat base is critical for sunrises/sunsets as it presents a continuous ceiling for the warm light to blanket.
+* **Wind Shearing (Anvils):** Sunsets look incredibly majestic passing through heavy storm fronts. By mathematically shearing the volume matrix coordinates—skewing the clouds horizontally the higher they go (`p.x += p.y * shearFactor`)—you build dramatic, leaning cumulus "anvil" shapes that lean directly into the sunset to catch maximum light.
