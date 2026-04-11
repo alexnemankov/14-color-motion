@@ -2,6 +2,21 @@
 
 Based on an analysis of the current `CloudsCanvas.tsx` implementation, here are several avenues for improving performance and visual quality. The volumetric raymarching is quite heavy because it evaluates 3D gradient noise up to 140 times per pixel in the most detailed areas.
 
+## Execution Priority Plan
+
+### 1. The "Free" Wins (Do these immediately)
+* **Hoist the Drift Math:** Calculating `cloudOffset()` inside `mapN()` forces the shader to do redundant vector math on every single ray step. Calculating `vec3 uCloudDrift` in JavaScript and passing it as a uniform is free performance.
+* **AABB Early-Out:** Blindly stepping forward from the camera and checking `pos.y` limits on every iteration is wasteful. Implementing the ray-slab intersection math before the loop starts to skip empty air is a trivial addition that offers a ~1.5x speedup.
+
+### 2. The High-Impact structural changes
+* **Half-res + Upscale:** Native raymarching on retina screens is brutal. Rendering to an FBO at 50% resolution and upscaling with bilinear filtering is relatively easy to implement and will yield a ~4x performance boost. Because clouds are naturally soft, the resolution drop will be barely noticeable.
+* **Blue Noise Dithering:** You currently use a low-intensity `fract(dot(...))` white noise to break up banding. Replacing this with a pre-computed 2D Blue Noise texture lookup will vastly reduce perceptive grain and temporal flicker.
+
+### 3. Advanced Volumetric Rendering
+* **Temporal Accumulation:** Once your baseline performance is stable, setting up a ping-pong FBO to blend 80% of the previous frame with 20% of the new frame is the industry standard. This allows you to drastically reduce your raymarching steps.
+
+---
+
 ## 1. Cloud Slab Early-Out (AABB Intersection)
 **Impact:** ~1.5x faster | **Effort:** Trivial
 **Current state:** The raymarch loop starts at the camera and steps forward blindly, checking `if (pos.y < -3.0 || pos.y > 2.0)` each step to break early.

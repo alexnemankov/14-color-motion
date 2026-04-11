@@ -26,7 +26,7 @@ uniform float iTime;
 uniform vec4  iMouse;
 
 // GradientParams-driven uniforms
-uniform float uSpeed;       // cloud drift velocity
+uniform vec3  uCloudDrift;  // pre-computed drift vector (JS: vec3(0,0.1,1)*time*speed)
 uniform float uCoverage;    // density offset — how much sky is clouded (-0.6 to +0.6)
 uniform float uAmplitude;   // FBM amplitude multiplier
 uniform float uDefinition;  // raymarch octave budget (2–5)
@@ -72,11 +72,6 @@ float noise3(vec3 p) {
                      dot(_h3(i + vec3(1,1,1)), f - vec3(1,1,1)), u.x), u.y), u.z);
 }
 
-// ── Cloud drift offset ───────────────────────────────────────────────────────
-vec3 cloudOffset() {
-  return vec3(0.0, 0.1, 1.0) * iTime * uSpeed;
-}
-
 // ── Cloud type density modifier ──────────────────────────────────────────────
 // Returns a clamped density value [0,1] for a given world position p
 // and base FBM accumulation f. uCoverage shifts the density threshold.
@@ -113,7 +108,7 @@ float cloudDensity(vec3 p, float f) {
 // Each mapN call requests a different count; the actual octaves used are
 // min(requested, uMaxOctaves) so quality scales smoothly with the slider.
 float mapN(vec3 p, int maxOctaves) {
-  vec3 q = p - cloudOffset();
+  vec3 q = p - uCloudDrift;  // drift hoisted to JS uniform — no per-step recalc
   float f = 0.0;
   float weight = 0.5;
   // Hard cap at 5 — loop limit must be a compile-time constant
@@ -164,7 +159,27 @@ vec4 marchStep(vec3 pos, vec3 bgcol, float t, float den, float denShadow) {
 vec4 raymarch(vec3 ro, vec3 rd, vec3 bgcol, float dither) {
   const vec3 sundir = vec3(-0.7071, 0.0, -0.7071);
   vec4 sum = vec4(0.0);
-  float t = 0.02 * dither;  // smaller start jitter = less grain
+
+  // ── AABB slab early-out ───────────────────────────────────────────────────
+  // Intersect the ray with the horizontal cloud slab y ∈ [-3, 2].
+  // If rd.y ≈ 0 (ray nearly horizontal) avoid divide-by-zero with a tiny epsilon.
+  float tMin, tMax;
+  if (abs(rd.y) > 1e-4) {
+    float t0 = ( 2.0 - ro.y) / rd.y;   // intersection with y = +2 (slab top)
+    float t1 = (-3.0 - ro.y) / rd.y;   // intersection with y = -3 (slab bottom)
+    tMin = max(0.0, min(t0, t1));
+    tMax =         max(t0, t1);
+  } else {
+    // Ray is horizontal — check if camera is inside the slab
+    tMin = (ro.y >= -3.0 && ro.y <= 2.0) ? 0.0 : 1e9;
+    tMax = 1e9;
+  }
+
+  // Ray misses the slab entirely — return empty
+  if (tMin > tMax || tMax < 0.0) return sum;
+
+  // Start at slab entry + small dither jitter (skips all empty air above)
+  float t = tMin + 0.02 * dither;
 
   // Pass 1 — high-detail near range (40 steps)
   for (int i = 0; i < 40; i++) {
@@ -370,7 +385,7 @@ const CloudsCanvas = forwardRef<RendererHandle, RendererProps>(function CloudsCa
     const U: Record<string, WebGLUniformLocation | null> = {};
     for (const n of [
       "iResolution", "iTime", "iMouse",
-      "uSpeed", "uCoverage", "uAmplitude", "uDefinition", "uBlend", "uCloudType",
+      "uCloudDrift", "uCoverage", "uAmplitude", "uDefinition", "uBlend", "uCloudType",
       "uSkyColor", "uCloudTint", "uSunColor", "uShadowColor",
     ]) {
       U[n] = gl.getUniformLocation(prog, n);
@@ -440,8 +455,10 @@ const CloudsCanvas = forwardRef<RendererHandle, RendererProps>(function CloudsCa
       // Pass orbit as canvas-pixel coords so the shader's /iResolution gives 0–1
       gl.uniform4f(U.iMouse, orbitRef.x * canvas.width, orbitRef.y * canvas.height, 0, 0);
 
-      // speed: 0–1 → 0.05–0.6 (slow drift feel)
-      gl.uniform1f(U.uSpeed, 0.05 + p.speed * 0.55);
+      // Drift vector computed once in JS — shader just subtracts it, no per-step math
+      const driftSpeed = 0.05 + p.speed * 0.55;
+      const drift = s.animTime * driftSpeed;
+      gl.uniform3f(U.uCloudDrift, 0.0, 0.1 * drift, 1.0 * drift);
 
       // coverage: scale 0.01–2 → -0.6 to +0.6 density offset
       gl.uniform1f(U.uCoverage, (p.scale - 1.0) * 0.6);
