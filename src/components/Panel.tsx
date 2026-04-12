@@ -384,14 +384,14 @@ export default function Panel({
   };
 
   const updateParam = (
-    name: keyof Omit<GradientParams, "dofEnabled">,
+    name: keyof Omit<GradientParams, "dofEnabled" | "godRays">,
     value: number,
   ) => {
     setParams((prev) => ({ ...prev, [name]: Number.isNaN(value) ? 0 : value }));
   };
 
   const renderParamRow = (
-    key: keyof Omit<GradientParams, "dofEnabled">,
+    key: keyof Omit<GradientParams, "dofEnabled" | "godRays">,
     min: number,
     max: number,
     step: number,
@@ -1096,6 +1096,25 @@ export default function Panel({
                 <span>{sub}</span>
               </button>
             ))}
+          </div>
+        </div>
+      )}
+
+      {animationType === "clouds" && (
+        <div className="panel-section">
+          <div className="section-heading">
+            <span className="section-label">God Rays</span>
+            <button
+              type="button"
+              className={`section-toggle ${params.godRays ? "active" : ""}`}
+              onClick={() => setParams((prev) => ({ ...prev, godRays: !prev.godRays }))}
+              aria-pressed={params.godRays}
+            >
+              {params.godRays ? "On" : "Off"}
+            </button>
+          </div>
+          <div className="section-copy">
+            Volumetric light shafts radiating from the sun through cloud gaps.
           </div>
         </div>
       )}

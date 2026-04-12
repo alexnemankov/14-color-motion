@@ -349,10 +349,36 @@ const BLIT_FRAG = /* glsl */ `#version 300 es
 precision mediump float;
 uniform sampler2D uTex;
 uniform vec2      uResolution;
+uniform int       uGodRays;         // 0=off, 1=on
+uniform vec2      uLightScreenPos;  // dominant light (sun/moon) in [0,1] UV; (-1,-1)=off-screen
 out vec4 fragColor;
 void main() {
-  // Bilinear filtering is provided automatically by LINEAR texture minification
-  fragColor = texture(uTex, gl_FragCoord.xy / uResolution);
+  vec2 uv  = gl_FragCoord.xy / uResolution;
+  vec4 col = texture(uTex, uv);
+
+  if (uGodRays == 1 && uLightScreenPos.x > -0.5) {
+    // Screen-space radial blur toward the light source (Crytek technique).
+    // A luminance threshold ensures only the bright sun/moon disk contributes —
+    // cloud bodies are below the threshold and do not wash out the scene.
+    const int   SAMPLES   = 16;
+    const float DECAY     = 0.93;
+    const float THRESHOLD = 0.82; // only values brighter than this bleed outward
+
+    vec2 delta    = (uv - uLightScreenPos) * (0.9 / float(SAMPLES));
+    vec2 sampleUV = uv;
+    vec3 rays     = vec3(0.0);
+    float w       = 1.0;
+    for (int i = 0; i < SAMPLES; i++) {
+      sampleUV -= delta;
+      vec3 s = texture(uTex, clamp(sampleUV, vec2(0.0), vec2(1.0))).rgb;
+      // Only the bright disk / halo above the threshold bleeds — clouds don't
+      rays += max(vec3(0.0), s - THRESHOLD) * w;
+      w    *= DECAY;
+    }
+    col.rgb += rays * 0.18;
+  }
+
+  fragColor = col;
 }
 `;
 
@@ -550,7 +576,7 @@ const CloudsCanvas = forwardRef<RendererHandle, RendererProps>(function CloudsCa
       A[n] = gl.getUniformLocation(accumProg, n);
 
     const B: Record<string, WebGLUniformLocation | null> = {};
-    for (const n of ["uTex", "uResolution"])
+    for (const n of ["uTex", "uResolution", "uGodRays", "uLightScreenPos"])
       B[n] = gl.getUniformLocation(blitProg, n);
 
     // ── Textures ─────────────────────────────────────────────────────────────
@@ -735,6 +761,50 @@ const CloudsCanvas = forwardRef<RendererHandle, RendererProps>(function CloudsCa
       gl.bindTexture(gl.TEXTURE_2D, accumTex[currIdx]);
       gl.uniform1i(B.uTex, 1);
       gl.uniform2f(B.uResolution, canvas.width, canvas.height);
+
+      // ── God rays: project dominant light source to screen UV ─────────────
+      // Replicate the FRAG_SRC camera setup in JS to get the sun (or moon at
+      // night) screen position, then upload to the blit shader for radial blur.
+      {
+        const mx = orbitRef.x, my = orbitRef.y;
+        const rrx = Math.sin(3 * mx), rry = 0.8 * my, rrz = Math.cos(3 * mx);
+        const rrl = Math.sqrt(rrx * rrx + rry * rry + rrz * rrz);
+        const rox = 4 * rrx / rrl, roy = 4 * rry / rrl - 0.1, roz = 4 * rrz / rrl;
+
+        const cr  = 0.07 * Math.cos(0.25 * s.animTime);
+        // cw = normalize(ta - ro), ta = [0,-1,0]
+        const cwx0 = -rox, cwy0 = -1 - roy, cwz0 = -roz;
+        const cwl  = Math.sqrt(cwx0*cwx0 + cwy0*cwy0 + cwz0*cwz0);
+        const cwx = cwx0/cwl, cwy = cwy0/cwl, cwz = cwz0/cwl;
+        // cu = normalize(cross(cw, cp)), cp = [sin(cr), cos(cr), 0]
+        const cpx = Math.sin(cr), cpy = Math.cos(cr);
+        const cux0 = cwy*0-cwz*cpy, cuy0 = cwz*cpx-cwx*0, cuz0 = cwx*cpy-cwy*cpx;
+        const cul  = Math.sqrt(cux0*cux0 + cuy0*cuy0 + cuz0*cuz0);
+        const cux = cux0/cul, cuy = cuy0/cul, cuz = cuz0/cul;
+        // cv = normalize(cross(cu, cw))
+        const cvx0 = cuy*cwz-cuz*cwy, cvy0 = cuz*cwx-cux*cwz, cvz0 = cux*cwy-cuy*cwx;
+        const cvl  = Math.sqrt(cvx0*cvx0 + cvy0*cvy0 + cvz0*cvz0);
+        const cvx = cvx0/cvl, cvy = cvy0/cvl, cvz = cvz0/cvl;
+
+        // Project a world-space direction to screen UV
+        const project = (dx: number, dy: number, dz: number): [number, number] | null => {
+          const vz = cwx*dx + cwy*dy + cwz*dz; // view-space Z
+          if (vz < 0.01) return null;           // behind camera
+          const vx = cux*dx + cuy*dy + cuz*dz;
+          const vy = cvx*dx + cvy*dy + cvz*dz;
+          const asp = canvas.width / canvas.height;
+          return [vx / vz * 1.5 / (2 * asp) + 0.5,
+                  vy / vz * 1.5 / 2           + 0.5];
+        };
+
+        // Sun during day; moon (opposite direction) during night
+        const sunD  = [sx / sl, sy / sl, sz / sl] as const;
+        let   uv    = project(sunD[0], sunD[1], sunD[2]);
+        if (!uv) uv = project(-sunD[0], -sunD[1], -sunD[2]); // try moon
+
+        gl.uniform1i(B.uGodRays, s.params.godRays ? 1 : 0);
+        gl.uniform2f(B.uLightScreenPos, uv ? uv[0] : -1, uv ? uv[1] : -1);
+      }
 
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 

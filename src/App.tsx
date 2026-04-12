@@ -48,6 +48,7 @@ export interface GradientParams {
   dofEnabled: boolean;
   topoLineWidth: number;
   cloudType: number;
+  godRays: boolean;
 }
 
 export type ColorRgb = [number, number, number];
@@ -133,6 +134,7 @@ const DEFAULT_PARAMS: GradientParams = {
   dofEnabled: false,
   topoLineWidth: 1,
   cloudType: 0,
+  godRays: false,
 };
 
 const SESSION_STORAGE_KEY = "color-motion-session";
@@ -256,6 +258,7 @@ function randomParams(
     dofEnabled: locks.motion ? base.dofEnabled : true,
     topoLineWidth: base.topoLineWidth,
     cloudType: base.cloudType,
+    godRays: base.godRays,
   };
 }
 
@@ -547,6 +550,10 @@ function normalizeSceneState(value: unknown): SceneState | null {
       typeof params.cloudType === "number"
         ? params.cloudType
         : DEFAULT_PARAMS.cloudType,
+    godRays:
+      typeof params.godRays === "boolean"
+        ? params.godRays
+        : DEFAULT_PARAMS.godRays,
   };
 
   const colors = Array.isArray(candidate.colors)
