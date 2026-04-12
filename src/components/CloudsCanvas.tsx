@@ -54,26 +54,38 @@ mat3 setCamera(vec3 ro, vec3 ta, float cr) {
   return mat3(cu, cv, cw);
 }
 
-// ── Gradient noise (smoother than value noise, no banding) ───────────────────
+// ── Cellular / Voronoi noise (Cauliflower billows) ───────────────────────────
 vec3 _h3(vec3 p) {
   p = vec3(dot(p, vec3(127.1, 311.7,  74.7)),
            dot(p, vec3(269.5, 183.3, 246.1)),
            dot(p, vec3(113.5, 271.9, 124.6)));
-  return -1.0 + 2.0 * fract(sin(p) * 43758.5453123);
+  return fract(sin(p) * 43758.5453123);
 }
 
-float noise3(vec3 p) {
+float cellular3(vec3 p) {
   vec3 i = floor(p);
   vec3 f = fract(p);
-  vec3 u = f * f * (3.0 - 2.0 * f);
-  return mix(mix(mix(dot(_h3(i + vec3(0,0,0)), f - vec3(0,0,0)),
-                     dot(_h3(i + vec3(1,0,0)), f - vec3(1,0,0)), u.x),
-                 mix(dot(_h3(i + vec3(0,1,0)), f - vec3(0,1,0)),
-                     dot(_h3(i + vec3(1,1,0)), f - vec3(1,1,0)), u.x), u.y),
-             mix(mix(dot(_h3(i + vec3(0,0,1)), f - vec3(0,0,1)),
-                     dot(_h3(i + vec3(1,0,1)), f - vec3(1,0,1)), u.x),
-                 mix(dot(_h3(i + vec3(0,1,1)), f - vec3(0,1,1)),
-                     dot(_h3(i + vec3(1,1,1)), f - vec3(1,1,1)), u.x), u.y), u.z);
+  // 8-tap quadrant approximation: drastically reduces evaluations from 27 to 8
+  // while retaining excellent Voronoi characteristics for volumetric clouds.
+  vec3 dir = sign(f - 0.5);
+  float minDist = 2.0;
+
+  for (int z = 0; z <= 1; z++) {
+    for (int y = 0; y <= 1; y++) {
+      for (int x = 0; x <= 1; x++) {
+        vec3 neighbor = vec3(float(x), float(y), float(z)) * dir;
+        vec3 pt = _h3(i + neighbor);
+        vec3 diff = neighbor + pt - f;
+        float d = dot(diff, diff);
+        minDist = min(minDist, d);
+      }
+    }
+  }
+  
+  // Inverted distance check (1.0 - dist) produces cratered, heavily bubbling
+  // cumulus structures instead of wispy, smoke-like Perlin gradients.
+  // Mapped to [-1.0, 1.0] to work seamlessly with existing FBM amplitudes.
+  return (1.0 - sqrt(minDist)) * 2.0 - 1.0;
 }
 
 // ── Per-type density helpers ─────────────────────────────────────────────────
@@ -130,7 +142,7 @@ float mapN(vec3 p, int maxOctaves) {
   // Hard cap at 5 — loop limit must be a compile-time constant
   for (int i = 0; i < 5; i++) {
     if (i >= maxOctaves) break;
-    f += weight * noise3(q);
+    f += weight * cellular3(q);
     q *= 2.02;
     weight *= 0.5;
   }

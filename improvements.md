@@ -120,7 +120,7 @@ If you significantly refactor the shader going forward, here are advanced theore
 ## 13. Advanced Visual Variations
 
 - **Multi-Layer Atmosphere:** Implement distinct stratified layers—e.g., fast-moving stringy stratus clouds at `y = -2.0` and slow, dense cumulus towers at `y = 1.0`. Intersecting specific vertical bands independently fakes incredible depth and scale.
-- **Cellular / Voronoi Clouds:** Migrate away from pure Gradient noise (Perlin/Simplex), and introduce Cellular noise with inverted distance checks. This produces distinct "cauliflower" billows and heavily cratered, bubbly cumulus structures instead of wispy smoke-like gradients.
+- ✅ **Cellular / Voronoi Clouds:** Migrate away from pure Gradient noise (Perlin/Simplex), and introduce Cellular noise with inverted distance checks. This produces distinct "cauliflower" billows and heavily cratered, bubbly cumulus structures instead of wispy smoke-like gradients.
 - **Aurora Borealis & Bioluminescence:** Include a secondary emissive pass that willfully ignores the sun direction. By injecting saturated localized colors parameterized to a low-frequency noise curve, you can forge glowing auroras or magical, self-illuminating nebula dust.
 - **Morphological Modifiers (Anvils & Shelves):** Apply height-dependent density clamping. Crushing the top Y-values while increasing noise frequency laterally flattens storm clouds into classic Cumulonimbus "anvils", or twists them into terrifying rolling shelf-clouds.
 - **Stylized / Ghibli-Toon Clouds:** Siphon the final `den` and `shadow` values through a hard `step()` threshold or a 1D color texture ramp instead of a soft blend. This translates the volumetric data into cel-shaded, Anime-style fluffy clouds with solid edges.
