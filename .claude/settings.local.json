@@ -4,7 +4,9 @@
       "Bash(node -e \"const icons = require\\('@phosphor-icons/react'\\); const names = Object.keys\\(icons\\).filter\\(k => k.toLowerCase\\(\\).includes\\('map'\\) || k.toLowerCase\\(\\).includes\\('contour'\\) || k.toLowerCase\\(\\).includes\\('terrain'\\) || k.toLowerCase\\(\\).includes\\('topo'\\) || k.toLowerCase\\(\\).includes\\('layer'\\)\\); console.log\\(names.slice\\(0,30\\).join\\('\\\\n'\\)\\)\")",
       "Bash(node --input-type=module)",
       "Bash(node -e \"const pkg = require\\('./node_modules/@phosphor-icons/react/package.json'\\); console.log\\('version:', pkg.version\\);\")",
-      "WebFetch(domain:alexnemankov.github.io)"
+      "WebFetch(domain:alexnemankov.github.io)",
+      "Bash(git reset:*)",
+      "Bash(git push:*)"
     ]
   }
 }

@@ -28,18 +28,18 @@ No test or lint scripts are configured.
 
 Ten renderers each implement the `RendererHandle` interface from [rendererTypes.ts](src/components/rendererTypes.ts):
 
-| Component | Technique | Backend |
-|-----------|-----------|---------|
-| `LiquidCanvas` | Fluid FBM | WebGL2 |
-| `WavesCanvas` | Interference waves | WebGL2 |
-| `VoronoiCanvas` | Cellular Voronoi | WebGL2 |
-| `TuringCanvas` | Reaction-Diffusion (dispatches to sub-renderers) | WebGPU → WebGL2 fallback |
-| `BlobsCanvas` | Molten blobs | Canvas 2D |
-| `ThreeJSCanvas` | 3D scene | Three.js 0.162 |
-| `TopographicCanvas` | Topographic contours | Canvas 2D |
-| `ParticlesCanvas` | Particle web | Web Worker + Canvas 2D |
-| `NeonDripCanvas` | Metaball drip blobs | Canvas 2D |
-| `CloudsCanvas` | Volumetric ray-marched sky | WebGL2 |
+| Component           | Technique                                        | Backend                  |
+| ------------------- | ------------------------------------------------ | ------------------------ |
+| `LiquidCanvas`      | Fluid FBM                                        | WebGL2                   |
+| `WavesCanvas`       | Interference waves                               | WebGL2                   |
+| `VoronoiCanvas`     | Cellular Voronoi                                 | WebGL2                   |
+| `TuringCanvas`      | Reaction-Diffusion (dispatches to sub-renderers) | WebGPU → WebGL2 fallback |
+| `BlobsCanvas`       | Molten blobs                                     | Canvas 2D                |
+| `ThreeJSCanvas`     | 3D scene                                         | Three.js 0.162           |
+| `TopographicCanvas` | Topographic contours                             | Canvas 2D                |
+| `ParticlesCanvas`   | Particle web                                     | Web Worker + Canvas 2D   |
+| `NeonDripCanvas`    | Metaball drip blobs                              | Canvas 2D                |
+| `CloudsCanvas`      | Volumetric ray-marched sky                       | WebGL2                   |
 
 The `RendererHandle` interface requires: `status`, `supportsExternalTime`, `supportsLoopSafeExport`, `getCanvas()`, `captureFrame()`. Renderers are wrapped in `RendererBoundary` for error isolation.
 
@@ -49,27 +49,28 @@ The `RendererHandle` interface requires: `status`, `supportsExternalTime`, `supp
 
 All renderers share a single `GradientParams` object. Most fields are universal; some are mode-specific:
 
-| Field | Type | Notes |
-|-------|------|-------|
-| `seed` | number | Random seed / reseed trigger |
-| `speed` | number | Animation speed |
-| `scale` | number | Zoom / scale |
-| `amplitude` | number | FBM amplitude or wander strength |
-| `frequency` | number | Noise / cell frequency |
-| `definition` | number | Octave count / detail level |
-| `blend` | number | Color blend / contrast / softness |
-| `morphSpeed` | number | 3D mesh drift speed (Three only) |
-| `morphAmount` | number | 3D mesh drift height (Three only) |
-| `focusDistance` | number | DOF focus distance (Three only) |
-| `aperture` | number | DOF aperture (Three only) |
-| `maxBlur` | number | DOF max blur (Three only) |
-| `dofEnabled` | boolean | DOF toggle (Three only) |
-| `topoLineWidth` | number | Contour line width (Topographic only) |
-| `cloudType` | number | 0–4 cloud formation (Clouds only) |
+| Field           | Type    | Notes                                 |
+| --------------- | ------- | ------------------------------------- |
+| `seed`          | number  | Random seed / reseed trigger          |
+| `speed`         | number  | Animation speed                       |
+| `scale`         | number  | Zoom / scale                          |
+| `amplitude`     | number  | FBM amplitude or wander strength      |
+| `frequency`     | number  | Noise / cell frequency                |
+| `definition`    | number  | Octave count / detail level           |
+| `blend`         | number  | Color blend / contrast / softness     |
+| `morphSpeed`    | number  | 3D mesh drift speed (Three only)      |
+| `morphAmount`   | number  | 3D mesh drift height (Three only)     |
+| `focusDistance` | number  | DOF focus distance (Three only)       |
+| `aperture`      | number  | DOF aperture (Three only)             |
+| `maxBlur`       | number  | DOF max blur (Three only)             |
+| `dofEnabled`    | boolean | DOF toggle (Three only)               |
+| `topoLineWidth` | number  | Contour line width (Topographic only) |
+| `cloudType`     | number  | 0–4 cloud formation (Clouds only)     |
 
 ### CloudsCanvas Details
 
 `CloudsCanvas` is a WebGL2 volumetric ray-marcher with:
+
 - **Procedural gradient noise** (no textures required)
 - **5 cloud types** via `uniform int uCloudType`: Cumulus (0), Stratus (1), Cirrus (2), Cumulonimbus (3), Mammatus (4)
 - **4-pass progressive raymarch** with quality degrading by distance; all passes always sample — octave count is controlled via `uDefinition` (maps 1–12 → 1–5 octaves via `qualityOctaves()`)
@@ -100,3 +101,15 @@ Exports go through phases tracked in App.tsx: `idle → preparing → capturing 
 - **Framer Motion 12** for UI animations.
 - **@phosphor-icons/react** + **lucide-react** for icons.
 - **react-colorful** for color pickers.
+
+### Boilerplate pattern for new volumetric projects
+
+When starting a new WebGL2 volumetric renderer, apply these four in order — each is independent and additive:
+
+1. **Always add an AABB or SDF early-out** before the march loop. Identify your volume's bounding geometry, compute the ray-slab (or ray-sphere) intersection, and advance `t` to the near hit. Cost is zero.
+
+2. **Hoist all per-frame constants to uniforms.** Anything that doesn't change per-sample (time, direction vectors, palette colors) should be computed in JS and uploaded as uniforms. Never compute `animTime * speed * direction` inside FBM loops.
+
+3. **Render at half resolution into an FBO and blit.** Do this first, before adding octaves or quality. Volumetric effects are soft enough that users won't notice on typical screens, and it buys back 4× fragment budget.
+
+4. **Add temporal accumulation as the final pass.** A ping-pong FBO pair with an 80/20 history blend is ~30 lines of code and delivers 2–3× perceived quality for free. Use adaptive alpha: `1.0` on reset, a higher value during fast motion (drag), and a low value (~0.2) when idle.
