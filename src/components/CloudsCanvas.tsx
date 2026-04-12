@@ -139,12 +139,22 @@ float map2(vec3 p) { return mapN(p, qualityOctaves(2)); }
 
 // ── Per-step compositing ─────────────────────────────────────────────────────
 vec4 marchStep(vec3 pos, vec3 bgcol, float t, float den, float denShadow) {
+  float nightFade = clamp(-uSunDir.y * 6.0, 0.0, 1.0);
+
   // Shadow softness controlled by uBlend (0–1)
   float shadowSoftness = max(0.3, uBlend * 0.8);
   float dif = clamp((den - denShadow) / shadowSoftness, 0.0, 1.0);
 
-  // Lit surface blends between shadow and cloud tint, scaled by sun
-  vec3 lin = uSunColor * dif + vec3(0.88, 0.96, 1.05);
+  // Day: warm sun scatter + neutral ambient
+  // Night: moonlit ambient (blue-grey, dim but visible) + soft directional moonlit tops
+  vec3 dayAmbient   = vec3(0.88, 0.96, 1.05);
+  vec3 nightAmbient = vec3(0.22, 0.25, 0.40); // moonlit blue-grey — clouds stay visible
+  // Directional moonlit highlight: reuses dif (density gradient) to give
+  // cloud tops a pale silver-blue sheen without extra FBM samples
+  vec3 moonlit = vec3(0.55, 0.62, 0.95) * dif * 0.30 * nightFade;
+  vec3 lin = uSunColor * dif * (1.0 - nightFade)
+           + mix(dayAmbient, nightAmbient, nightFade)
+           + moonlit;
   vec4 col = vec4(mix(uCloudTint, uShadowColor, clamp(den * 1.2, 0.0, 1.0)), den);
   col.xyz *= lin;
 
@@ -229,24 +239,77 @@ vec4 raymarch(vec3 ro, vec3 rd, vec3 bgcol, float dither) {
   return clamp(sum, 0.0, 1.0);
 }
 
+// ── Star field hash ──────────────────────────────────────────────────────────
+// Per-cell hash for procedural star placement (Quilez-style)
+float hash21(vec2 p) {
+  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+}
+
 // ── Final composite ──────────────────────────────────────────────────────────
 vec4 render(vec3 ro, vec3 rd, float dither) {
+  // Night factor: 0 at daytime, ramps to 1 as sun dips below horizon
+  float nightFade = clamp(-uSunDir.y * 6.0, 0.0, 1.0);
+
   float sun = clamp(dot(uSunDir, rd), 0.0, 1.0);
 
-  // Sky gradient: uSkyColor fades with altitude
-  vec3 col = uSkyColor - rd.y * 0.2 * vec3(1.0, 0.5, 1.0) + 0.075;
+  // Sky gradient — fades to deep blue at night (not pure black)
+  vec3 col = (uSkyColor - rd.y * 0.2 * vec3(1.0, 0.5, 1.0) + 0.075)
+             * (1.0 - nightFade * 0.92);
+  // Night sky base: dark blue so stars have something to sit on
+  col += vec3(0.01, 0.012, 0.04) * nightFade;
 
-  // Wide atmospheric scatter
-  col += uSunColor * 0.18 * pow(sun, 4.0);
+  // Wide atmospheric scatter — only visible in daytime
+  col += uSunColor * 0.18 * pow(sun, 4.0) * (1.0 - nightFade);
 
   // Composite clouds
   vec4 res = raymarch(ro, rd, col, dither);
   col = col * (1.0 - res.w) + res.xyz;
 
-  // Sun corona (medium glow visible through thin cloud edges)
-  col += uSunColor * 0.55 * pow(sun, 22.0);
-  // Sun disk (bright tight point)
-  col += vec3(1.0) * pow(sun, 800.0) * 2.5;
+  // ── Stars ─────────────────────────────────────────────────────────────────
+  // Only rendered above the horizon and when sun is below it.
+  // Project ray onto a sky-dome UV grid (stable in world space).
+  if (nightFade > 0.001 && rd.y > 0.01) {
+    vec2 skyUV = rd.xz / rd.y * 50.0;
+    vec2 cell  = floor(skyUV);
+    vec2 f     = fract(skyUV);
+
+    float h = hash21(cell);
+    if (h > 0.955) {
+      // Random sub-cell position for each star
+      vec2 starPos = vec2(hash21(cell + vec2(3.7, 7.3)),
+                          hash21(cell + vec2(9.1, 2.5)));
+      float d          = length(f - starPos);
+      float brightness = (h - 0.955) / 0.045;  // [0,1] within bright-star cells
+      float size       = 0.05 + brightness * 0.05;
+      // smoothstep(0,size,d) → 1 at center, 0 at edge (edge0 < edge1 — correct)
+      float star       = (1.0 - smoothstep(0.0, size, d)) * brightness;
+      // Gentle twinkle — phase varies per star via hash
+      float twinkle    = 0.75 + 0.25 * sin(iTime * (1.5 + h * 4.0) + h * 39.4);
+      // Slight warm/cool color variation across the field
+      vec3 starColor   = mix(vec3(1.0, 0.88, 0.72), vec3(0.72, 0.88, 1.0),
+                             hash21(cell + 0.5));
+      col += starColor * star * twinkle * nightFade * 2.0 * (1.0 - res.w);
+    }
+  }
+
+  // ── Moon ──────────────────────────────────────────────────────────────────
+  // Positioned exactly opposite the sun; rises naturally as sun sets.
+  if (nightFade > 0.001) {
+    vec3  moonDir  = normalize(-uSunDir);
+    float moonDot  = dot(moonDir, rd);
+    // Hard disk edge
+    float moonDisk = smoothstep(0.9985, 0.9998, moonDot);
+    // Wide soft halo
+    float moonGlow = pow(clamp(moonDot, 0.0, 1.0), 64.0) * 0.25;
+    vec3  moonCol  = vec3(0.82, 0.87, 1.0);  // cool blue-white
+    // Clouds dim the moon but don't block it entirely (0.7 factor)
+    col += moonCol * (moonDisk * 2.0 + moonGlow) * nightFade
+           * (1.0 - res.w * 0.7);
+  }
+
+  // Sun corona + disk — suppressed when sun is below horizon
+  col += uSunColor * 0.55 * pow(sun, 22.0)   * (1.0 - nightFade);
+  col += vec3(1.0)  * pow(sun, 800.0) * 2.5  * (1.0 - nightFade);
 
   // Subtle vignette
   vec2 uv = gl_FragCoord.xy / iResolution;
@@ -596,11 +659,12 @@ const CloudsCanvas = forwardRef<RendererHandle, RendererProps>(function CloudsCa
       gl.uniform4f(M.iMouse, orbitRef.x * fboW, orbitRef.y * fboH, 0, 0);
 
       // ── Sun arc ───────────────────────────────────────────────────────────
-      // Sun slowly orbits the sky. Speed param scales the rate (~10 min full
-      // circle at speed=1). Elevation oscillates so it rises, crests, and dips.
-      const sunAngle = s.animTime * 0.01 * (0.3 + p.speed * 0.7);
+      // Full day-night cycle: sunAngle drives azimuth; elevation follows a sine
+      // so the sun rises, crests, sets below the horizon, then rises again.
+      // At speed=1 a full cycle takes ~10 min. Increase speed to see night faster.
+      const sunAngle = s.animTime * 0.05 * (0.2 + p.speed * 0.8);
       const sx = Math.cos(sunAngle);
-      const sy = 0.28 + 0.22 * Math.sin(sunAngle * 0.41); // gentle elevation arc
+      const sy = Math.sin(sunAngle * 0.5) * 0.6; // [-0.6, +0.6] — crosses horizon
       const sz = Math.sin(sunAngle);
       const sl = Math.sqrt(sx * sx + sy * sy + sz * sz);
       gl.uniform3f(M.uSunDir, sx / sl, sy / sl, sz / sl);
