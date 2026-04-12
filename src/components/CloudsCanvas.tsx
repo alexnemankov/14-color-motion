@@ -32,6 +32,7 @@ uniform float uAmplitude;   // FBM amplitude multiplier
 uniform float uDefinition;  // raymarch octave budget (2–5)
 uniform float uBlend;       // shadow softness
 uniform int   uCloudType;   // 0–4 cloud type selector
+uniform vec3  uSunDir;      // sun direction (unit vector), animated from JS
 
 // Palette-driven color uniforms
 uniform vec3      uSkyColor;    // palette[0] — sky + horizon background
@@ -138,8 +139,6 @@ float map2(vec3 p) { return mapN(p, qualityOctaves(2)); }
 
 // ── Per-step compositing ─────────────────────────────────────────────────────
 vec4 marchStep(vec3 pos, vec3 bgcol, float t, float den, float denShadow) {
-  const vec3 sundir = vec3(-0.7071, 0.0, -0.7071);
-
   // Shadow softness controlled by uBlend (0–1)
   float shadowSoftness = max(0.3, uBlend * 0.8);
   float dif = clamp((den - denShadow) / shadowSoftness, 0.0, 1.0);
@@ -160,7 +159,6 @@ vec4 marchStep(vec3 pos, vec3 bgcol, float t, float den, float denShadow) {
 // Four passes always sample — octave quality degrades with distance for perf.
 // uDefinition controls FBM detail via qualityOctaves(); t always advances.
 vec4 raymarch(vec3 ro, vec3 rd, vec3 bgcol, float dither) {
-  const vec3 sundir = vec3(-0.7071, 0.0, -0.7071);
   vec4 sum = vec4(0.0);
 
   // ── AABB slab early-out ───────────────────────────────────────────────────
@@ -190,7 +188,7 @@ vec4 raymarch(vec3 ro, vec3 rd, vec3 bgcol, float dither) {
     if (pos.y < -3.0 || pos.y > 2.0 || sum.a > 0.99) break;
     float den = map5(pos);
     if (den > 0.01) {
-      sum += marchStep(pos, bgcol, t, den, map5(pos + 0.3 * sundir)) * (1.0 - sum.a);
+      sum += marchStep(pos, bgcol, t, den, map5(pos + 0.3 * uSunDir)) * (1.0 - sum.a);
     }
     t += max(0.06, 0.05 * t);
   }
@@ -201,7 +199,7 @@ vec4 raymarch(vec3 ro, vec3 rd, vec3 bgcol, float dither) {
     if (pos.y < -3.0 || pos.y > 2.0 || sum.a > 0.99) break;
     float den = map4(pos);
     if (den > 0.01) {
-      sum += marchStep(pos, bgcol, t, den, map4(pos + 0.3 * sundir)) * (1.0 - sum.a);
+      sum += marchStep(pos, bgcol, t, den, map4(pos + 0.3 * uSunDir)) * (1.0 - sum.a);
     }
     t += max(0.06, 0.05 * t);
   }
@@ -212,7 +210,7 @@ vec4 raymarch(vec3 ro, vec3 rd, vec3 bgcol, float dither) {
     if (pos.y < -3.0 || pos.y > 2.0 || sum.a > 0.99) break;
     float den = map3(pos);
     if (den > 0.01) {
-      sum += marchStep(pos, bgcol, t, den, map3(pos + 0.3 * sundir)) * (1.0 - sum.a);
+      sum += marchStep(pos, bgcol, t, den, map3(pos + 0.3 * uSunDir)) * (1.0 - sum.a);
     }
     t += max(0.06, 0.05 * t);
   }
@@ -223,7 +221,7 @@ vec4 raymarch(vec3 ro, vec3 rd, vec3 bgcol, float dither) {
     if (pos.y < -3.0 || pos.y > 2.0 || sum.a > 0.99) break;
     float den = map2(pos);
     if (den > 0.01) {
-      sum += marchStep(pos, bgcol, t, den, map2(pos + 0.3 * sundir)) * (1.0 - sum.a);
+      sum += marchStep(pos, bgcol, t, den, map2(pos + 0.3 * uSunDir)) * (1.0 - sum.a);
     }
     t += max(0.06, 0.05 * t);
   }
@@ -233,9 +231,7 @@ vec4 raymarch(vec3 ro, vec3 rd, vec3 bgcol, float dither) {
 
 // ── Final composite ──────────────────────────────────────────────────────────
 vec4 render(vec3 ro, vec3 rd, float dither) {
-  // Sun slightly above horizon, left-forward so it's visible in default view
-  const vec3 sundir = normalize(vec3(-0.5, 0.28, -0.82));
-  float sun = clamp(dot(sundir, rd), 0.0, 1.0);
+  float sun = clamp(dot(uSunDir, rd), 0.0, 1.0);
 
   // Sky gradient: uSkyColor fades with altitude
   vec3 col = uSkyColor - rd.y * 0.2 * vec3(1.0, 0.5, 1.0) + 0.075;
@@ -482,6 +478,7 @@ const CloudsCanvas = forwardRef<RendererHandle, RendererProps>(function CloudsCa
     for (const n of [
       "iResolution", "iTime", "iMouse",
       "uCloudDrift", "uCoverage", "uAmplitude", "uDefinition", "uBlend", "uCloudType",
+      "uSunDir",
       "uSkyColor", "uCloudTint", "uSunColor", "uShadowColor", "uBlueNoise",
     ]) M[n] = gl.getUniformLocation(marchProg, n);
 
@@ -597,6 +594,16 @@ const CloudsCanvas = forwardRef<RendererHandle, RendererProps>(function CloudsCa
       gl.uniform1f(M.iTime, s.animTime);
       // Orbit passed as FBO-pixel coords; shader divides by iResolution → 0–1
       gl.uniform4f(M.iMouse, orbitRef.x * fboW, orbitRef.y * fboH, 0, 0);
+
+      // ── Sun arc ───────────────────────────────────────────────────────────
+      // Sun slowly orbits the sky. Speed param scales the rate (~10 min full
+      // circle at speed=1). Elevation oscillates so it rises, crests, and dips.
+      const sunAngle = s.animTime * 0.01 * (0.3 + p.speed * 0.7);
+      const sx = Math.cos(sunAngle);
+      const sy = 0.28 + 0.22 * Math.sin(sunAngle * 0.41); // gentle elevation arc
+      const sz = Math.sin(sunAngle);
+      const sl = Math.sqrt(sx * sx + sy * sy + sz * sz);
+      gl.uniform3f(M.uSunDir, sx / sl, sy / sl, sz / sl);
 
       const driftSpeed = 0.05 + p.speed * 0.55;
       const drift = s.animTime * driftSpeed;

@@ -6,7 +6,8 @@
       "Bash(node -e \"const pkg = require\\('./node_modules/@phosphor-icons/react/package.json'\\); console.log\\('version:', pkg.version\\);\")",
       "WebFetch(domain:alexnemankov.github.io)",
       "Bash(git reset:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(npx tsc:*)"
     ]
   }
 }
