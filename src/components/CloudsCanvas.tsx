@@ -31,7 +31,7 @@ uniform float uCoverage;    // density offset — how much sky is clouded (-0.6 
 uniform float uAmplitude;   // FBM amplitude multiplier
 uniform float uDefinition;  // raymarch octave budget (2–5)
 uniform float uBlend;       // shadow softness
-uniform int   uCloudType;   // 0–4 cloud type selector
+uniform float uCloudType;   // 0–4 cloud type (float for smooth morphing)
 uniform vec3  uSunDir;      // sun direction (unit vector), animated from JS
 
 // Palette-driven color uniforms
@@ -76,35 +76,47 @@ float noise3(vec3 p) {
                      dot(_h3(i + vec3(1,1,1)), f - vec3(1,1,1)), u.x), u.y), u.z);
 }
 
-// ── Cloud type density modifier ──────────────────────────────────────────────
-// Returns a clamped density value [0,1] for a given world position p
-// and base FBM accumulation f. uCoverage shifts the density threshold.
+// ── Per-type density helpers ─────────────────────────────────────────────────
+float _denCumulus(vec3 p, float f, float amp, float cov) {
+  return clamp(1.5 - p.y - 2.0 + amp * f + cov, 0.0, 1.0);
+}
+float _denStratus(vec3 p, float f, float amp, float cov) {
+  float band = 1.0 - clamp(abs(p.y + 0.5) * 4.0, 0.0, 1.0);
+  return clamp((1.5 - 2.0 + amp * f + cov) * band, 0.0, 1.0);
+}
+float _denCirrus(vec3 p, float f, float amp, float cov) {
+  float raw = clamp(1.5 - p.y * 1.5 + 0.8 - 2.0 + amp * f + cov, 0.0, 1.0);
+  return raw > 0.003 ? raw * 0.55 : 0.0;
+}
+float _denCumulonimbus(vec3 p, float f, float amp, float cov) {
+  return clamp(1.5 - p.y * 0.35 - 2.0 + (amp + 0.35) * f + cov, 0.0, 1.0);
+}
+float _denMammatus(vec3 p, float f, float amp, float cov) {
+  return clamp(1.5 - p.y - 2.0 + amp * f + cov - sin(p.x * 4.0) * 0.3, 0.0, 1.0);
+}
+
+// Dispatch by integer index (0–4)
+float _denByType(int idx, vec3 p, float f, float amp, float cov) {
+  if (idx == 0) return _denCumulus(p, f, amp, cov);
+  if (idx == 1) return _denStratus(p, f, amp, cov);
+  if (idx == 2) return _denCirrus(p, f, amp, cov);
+  if (idx == 3) return _denCumulonimbus(p, f, amp, cov);
+  return _denMammatus(p, f, amp, cov);
+}
+
+// ── Cloud type density — blends continuously between adjacent types ───────────
+// uCloudType is a float 0–4: integer = discrete type, fractional = morph weight.
 float cloudDensity(vec3 p, float f) {
-  float amp = uAmplitude;  // user-controlled FBM amplitude
-  float cov = uCoverage;   // user-controlled coverage
+  float amp = uAmplitude;
+  float cov = uCoverage;
+  float t   = clamp(uCloudType, 0.0, 4.0);
+  int   lo  = int(t);
+  float w   = fract(t);
 
-  if (uCloudType == 0) {
-    // Cumulus — puffy with flat base
-    return clamp(1.5 - p.y - 2.0 + amp * f + cov, 0.0, 1.0);
-
-  } else if (uCloudType == 1) {
-    // Stratus — narrow horizontal band (thin flat layer)
-    float band = 1.0 - clamp(abs(p.y + 0.5) * 4.0, 0.0, 1.0);
-    return clamp((1.5 - 2.0 + amp * f + cov) * band, 0.0, 1.0);
-
-  } else if (uCloudType == 2) {
-    // Cirrus — wispy, high altitude. Very sparse density threshold.
-    float raw = clamp(1.5 - p.y * 1.5 + 0.8 - 2.0 + amp * f + cov, 0.0, 1.0);
-    return raw > 0.003 ? raw * 0.55 : 0.0;
-
-  } else if (uCloudType == 3) {
-    // Cumulonimbus — tall storm tower, extended vertical range + stronger FBM
-    return clamp(1.5 - p.y * 0.35 - 2.0 + (amp + 0.35) * f + cov, 0.0, 1.0);
-
-  } else {
-    // Mammatus — bubble pouches on underside
-    return clamp(1.5 - p.y - 2.0 + amp * f + cov - sin(p.x * 4.0) * 0.3, 0.0, 1.0);
-  }
+  float d0 = _denByType(lo, p, f, amp, cov);
+  if (w < 0.001) return d0;          // already at an integer type — no blending cost
+  float d1 = _denByType(lo + 1, p, f, amp, cov);
+  return mix(d0, d1, w);
 }
 
 // ── FBM cloud map ────────────────────────────────────────────────────────────
@@ -644,13 +656,14 @@ const CloudsCanvas = forwardRef<RendererHandle, RendererProps>(function CloudsCa
       rafId = requestAnimationFrame(render);
       const s = state.current;
 
+      const rawDt = s.lastTimestamp === 0 ? 0 : Math.min((ts - s.lastTimestamp) / 1000, 0.1);
+
       if (s.externalTime !== null) {
         s.animTime = s.externalTime;
         s.lastTimestamp = ts;
       } else if (!s.paused) {
-        const dt = s.lastTimestamp === 0 ? 0 : (ts - s.lastTimestamp) / 1000;
         s.lastTimestamp = ts;
-        s.animTime += dt;
+        s.animTime += rawDt;
       } else {
         s.lastTimestamp = ts;
       }
@@ -703,7 +716,7 @@ const CloudsCanvas = forwardRef<RendererHandle, RendererProps>(function CloudsCa
       gl.uniform1f(M.uAmplitude,  1.2 + p.amplitude * 0.45);
       gl.uniform1f(M.uDefinition, 2.0 + (p.definition - 1.0) / 11.0 * 3.0);
       gl.uniform1f(M.uBlend,      p.blend);
-      gl.uniform1i(M.uCloudType,  Math.round(Math.max(0, Math.min(4, p.cloudType ?? 0))));
+      gl.uniform1f(M.uCloudType,  Math.max(0, Math.min(4, p.cloudType ?? 0)));
 
       const sky    = c[0] ? [c[0][0]/255, c[0][1]/255, c[0][2]/255] : [0.6, 0.71, 0.75];
       const cloud  = c[1] ? [c[1][0]/255, c[1][1]/255, c[1][2]/255] : [1.0, 0.95, 0.88];

@@ -88,7 +88,7 @@ In addition to the performance optimizations above, the following features can b
 - **Auto Mood Interpolation:** When switching presets, `lerp` the `colors` arrays and `params` inside `requestAnimationFrame` over a defined duration instead of cutting instantly.
 - **Wind Direction Vector (`uWindDir`):** Replace the scalar float `uSpeed` with a `vec2` uniform, allowing clouds to travel dynamically along both X and Z axes.
 - **Weather Cycle Automation:** Introduce a slow, 1D Perlin noise generator in JS that automatically drifts values like `coverage` and `amplitude` over minutes, simulating realistically changing weather.
-- **Animate Cloud Type Transitions:** Instead of using discrete integer jumps for `uCloudType`, refactor the density equations to continuously blend using a float parameter, letting stratus morph into cumulus organically.
+- ✅ **Animate Cloud Type Transitions:** Instead of using discrete integer jumps for `uCloudType`, refactor the density equations to continuously blend using a float parameter, letting stratus morph into cumulus organically.
 
 ## 10. Interaction
 
