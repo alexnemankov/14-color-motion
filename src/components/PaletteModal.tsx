@@ -174,11 +174,17 @@ export default function PaletteModal({ isOpen, onClose, onSelect }: PaletteModal
   }, [recentPaletteNames]);
 
   const featuredPalettes = useMemo(() => {
-    return PALETTES.filter(palette =>
-      palette.tags.includes('Vibrant')
-      || palette.tags.includes('Neon')
-      || palette.tags.includes('Pastel')
-    ).slice(0, 6);
+    const featuredNames = [
+      'Plasma Core',
+      'Neon Sunset',
+      'Midnight Ember',
+      'Mantis Shrimp Vision',
+      'Vaporwave Core',
+      'Lysergic Bloom',
+    ];
+    return featuredNames
+      .map(name => PALETTES.find(p => p.name === name))
+      .filter((p): p is PaletteDescriptor => Boolean(p));
   }, []);
 
   const showLibraryShelves = activeCategory === 'All' && !searchQuery.trim();

@@ -73,5 +73,6 @@ export const PALETTES: PaletteDescriptor[] = [
   { name: 'Cathedral Glass', colors: ['#040210', '#220044', '#0044AA', '#00AA66', '#DD8800', '#CC2200', '#440011'], tags: ['Historical', 'Dark', 'Vibrant'] },
   { name: 'Moorish Tile', colors: ['#080600', '#3A1A00', '#884422', '#0088AA', '#00CCBB', '#AAFFEE'], tags: ['Historical', 'Warm', 'Cool'] },
   { name: 'Monk\'s Candlelight', colors: ['#000000', '#0A0600', '#2A1400', '#7A4400', '#CC8833', '#F5CC88'], tags: ['Historical', 'Dark', 'Warm'] },
-  { name: 'Ghibli Clouds', colors: ['#1CA3EC', '#FFFFFF', '#FFFDF4', '#8B9BB4'], tags: ['Nature', 'Pastel', 'Light'] }
+  { name: 'Ghibli Clouds', colors: ['#1CA3EC', '#FFFFFF', '#FFFDF4', '#8B9BB4'], tags: ['Nature', 'Pastel', 'Light'] },
+  { name: 'Plasma Core', colors: ['#000000', '#0A0033', '#5500BB', '#CC0044', '#FF4400', '#E0FFFF'], tags: ['Dark', 'Neon', 'Vibrant'] }
 ];
