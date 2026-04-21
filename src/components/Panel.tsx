@@ -735,130 +735,33 @@ export default function Panel({
         </div>
         <div className="mode-card">
           <div className="mode-switcher">
-            <button
-              className={`mode-btn ${animationType === "liquid" ? "active" : ""}`}
-              onClick={() => setAnimationType("liquid")}
-              title="Fluid FBM"
-              aria-label="Switch to Fluid FBM mode"
-            >
-              <Drop
-                size={16}
-                weight={animationType === "liquid" ? "fill" : "bold"}
-              />
-            </button>
-            <button
-              className={`mode-btn ${animationType === "waves" ? "active" : ""}`}
-              onClick={() => setAnimationType("waves")}
-              title="Interference Waves"
-              aria-label="Switch to Interference Waves mode"
-            >
-              <Waves
-                size={16}
-                weight={animationType === "waves" ? "fill" : "bold"}
-              />
-            </button>
-            <button
-              className={`mode-btn ${animationType === "voronoi" ? "active" : ""}`}
-              onClick={() => setAnimationType("voronoi")}
-              title="Cellular Voronoi"
-              aria-label="Switch to Cellular Voronoi mode"
-            >
-              <Hexagon
-                size={16}
-                weight={animationType === "voronoi" ? "fill" : "bold"}
-              />
-            </button>
-            <button
-              className={`mode-btn ${animationType === "turing" ? "active" : ""}`}
-              onClick={() => setAnimationType("turing")}
-              title="Reaction-Diffusion"
-              aria-label="Switch to Reaction-Diffusion mode"
-            >
-              <Atom
-                size={16}
-                weight={animationType === "turing" ? "fill" : "bold"}
-              />
-            </button>
-            <button
-              className={`mode-btn ${animationType === "particles" ? "active" : ""}`}
-              onClick={() => setAnimationType("particles")}
-              title="Particle Web"
-              aria-label="Switch to Particle Web mode"
-            >
-              <ShareNetwork
-                size={16}
-                weight={animationType === "particles" ? "fill" : "bold"}
-              />
-            </button>
-            <button
-              className={`mode-btn ${animationType === "blobs" ? "active" : ""}`}
-              onClick={() => setAnimationType("blobs")}
-              title="Molten Blobs"
-              aria-label="Switch to Molten Blobs mode"
-            >
-              <Gradient
-                size={16}
-                weight={animationType === "blobs" ? "fill" : "bold"}
-              />
-            </button>
-            <button
-              className={`mode-btn ${animationType === "three" ? "active" : ""}`}
-              onClick={() => setAnimationType("three")}
-              title="3D Mesh"
-              aria-label="Switch to 3D mesh mode"
-            >
-              <Cube
-                size={16}
-                weight={animationType === "three" ? "fill" : "bold"}
-              />
-            </button>
-            <button
-              className={`mode-btn ${animationType === "topographic" ? "active" : ""}`}
-              onClick={() => setAnimationType("topographic")}
-              title="Topographic"
-              aria-label="Switch to Topographic mode"
-            >
-              <ChartLineIcon
-                size={16}
-                weight={animationType === "topographic" ? "fill" : "bold"}
-              />
-            </button>
-            <button
-              className={`mode-btn ${animationType === "neondrip" ? "active" : ""}`}
-              onClick={() => setAnimationType("neondrip")}
-              title="Neon Drip"
-              aria-label="Switch to Neon Drip mode"
-            >
-              <Flame
-                size={16}
-                weight={animationType === "neondrip" ? "fill" : "bold"}
-              />
-            </button>
-            <button
-              className={`mode-btn ${animationType === "clouds" ? "active" : ""}`}
-              onClick={() => setAnimationType("clouds")}
-              title="Clouds"
-              aria-label="Switch to Clouds mode"
-            >
-              <Cloud
-                size={16}
-                weight={animationType === "clouds" ? "fill" : "bold"}
-              />
-            </button>
-            <button
-              className={`mode-btn ${animationType === "sea" ? "active" : ""}`}
-              onClick={() => setAnimationType("sea")}
-              title="Sea"
-              aria-label="Switch to Sea mode"
-            >
-              <Boat
-                size={16}
-                weight={animationType === "sea" ? "fill" : "bold"}
-              />
-            </button>
+            {(
+              [
+                { id: "liquid",      Icon: Drop,          label: "Fluid"     },
+                { id: "waves",       Icon: Waves,         label: "Waves"     },
+                { id: "voronoi",     Icon: Hexagon,       label: "Voronoi"   },
+                { id: "turing",      Icon: Atom,          label: "Turing"    },
+                { id: "particles",   Icon: ShareNetwork,  label: "Particles" },
+                { id: "blobs",       Icon: Gradient,      label: "Blobs"     },
+                { id: "three",       Icon: Cube,          label: "3D"        },
+                { id: "topographic", Icon: ChartLineIcon, label: "Topo"      },
+                { id: "neondrip",    Icon: Flame,         label: "Neon Drip" },
+                { id: "clouds",      Icon: Cloud,         label: "Clouds"    },
+                { id: "sea",         Icon: Boat,          label: "Sea"       },
+              ] as const
+            ).map(({ id, Icon, label }) => (
+              <button
+                key={id}
+                className={`mode-btn ${animationType === id ? "active" : ""}`}
+                onClick={() => setAnimationType(id)}
+                aria-label={`Switch to ${label} mode`}
+              >
+                <Icon size={13} weight={animationType === id ? "fill" : "bold"} />
+                <span>{label}</span>
+              </button>
+            ))}
           </div>
           <div className="mode-summary">
-            <strong>{MODE_DETAILS[animationType].name}</strong>
             <p>{MODE_DETAILS[animationType].description}</p>
           </div>
         </div>
@@ -1085,6 +988,82 @@ export default function Panel({
                       rgb(${colors[0].join(",")}) 0%,
                       rgb(${colors[1].join(",")}) 50%,
                       rgb(${colors[2].join(",")}) 100%)`,
+                  }}
+                />
+                <div className="cloud-mood-text">
+                  <strong>{label}</strong>
+                  <span>{sub}</span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {animationType === "sea" && (
+        <div className="panel-section">
+          <span className="section-label">Sea Mood</span>
+          <div className="section-copy">
+            Load a palette tuned for this lighting condition.
+          </div>
+          <div className="cloud-mood-selector">
+            {(
+              [
+                {
+                  label: "Midday",
+                  sub: "bright tropical",
+                  colors: [
+                    [0, 23, 46] as ColorRgb,
+                    [122, 138, 92] as ColorRgb,
+                    [100, 168, 210] as ColorRgb,
+                    [255, 195, 100] as ColorRgb,
+                  ],
+                },
+                {
+                  label: "Sunset",
+                  sub: "violet sky, copper sea",
+                  colors: [
+                    [8, 10, 35] as ColorRgb,
+                    [180, 90, 30] as ColorRgb,
+                    [52, 28, 90] as ColorRgb,
+                    [255, 115, 25] as ColorRgb,
+                  ],
+                },
+                {
+                  label: "Tropic",
+                  sub: "clear shallow water",
+                  colors: [
+                    [0, 45, 65] as ColorRgb,
+                    [80, 190, 160] as ColorRgb,
+                    [75, 170, 220] as ColorRgb,
+                    [255, 230, 120] as ColorRgb,
+                  ],
+                },
+                {
+                  label: "Storm",
+                  sub: "overcast, rough",
+                  colors: [
+                    [15, 22, 32] as ColorRgb,
+                    [55, 68, 75] as ColorRgb,
+                    [50, 60, 75] as ColorRgb,
+                    [90, 105, 120] as ColorRgb,
+                  ],
+                },
+              ]
+            ).map(({ label, sub, colors }) => (
+              <button
+                key={label}
+                type="button"
+                className="cloud-mood-btn"
+                onClick={() => setColors(colors)}
+              >
+                <div
+                  className="cloud-mood-swatch"
+                  style={{
+                    background: `linear-gradient(135deg,
+                      rgb(${colors[0].join(",")}) 0%,
+                      rgb(${colors[2].join(",")}) 50%,
+                      rgb(${colors[3].join(",")}) 100%)`,
                   }}
                 />
                 <div className="cloud-mood-text">

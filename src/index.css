@@ -337,15 +337,13 @@ canvas {
 
 .mode-switcher {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 0;
-  flex-shrink: 0;
+  grid-template-columns: 1fr 1fr;
   padding: 4px;
   gap: 3px;
 }
 
 .mode-btn {
-  height: 34px;
+  height: 28px;
   background: transparent;
   border: none;
   color: var(--text-muted);
@@ -353,14 +351,19 @@ canvas {
   transition: var(--transition);
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
+  gap: 6px;
+  padding: 0 8px;
   border-radius: 6px;
-  position: relative;
 }
 
-.mode-btn svg {
-  width: 15px;
-  height: 15px;
+.mode-btn span {
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .mode-btn:hover {
@@ -375,20 +378,9 @@ canvas {
 }
 
 .mode-summary {
-  padding: 10px 12px 11px;
+  padding: 8px 12px 10px;
   border-top: 1px solid var(--panel-border);
   background: rgba(255, 255, 255, 0.015);
-}
-
-.mode-summary strong {
-  display: block;
-  margin-bottom: 3px;
-  font-family: var(--font-display);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text);
 }
 
 .mode-summary p {

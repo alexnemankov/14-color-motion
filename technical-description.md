@@ -8,7 +8,7 @@ Color Motion Lab is a fullscreen generative motion app with a single active rend
 
 The shipped product currently includes:
 
-- ten rendering modes
+- eleven rendering modes
 - a floating desktop panel and mobile bottom-sheet UI
 - palette library browsing with favorites and recents
 - local preset storage and recent scene tracking
@@ -65,6 +65,7 @@ src/
     TopographicCanvas.tsx       Canvas 2D topographic contours, external time support
     NeonDripCanvas.tsx          Canvas 2D metaball drip blobs, external time support
     CloudsCanvas.tsx            WebGL2 volumetric ray-marched clouds, external time support
+    SeaCanvas.tsx               WebGL2 height-field ocean, external time support
 ```
 
 ## 4. Core Domain Model
@@ -85,6 +86,7 @@ src/
 - `topographic`
 - `neondrip`
 - `clouds`
+- `sea`
 
 `GradientParams`
 
@@ -111,6 +113,7 @@ Mode-specific:
 
 - `topoLineWidth` — contour line width (Topographic only)
 - `cloudType` — cloud formation 0–4 (Clouds only)
+- `godRays` — volumetric light shafts toggle (Clouds only)
 
 `SceneState`
 
@@ -134,7 +137,7 @@ The application keeps one normalized scene model and lets each renderer interpre
 - maintaining active scene state and scene history
 - driving palette interpolation during palette changes
 - handling mode transition crossfades
-- injecting mode-specific default colors on mode switch (e.g. Noon palette when entering Clouds)
+- injecting mode-specific default colors on mode switch (Noon palette for Clouds; Midday palette for Sea)
 - saving presets and recent scenes
 - copying share links to the clipboard
 - coordinating PNG and WebM export
@@ -206,7 +209,7 @@ This smoothing is used inside render loops so parameter edits feel continuous in
 
 ### Deterministic renderers (support loop-safe export)
 
-`LiquidCanvas`, `WavesCanvas`, `VoronoiCanvas`, `BlobsCanvas`, `ThreeJSCanvas`, `CloudsCanvas`:
+`LiquidCanvas`, `WavesCanvas`, `VoronoiCanvas`, `BlobsCanvas`, `ThreeJSCanvas`, `CloudsCanvas`, `SeaCanvas`:
 
 - render to fullscreen canvas elements
 - support parameter smoothing via `rendererMotion`
@@ -275,11 +278,49 @@ Turing does not support `externalTime` or loop-safe export because it is simulat
 **Panel integration:**
 - Cloud Type section: 5 buttons setting `params.cloudType`
 - Sky Mood section: 4 preset buttons (Noon, Dusk, Dawn, Storm) each calling `setColors([...])` with a full 4-color palette
+- God Rays toggle: screen-space radial blur toward the dominant light source (Crytek technique, 16 samples, luminance-threshold)
 - Entering Clouds mode via `startModeTransition` auto-applies the Noon palette
 
-### CloudsCanvas performance architecture
+### Sea renderer
 
-Volumetric raymarching is expensive by nature — the shader evaluates 3D FBM noise up to 140 times per pixel in the most detailed areas. Four structural optimisations were applied to make the renderer interactive on mid-range hardware. Each is documented below with its rationale so future projects can adopt the same pattern.
+`SeaCanvas` is a WebGL2 height-field ocean renderer. Key design points:
+
+**Shader:**
+- Procedural wave octaves via `sea_octave()`: noise-displaced sine waves, mixed with absolute cosine for sharp crests
+- Two passes per octave (forward + backward wave travel) summed for standing-wave interference
+- `ITER_GEOMETRY = 3` octaves in the fast `map()` function used during height-field tracing; `uIterDetail` (3–7, driven by `uDefinition`) in the detailed `map_detailed()` used for normals and shading
+- Height-field tracing via bisection: 32 steps of regula-falsi (Illinois method) converging to `EPSILON = 1e-3`
+- Shading: Fresnel blend between refracted deep water and sky reflection; specular highlight `pow(max(dot(reflect(eye,n),l), 0), 600)`; foam/shallow tint from `(p.y - uSeaHeight) * atten`
+- Sky gradient: `mix(uSkyTop, uSunColor, t²)` from zenith to horizon
+- Gamma correction: `pow(color, vec3(0.65))` applied in `main()`
+
+**Palette mapping (colors[0..3]):**
+- `colors[0]` → `uSeaBase` (deep water base color)
+- `colors[1]` → `uWaterColor` (surface tint / foam highlights)
+- `colors[2]` → `uSkyTop` (sky zenith color)
+- `colors[3]` → `uSunColor` (horizon glow / sun scatter)
+
+**GradientParams mapping:**
+- `amplitude` → `uSeaHeight` (wave amplitude, 0.35–0.80)
+- `blend` → `uSeaChoppy` (wave choppiness, 1–6)
+- `frequency` → `uSeaFreq` (base wave frequency, 0.08–0.20)
+- `speed` → `uSeaSpeed` (animation speed, 0.2–1.0)
+- `definition` → `uIterDetail` (fragment octave count, 3–7)
+
+**Camera / interaction:**
+- The `fromEuler(ang)` convention used: `ang.z` controls horizontal heading (forward = `(sin(z), 0, cos(z))`), `ang.y` controls elevation (positive = tilt downward)
+- Drag-to-orbit: `orbitRef` initialized to `(0.5, 0.5)`
+- Mouse X → `heading = (m.x - 0.5) * 2.5` → `ang.z` — drag right turns camera right
+- Mouse Y → `elevation = 0.3 - (m.y - 0.5) * 0.8` → `ang.y` — drag up shows more sky (default `0.3` = slight downward tilt toward ocean)
+- Camera position flies forward continuously: `ori.z = seaTime * 5.0`
+
+**Panel integration:**
+- Sea Mood section: 4 preset buttons (Midday, Sunset, Tropic, Storm) each calling `setColors([...])` with a full 4-color palette
+- Entering Sea mode via `startModeTransition` auto-applies the Midday palette
+
+### Volumetric renderer performance architecture
+
+Both `CloudsCanvas` and `SeaCanvas` share the same four-pass architecture applied to all new WebGL2 volumetric renderers. Each optimisation is independent and additive.
 
 ---
 
@@ -318,15 +359,9 @@ A horizontal-ray epsilon guard (`abs(rd.y) < 1e-4`) prevents divide-by-zero when
 
 #### 3. Half-resolution render + bilinear upscale
 
-**What:** The entire raymarch pass renders into a Framebuffer Object (`marchFbo`) at `canvas.width/2 × canvas.height/2`. A minimal blit shader (`BLIT_FRAG`) upscales the result to full canvas resolution using `LINEAR`-filtered texture sampling.
+**What:** The entire raymarch/trace pass renders into a Framebuffer Object (`marchFbo`) at `canvas.width/2 × canvas.height/2`. A minimal blit shader upscales the result to full canvas resolution using `LINEAR`-filtered texture sampling.
 
-```glsl
-// BLIT_FRAG — fullscreen quad, hardware bilinear upscale
-vec2 uv = vTexCoord;
-fragColor = texture(uTexture, uv);
-```
-
-**Why:** Fragment shader cost scales with pixel count. Halving each dimension reduces raymarch invocations by 4×. Clouds are intrinsically soft and volumetric — bilinear blur from the upscale is indistinguishable from full-res on a typical screen distance.
+**Why:** Fragment shader cost scales with pixel count. Halving each dimension reduces invocations by 4×. Volumetric effects are intrinsically soft — bilinear blur from the upscale is indistinguishable from full-res at normal viewing distance.
 
 **Cost:** One extra FBO, one blit draw call. FBO allocation happens at init and on resize.
 
@@ -336,28 +371,23 @@ fragColor = texture(uTexture, uv);
 
 #### 4. Temporal accumulation (ping-pong FBO)
 
-**What:** A second pair of framebuffers (`accumFbo[0/1]`) blends the current march output with the previous frame's accumulated result. The blend factor (`uAlpha`) adapts to interaction state:
+**What:** A second pair of framebuffers (`accumFbo[0/1]`) blends the current frame output with the previous accumulated result. The blend factor (`uAlpha`) adapts to interaction state:
 
-| State | `uAlpha` | Effect |
-|-------|----------|--------|
-| First frame / resize | `1.0` | Full reset — no history bleed |
-| Camera dragging | `0.7` | Fast ghost clear during rapid motion |
-| Idle | `0.2` | 80% history weight — smooth noise reduction |
+| State | Clouds `uAlpha` | Sea `uAlpha` | Effect |
+|-------|-----------------|--------------|--------|
+| First frame / resize | `1.0` | `1.0` | Full reset — no history bleed |
+| Camera dragging | `0.7` | `0.9` | Fast ghost clear during motion |
+| Idle | `0.2` | `0.5` | History smoothing |
 
-The three-pass pipeline is: march → accumulate → blit.
+Sea uses a higher idle alpha (`0.5`) than clouds (`0.2`) because wave surfaces move rapidly each frame — heavier history blending would blur moving crests.
 
-```glsl
-// ACCUM_FRAG
-fragColor = mix(texture(uHistory, uv), texture(uCurrent, uv), uAlpha);
-```
+The three-pass pipeline is: march/trace → accumulate → blit.
 
-**Why:** Raymarching is stochastic — each frame has slightly different noise from blue-noise jitter. Averaging frames over time cancels grain without adding octaves. At `uAlpha = 0.2`, the effective sample count per pixel grows toward ~5 frames of history. This lets the march pass run at lower quality per frame while the accumulated result looks high quality.
-
-The adaptive alpha prevents ghost trails: dragging clears history quickly (0.7), and a reset frame forces `uAlpha = 1.0` so there is never a visible pop from stale history.
+**Why:** Per-frame noise averages out over accumulated frames without adding shader complexity.
 
 **Cost:** Two additional FBOs (accumulate pair), one extra draw call per frame for the accumulate pass.
 
-**Impact:** ~2–3× perceived quality improvement at fixed GPU budget, or equivalent quality at 2–3× lower march step count. Also smooths temporal noise across frames for free.
+**Impact:** ~2–3× perceived quality improvement at fixed GPU budget.
 
 ---
 
@@ -370,7 +400,7 @@ The adaptive alpha prevents ghost trails: dragging clears history quickly (0.7),
 | Half-res + upscale | 1 FBO + 1 blit | ~4× |
 | Temporal accumulation | 2 FBOs + 1 blit | ~2–3× perceived |
 
-Applied together: the renderer runs roughly **6–8× cheaper** than a naïve full-res single-pass march at equivalent visual quality.
+Applied together: the renderer runs roughly **6–8× cheaper** than a naïve full-res single-pass implementation at equivalent visual quality.
 
 ---
 
@@ -384,7 +414,7 @@ When starting a new WebGL2 volumetric renderer, apply these four in order — ea
 
 3. **Render at half resolution into an FBO and blit.** Do this first, before adding octaves or quality. Volumetric effects are soft enough that users won't notice on typical screens, and it buys back 4× fragment budget.
 
-4. **Add temporal accumulation as the final pass.** A ping-pong FBO pair with an 80/20 history blend is ~30 lines of code and delivers 2–3× perceived quality for free. Use adaptive alpha: `1.0` on reset, a higher value during fast motion (drag), and a low value (~0.2) when idle.
+4. **Add temporal accumulation as the final pass.** A ping-pong FBO pair with an 80/20 history blend is ~30 lines of code and delivers 2–3× perceived quality for free. Use adaptive alpha: `1.0` on reset, a higher value during fast motion (drag), and a lower value when idle. Tune the idle alpha to the scene's motion rate — slower-moving visuals tolerate heavier history blending.
 
 ## 10. UI Architecture
 
@@ -393,16 +423,21 @@ When starting a new WebGL2 volumetric renderer, apply these four in order — ea
 `src/components/Panel.tsx` is the main workspace surface. It contains:
 
 - workflow tools
-- mode selection (10 modes with icons)
+- mode selection (11 modes in a 2-column labeled grid — icon + name per button)
 - palette editing
 - motion and structure controls
-- mode-specific sections (Topographic line width; Clouds type selector and sky mood presets)
+- mode-specific sections:
+  - Topographic: line width slider
+  - Clouds: cloud type selector (5 formations) and Sky Mood presets (Noon, Dusk, Dawn, Storm)
+  - Sea: Sea Mood presets (Midday, Sunset, Tropic, Storm)
 - workspace actions
 - export controls
 - reset actions
 - saved preset browsing
 - recent scene browsing
 - transport controls
+
+The mode switcher uses a `grid-template-columns: 1fr 1fr` layout so all 11 modes fit in 6 rows of 2 with both icon and text label visible. The active mode's description is shown in a footer below the grid; the name is on the button itself.
 
 Current workflow features exposed in the panel:
 
@@ -449,7 +484,7 @@ The export system is entirely browser-side.
 
 - `MediaRecorder`-based WebM capture
 - standard `5s` and `10s` recordings
-- loop-safe recording for deterministic renderers (liquid, waves, voronoi, blobs, three, clouds)
+- loop-safe recording for deterministic renderers (liquid, waves, voronoi, blobs, three, clouds, sea)
 - progress state transitions through `preparing`, `recording`, `encoding`, and `complete`
 - progress arc and frame counter UI in the panel
 
@@ -502,7 +537,9 @@ Several features previously listed as future improvements are already implemente
 - WebGPU progressive enhancement for Turing
 - topographic contour renderer
 - neon drip metaball renderer
-- volumetric cloud renderer with 5 cloud types, sky mood presets, and drag-to-orbit camera
+- volumetric cloud renderer with 5 cloud types, sky mood presets, god rays, and drag-to-orbit camera
+- WebGL2 height-field sea renderer with sea mood presets and drag-to-orbit camera
+- labeled 2-column mode switcher (icon + name) for all 11 modes
 
 Not implemented in the current codebase:
 

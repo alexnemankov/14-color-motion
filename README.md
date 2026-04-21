@@ -4,7 +4,7 @@ Color Motion Lab is a browser-based motion design playground for building animat
 
 ## Current Feature Set
 
-- Ten renderers:
+- Eleven renderers:
   - Fluid FBM
   - Interference Waves
   - Cellular Voronoi
@@ -15,6 +15,7 @@ Color Motion Lab is a browser-based motion design playground for building animat
   - Topographic
   - Neon Drip
   - Clouds
+  - Sea
 - Shared scene controls:
   - `seed`
   - `speed`
@@ -33,6 +34,14 @@ Color Motion Lab is a browser-based motion design playground for building animat
   - Sky Mood presets: Noon, Dusk, Dawn, Storm (sets full 4-color palette)
   - Drag-to-orbit camera — angle persists across drags, never jumps
   - Auto-applies Noon palette on mode entry
+- Sea mode extras:
+  - Height-field ocean with procedural wave octaves
+  - Sea Mood presets: Midday, Sunset, Tropic, Storm (sets full 4-color palette)
+  - Drag-to-orbit camera — mouse X = heading, mouse Y = elevation
+  - Auto-applies Midday palette on mode entry
+- Mode switcher:
+  - 2-column labeled grid (icon + name) for all 11 modes
+  - Active mode description shown below the grid
 - Palette workflow:
   - 67 curated palettes
   - search and category filters
@@ -51,7 +60,7 @@ Color Motion Lab is a browser-based motion design playground for building animat
   - PNG export
   - 2x PNG export
   - 5s and 10s WebM recording
-  - loop-safe WebM export for deterministic renderers (liquid, waves, voronoi, blobs, three, clouds)
+  - loop-safe WebM export for deterministic renderers (liquid, waves, voronoi, blobs, three, clouds, sea)
   - compact shareable URLs with encoded scene state
 - UX:
   - first-run onboarding
@@ -77,10 +86,11 @@ Shortcuts are ignored while typing in editable fields.
 
 ## Renderer Notes
 
-- `liquid`, `waves`, `voronoi`, `blobs`, `three`, and `clouds` support deterministic `externalTime` playback and loop-safe export.
+- `liquid`, `waves`, `voronoi`, `blobs`, `three`, `clouds`, and `sea` support deterministic `externalTime` playback and loop-safe export.
 - `particles` runs its simulation in a Web Worker.
 - `turing` prefers WebGPU when available and falls back to WebGL2.
 - `clouds` uses a WebGL2 volumetric ray-marcher with procedural gradient noise and a drag-to-orbit camera.
+- `sea` uses a WebGL2 height-field ocean renderer with a mouse-driven orbit camera (X = heading, Y = elevation).
 - A renderer boundary and status overlay handle unsupported or failed rendering paths.
 
 ## Tech Stack
@@ -114,4 +124,4 @@ The app stores the current session, saved presets, recent scenes, palette favori
 
 ## Status
 
-This repository already includes several items that were previously roadmap ideas, including onboarding, keyboard shortcut discovery, renderer transition crossfades, palette interpolation, typed renderer handles, persistence migrations, a worker-backed particles renderer, WebGPU enhancement for Turing mode, topographic contour rendering, neon drip blobs, and volumetric cloud rendering with cloud type switching and sky mood presets.
+This repository already includes several items that were previously roadmap ideas, including onboarding, keyboard shortcut discovery, renderer transition crossfades, palette interpolation, typed renderer handles, persistence migrations, a worker-backed particles renderer, WebGPU enhancement for Turing mode, topographic contour rendering, neon drip blobs, volumetric cloud rendering with cloud type switching and sky mood presets, and a WebGL2 height-field sea renderer with sea mood presets.

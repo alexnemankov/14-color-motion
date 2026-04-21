@@ -184,12 +184,11 @@ void main() {
   uv = uv * 2.0 - 1.0;
   uv.x *= iResolution.x / iResolution.y;
 
-  // Camera driven by drag-to-orbit (mouse X = yaw, Y = pitch)
-  vec3 ang = vec3(
-    (m.y - 0.4) * 0.8,                  // pitch
-    (m.x - 0.5) * 2.0 + 0.3,            // yaw
-    sin(iTime * 0.1) * 0.03             // gentle roll
-  );
+  // ang.z = heading (left/right): forward = (sin(z), 0, cos(z))
+  // ang.y = elevation (up/down): positive values tilt camera downward
+  float heading   = (m.x - 0.5) * 2.5;
+  float elevation = 0.3 - (m.y - 0.5) * 0.8;  // default 0.3; drag up → smaller → look up
+  vec3 ang = vec3(0.0, elevation, heading);
   vec3 ori = vec3(0.0, 3.5, iTime * uSeaSpeed * 5.0);
   vec3 dir = normalize(vec3(uv.xy, -2.0));
   dir.z += length(uv) * 0.14;
@@ -379,10 +378,10 @@ const SeaCanvas = forwardRef<RendererHandle, RendererProps>(function SeaCanvas(
     let needsReset = true;
 
     // ── Drag-to-orbit ─────────────────────────────────────────────────────────
-    const orbitRef = { x: 0.5, y: 0.4 };
+    const orbitRef = { x: 0.5, y: 0.5 };
     let isDragging = false;
     let dragStartClient = { x: 0, y: 0 };
-    let orbitAtDragStart = { x: 0.5, y: 0.4 };
+    let orbitAtDragStart = { x: 0.5, y: 0.5 };
     let prevOrbitX = orbitRef.x, prevOrbitY = orbitRef.y;
 
     const onMouseDown = (e: MouseEvent) => {

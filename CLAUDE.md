@@ -81,15 +81,15 @@ No test or lint scripts are configured.
 
 ### Core Components
 
-- **[App.tsx](src/App.tsx)** — Main orchestrator. Manages scene state, localStorage persistence, URL share encoding, undo/redo history, randomization, and export workflows. The `GradientParams` object is the single unified parameter set passed to all renderers. When switching to `"clouds"` mode, `startModeTransition` automatically applies a noon sky palette.
+- **[App.tsx](src/App.tsx)** — Main orchestrator. Manages scene state, localStorage persistence, URL share encoding, undo/redo history, randomization, and export workflows. The `GradientParams` object is the single unified parameter set passed to all renderers. When switching to `"clouds"` mode, `startModeTransition` automatically applies a Noon sky palette; switching to `"sea"` applies a Midday ocean palette.
 
-- **[Panel.tsx](src/components/Panel.tsx)** — Control panel. All parameter controls, palette selection, preset management, recording/export UI, and compact vs. advanced view modes. Contains mode-specific sections: `topoLineWidth` slider for Topographic, **Cloud Type** selector (5 formations) and **Sky Mood** presets (Noon/Dusk/Dawn/Storm) for Clouds.
+- **[Panel.tsx](src/components/Panel.tsx)** — Control panel. All parameter controls, palette selection, preset management, recording/export UI, and compact vs. advanced view modes. Mode switcher is a 2-column labeled grid (icon + name) for all 11 modes. Mode-specific sections: `topoLineWidth` for Topographic; **Cloud Type** selector (5 formations), **Sky Mood** presets (Noon/Dusk/Dawn/Storm), and **God Rays** toggle for Clouds; **Sea Mood** presets (Midday/Sunset/Tropic/Storm) for Sea.
 
 - **[PaletteModal.tsx](src/components/PaletteModal.tsx)** — Palette browser with 67 curated palettes (defined in [palettes.ts](src/data/palettes.ts)), search, tag filters, and localStorage-backed favorites.
 
 ### Renderer Layer
 
-Ten renderers each implement the `RendererHandle` interface from [rendererTypes.ts](src/components/rendererTypes.ts):
+Eleven renderers each implement the `RendererHandle` interface from [rendererTypes.ts](src/components/rendererTypes.ts):
 
 | Component           | Technique                                        | Backend                  |
 | ------------------- | ------------------------------------------------ | ------------------------ |
@@ -103,6 +103,7 @@ Ten renderers each implement the `RendererHandle` interface from [rendererTypes.
 | `ParticlesCanvas`   | Particle web                                     | Web Worker + Canvas 2D   |
 | `NeonDripCanvas`    | Metaball drip blobs                              | Canvas 2D                |
 | `CloudsCanvas`      | Volumetric ray-marched sky                       | WebGL2                   |
+| `SeaCanvas`         | Height-field ocean                               | WebGL2                   |
 
 The `RendererHandle` interface requires: `status`, `supportsExternalTime`, `supportsLoopSafeExport`, `getCanvas()`, `captureFrame()`. Renderers are wrapped in `RendererBoundary` for error isolation.
 
@@ -129,6 +130,7 @@ All renderers share a single `GradientParams` object. Most fields are universal;
 | `dofEnabled`    | boolean | DOF toggle (Three only)               |
 | `topoLineWidth` | number  | Contour line width (Topographic only) |
 | `cloudType`     | number  | 0–4 cloud formation (Clouds only)     |
+| `godRays`       | boolean | Volumetric light shafts (Clouds only) |
 
 ### CloudsCanvas Details
 
@@ -137,10 +139,23 @@ All renderers share a single `GradientParams` object. Most fields are universal;
 - **Procedural gradient noise** (no textures required)
 - **5 cloud types** via `uniform int uCloudType`: Cumulus (0), Stratus (1), Cirrus (2), Cumulonimbus (3), Mammatus (4)
 - **4-pass progressive raymarch** with quality degrading by distance; all passes always sample — octave count is controlled via `uDefinition` (maps 1–12 → 1–5 octaves via `qualityOctaves()`)
+- **God rays** (screen-space radial blur toward sun/moon, Crytek technique, luminance-threshold)
 - **Drag-to-orbit camera**: mousedown captures drag origin, mousemove accumulates delta, mouseup releases — angle never jumps on new drag
 - **Palette mapping**: `colors[0]` → sky, `colors[1]` → cloud tint, `colors[2]` → sun/scatter, `colors[3]` → shadow
 - **Sky Mood presets** in Panel set all 4 colors at once (Noon, Dusk, Dawn, Storm)
 - Entering Clouds mode auto-applies Noon palette
+
+### SeaCanvas Details
+
+`SeaCanvas` is a WebGL2 height-field ocean renderer with:
+
+- **Procedural wave octaves**: `sea_octave()` combines noise-displaced sines with absolute cosine for sharp crests; two passes per octave (±travel direction) create interference
+- **Height-field tracing**: 32-step bisection (regula-falsi) converging to `EPSILON = 1e-3`; fast `map()` at 3 octaves for tracing, detailed `map_detailed()` at `uIterDetail` octaves for normals
+- **Half-res FBO + temporal accumulation** (idle alpha `0.5` — higher than clouds because wave surfaces move quickly)
+- **Palette mapping**: `colors[0]` → deep water (`uSeaBase`), `colors[1]` → surface tint (`uWaterColor`), `colors[2]` → sky zenith (`uSkyTop`), `colors[3]` → horizon/sun (`uSunColor`)
+- **Sky gradient**: `mix(uSkyTop, uSunColor, t²)` — enables violet-to-orange sunset gradients by separating zenith and horizon colors
+- **Euler convention**: `ang.z` = horizontal heading (`forward = (sin(z), 0, cos(z))`), `ang.y` = elevation (positive = tilt down). Mouse X drives `ang.z`; mouse Y drives `ang.y` inverted (`0.3 − (m.y − 0.5) × 0.8`) so drag-up shows more sky
+- **Sea Mood presets** in Panel (Midday, Sunset, Tropic, Storm); entering Sea mode auto-applies Midday palette
 
 ### State & Persistence
 
@@ -155,7 +170,7 @@ Exports go through phases tracked in App.tsx: `idle → preparing → capturing 
 
 - **PNG**: 1× and 2× resolution.
 - **WebM video**: 5s or 10s real-time recording, OR loop-safe deterministic export (for renderers where `supportsLoopSafeExport` is true, driven by external time steps).
-- Loop-safe export is supported by: `liquid`, `waves`, `voronoi`, `blobs`, `three`, `clouds`.
+- Loop-safe export is supported by: `liquid`, `waves`, `voronoi`, `blobs`, `three`, `clouds`, `sea`.
 - `ParticlesCanvas` uses a Web Worker ([particlesWorker.ts](src/workers/particlesWorker.ts)) for simulation; coordinate with the worker protocol when touching particle logic.
 
 ### Key Dependencies
