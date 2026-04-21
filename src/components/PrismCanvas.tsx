@@ -15,6 +15,7 @@ precision highp float;
 
 uniform vec2  uRes;
 uniform float uTime;
+uniform float uSeed;
 uniform float uScale;
 uniform float uAmplitude;
 uniform float uFrequency;
@@ -27,9 +28,9 @@ uniform vec3  uColor3;
 
 void main() {
   vec3 c;
-  float l, z = uTime;
-  // definition controls color-channel z-separation (chromatic spread)
-  float zStep = 0.03 + uDefinition * 0.018;
+  float l, z = uTime + uSeed * 0.1;
+  // definition 0–1 → zStep 0.01–0.55 (wide chromatic spread range)
+  float zStep = 0.01 + uDefinition * 0.54;
 
   for (int i = 0; i < 3; i++) {
     vec2 p = gl_FragCoord.xy / uRes;
@@ -147,7 +148,7 @@ const PrismCanvas = forwardRef<RendererHandle, RendererProps>(function PrismCanv
     gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
 
     const U: Record<string, WebGLUniformLocation | null> = {};
-    ['uRes', 'uTime', 'uScale', 'uAmplitude', 'uFrequency', 'uDefinition', 'uBlend',
+    ['uRes', 'uTime', 'uSeed', 'uScale', 'uAmplitude', 'uFrequency', 'uDefinition', 'uBlend',
      'uColor0', 'uColor1', 'uColor2', 'uColor3']
       .forEach(n => { U[n] = gl.getUniformLocation(prog, n); });
 
@@ -187,6 +188,7 @@ const PrismCanvas = forwardRef<RendererHandle, RendererProps>(function PrismCanv
 
       gl.uniform2f(U.uRes, canvas.width, canvas.height);
       gl.uniform1f(U.uTime,       s.animTime);
+      gl.uniform1f(U.uSeed,       dp.seed);
       gl.uniform1f(U.uScale,      dp.scale);
       gl.uniform1f(U.uAmplitude,  dp.amplitude);
       gl.uniform1f(U.uFrequency,  dp.frequency * 9.0);
