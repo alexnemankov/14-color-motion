@@ -24,6 +24,8 @@ uniform float uSeaChoppy;  // wave choppiness
 uniform float uSeaFreq;    // base frequency
 uniform float uSeaSpeed;   // animation speed
 uniform int   uIterDetail; // fragment octave count (3–7)
+uniform float uCameraY;    // camera altitude (from scale param)
+uniform vec2  uSeedOffset; // world-space XZ start position (from seed param)
 
 // Palette-driven color uniforms
 uniform vec3 uSeaBase;    // palette[0] — deep water color
@@ -138,7 +140,7 @@ vec3 getSeaColor(vec3 p, vec3 n, vec3 l, vec3 eye, vec3 dist) {
   vec3 color = mix(refracted, reflected, fresnel);
 
   float atten = max(1.0 - dot(dist, dist) * 0.001, 0.0);
-  color += uWaterColor * (p.y - uSeaHeight) * 0.18 * atten;
+  color += uWaterColor * (p.y - uSeaHeight * 0.5) * 0.18 * atten;
 
   color += specular(n, l, eye, 600.0 * inversesqrt(dot(dist, dist)));
 
@@ -189,7 +191,8 @@ void main() {
   float heading   = (m.x - 0.5) * 2.5;
   float elevation = 0.3 - (m.y - 0.5) * 0.8;  // default 0.3; drag up → smaller → look up
   vec3 ang = vec3(0.0, elevation, heading);
-  vec3 ori = vec3(0.0, 3.5, iTime * uSeaSpeed * 5.0);
+  float safeY = max(uCameraY, uSeaHeight * 3.5 + 0.5);
+  vec3 ori = vec3(uSeedOffset.x, safeY, uSeedOffset.y + iTime * uSeaSpeed * 5.0);
   vec3 dir = normalize(vec3(uv.xy, -2.0));
   dir.z += length(uv) * 0.14;
   dir = normalize(dir) * fromEuler(ang);
@@ -357,6 +360,7 @@ const SeaCanvas = forwardRef<RendererHandle, RendererProps>(function SeaCanvas(
     for (const n of [
       "iResolution", "iTime", "iMouse",
       "uSeaHeight", "uSeaChoppy", "uSeaFreq", "uSeaSpeed", "uIterDetail",
+      "uCameraY", "uSeedOffset",
       "uSeaBase", "uWaterColor", "uSkyTop", "uSunColor",
     ]) M[n] = gl.getUniformLocation(marchProg, n);
 
@@ -462,11 +466,14 @@ const SeaCanvas = forwardRef<RendererHandle, RendererProps>(function SeaCanvas(
       gl.uniform1f(M.iTime, s.animTime);
       gl.uniform4f(M.iMouse, orbitRef.x * fboW, orbitRef.y * fboH, 0, 0);
 
-      gl.uniform1f(M.uSeaHeight, 0.35 + p.amplitude * 0.45);
+      gl.uniform1f(M.uSeaHeight, 0.2 + p.amplitude * 0.22);
       gl.uniform1f(M.uSeaChoppy, 1.0 + p.blend * 5.0);
       gl.uniform1f(M.uSeaFreq,   0.08 + p.frequency * 0.12);
       gl.uniform1f(M.uSeaSpeed,  0.2 + p.speed * 0.8);
       gl.uniform1i(M.uIterDetail, 3 + Math.min(4, Math.floor(p.definition / 3)));
+      gl.uniform1f(M.uCameraY,   1.5 + p.scale * 2.5);
+      const sa = p.seed * 0.73137;
+      gl.uniform2f(M.uSeedOffset, Math.sin(sa) * 50.0, Math.cos(sa) * 50.0);
 
       const seaBase  = c[0] ? [c[0][0]/255, c[0][1]/255, c[0][2]/255] : [0.0, 0.09, 0.18];
       const water    = c[1] ? [c[1][0]/255, c[1][1]/255, c[1][2]/255] : [0.48, 0.54, 0.36];
