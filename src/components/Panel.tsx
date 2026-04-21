@@ -25,6 +25,7 @@ import {
   Shuffle,
   Trash,
   Waves,
+  Diamond,
 } from "@phosphor-icons/react";
 import { HexColorPicker } from "react-colorful";
 import {
@@ -172,6 +173,10 @@ const MODE_DETAILS: Record<
   sea: {
     name: "Sea",
     description: "Procedural height-field ocean with realistic wave shading.",
+  },
+  prism: {
+    name: "Prism",
+    description: "UV-displacement light prism with chromatic RGB channel separation.",
   },
 };
 
@@ -579,6 +584,17 @@ export default function Panel({
       topoLineWidth: "",
       cloudType: "",
     },
+    prism: {
+      seed: "Seed",
+      speed: "Speed",
+      scale: "UV Scale",
+      amplitude: "Warp Strength",
+      frequency: "Ripple Freq",
+      definition: "Chroma Spread",
+      blend: "Saturation",
+      topoLineWidth: "",
+      cloudType: "",
+    },
   }[animationType] ?? {
     seed: "Seed", speed: "Speed", scale: "Scale", amplitude: "Amplitude",
     frequency: "Frequency", definition: "Definition", blend: "Blend", topoLineWidth: "",
@@ -748,6 +764,7 @@ export default function Panel({
                 { id: "neondrip",    Icon: Flame,         label: "Neon Drip" },
                 { id: "clouds",      Icon: Cloud,         label: "Clouds"    },
                 { id: "sea",         Icon: Boat,          label: "Sea"       },
+                { id: "prism",       Icon: Diamond,       label: "Prism"     },
               ] as const
             ).map(({ id, Icon, label }) => (
               <button
@@ -1064,6 +1081,82 @@ export default function Panel({
                       rgb(${colors[0].join(",")}) 0%,
                       rgb(${colors[2].join(",")}) 50%,
                       rgb(${colors[3].join(",")}) 100%)`,
+                  }}
+                />
+                <div className="cloud-mood-text">
+                  <strong>{label}</strong>
+                  <span>{sub}</span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {animationType === "prism" && (
+        <div className="panel-section">
+          <span className="section-label">Prism Mood</span>
+          <div className="section-copy">
+            Load a color harmony for this light-dispersion aesthetic.
+          </div>
+          <div className="cloud-mood-selector">
+            {(
+              [
+                {
+                  label: "Spectral",
+                  sub: "pure RGB prism",
+                  colors: [
+                    [255, 30, 30] as ColorRgb,
+                    [30, 255, 30] as ColorRgb,
+                    [30, 30, 255] as ColorRgb,
+                    [0, 0, 0] as ColorRgb,
+                  ],
+                },
+                {
+                  label: "Neon",
+                  sub: "cyberpunk glow",
+                  colors: [
+                    [255, 0, 110] as ColorRgb,
+                    [0, 230, 255] as ColorRgb,
+                    [80, 255, 120] as ColorRgb,
+                    [15, 0, 30] as ColorRgb,
+                  ],
+                },
+                {
+                  label: "Plasma",
+                  sub: "fire & electric",
+                  colors: [
+                    [255, 100, 0] as ColorRgb,
+                    [255, 0, 200] as ColorRgb,
+                    [0, 80, 255] as ColorRgb,
+                    [5, 0, 15] as ColorRgb,
+                  ],
+                },
+                {
+                  label: "Void",
+                  sub: "gold & ultraviolet",
+                  colors: [
+                    [255, 180, 30] as ColorRgb,
+                    [180, 0, 255] as ColorRgb,
+                    [220, 220, 255] as ColorRgb,
+                    [5, 0, 20] as ColorRgb,
+                  ],
+                },
+              ]
+            ).map(({ label, sub, colors }) => (
+              <button
+                key={label}
+                type="button"
+                className="cloud-mood-btn"
+                onClick={() => setColors(colors)}
+              >
+                <div
+                  className="cloud-mood-swatch"
+                  style={{
+                    background: `linear-gradient(135deg,
+                      rgb(${colors[0].join(",")}) 0%,
+                      rgb(${colors[1].join(",")}) 50%,
+                      rgb(${colors[2].join(",")}) 100%)`,
                   }}
                 />
                 <div className="cloud-mood-text">

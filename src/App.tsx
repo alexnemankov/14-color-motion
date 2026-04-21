@@ -11,6 +11,7 @@ import TopographicCanvas from "./components/TopographicCanvas";
 import NeonDripCanvas from "./components/NeonDripCanvas";
 import CloudsCanvas from "./components/CloudsCanvas";
 import SeaCanvas from "./components/SeaCanvas";
+import PrismCanvas from "./components/PrismCanvas";
 import Panel from "./components/Panel";
 import RendererBoundary from "./components/RendererBoundary";
 import { RendererHandle } from "./components/rendererTypes";
@@ -32,7 +33,8 @@ export type AnimationType =
   | "topographic"
   | "neondrip"
   | "clouds"
-  | "sea";
+  | "sea"
+  | "prism";
 
 export interface GradientParams {
   seed: number;
@@ -158,6 +160,7 @@ const VALID_ANIMATION_TYPES: AnimationType[] = [
   "neondrip",
   "clouds",
   "sea",
+  "prism",
 ];
 const HISTORY_LIMIT = 40;
 const PALETTE_TRANSITION_MS = 1500;
@@ -316,6 +319,7 @@ function animationTypeLabel(type: AnimationType) {
     neondrip: "Neon Drip",
     clouds: "Clouds",
     sea: "Sea",
+    prism: "Prism",
   }[type];
 }
 
@@ -1120,6 +1124,15 @@ function App() {
         [255, 195, 100],
       ]);
     }
+    if (nextType === "prism") {
+      // Spectral defaults: red, green, blue channels with dark ambient
+      setColors([
+        [255, 30, 30],
+        [30, 255, 30],
+        [30, 30, 255],
+        [0, 0, 0],
+      ]);
+    }
   }
 
   const showToast = (title: string, message?: string) => {
@@ -1899,6 +1912,17 @@ function App() {
         )}
         {animationType === "sea" && (
           <SeaCanvas
+            ref={rendererRef}
+            params={params}
+            colors={renderColors}
+            paused={paused}
+            onStatusChange={setRendererStatus}
+            renderScale={renderScale}
+            externalTime={externalRenderTime}
+          />
+        )}
+        {animationType === "prism" && (
+          <PrismCanvas
             ref={rendererRef}
             params={params}
             colors={renderColors}
