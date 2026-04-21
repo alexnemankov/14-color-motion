@@ -4,7 +4,7 @@ Color Motion Lab is a browser-based motion design playground for building animat
 
 ## Current Feature Set
 
-- Eleven renderers:
+- Twelve renderers:
   - Fluid FBM
   - Interference Waves
   - Cellular Voronoi
@@ -16,6 +16,7 @@ Color Motion Lab is a browser-based motion design playground for building animat
   - Neon Drip
   - Clouds
   - Sea
+  - Prism
 - Shared scene controls:
   - `seed`
   - `speed`
@@ -39,9 +40,13 @@ Color Motion Lab is a browser-based motion design playground for building animat
   - Sea Mood presets: Midday, Sunset, Tropic, Storm (sets full 4-color palette)
   - Drag-to-orbit camera — mouse X = heading, mouse Y = elevation
   - Auto-applies Midday palette on mode entry
+- Prism mode extras:
+  - UV-displacement prism with chromatic RGB channel separation
+  - Prism Mood presets: Spectral, Neon, Plasma, Void (sets full 4-color palette)
+  - Auto-applies Spectral palette on mode entry
 - Mode switcher:
-  - 2-column labeled grid (icon + name) for all 11 modes
-  - Active mode description shown below the grid
+  - Compact trigger button (same style as Palette Library) showing the current mode name and description
+  - Opens a modal with a 3-column card grid for all 12 modes (icon + name + description per card)
 - Palette workflow:
   - 67 curated palettes
   - search and category filters
@@ -60,7 +65,7 @@ Color Motion Lab is a browser-based motion design playground for building animat
   - PNG export
   - 2x PNG export
   - 5s and 10s WebM recording
-  - loop-safe WebM export for deterministic renderers (liquid, waves, voronoi, blobs, three, clouds, sea)
+  - loop-safe WebM export for deterministic renderers (liquid, waves, voronoi, blobs, three, clouds, sea, prism)
   - compact shareable URLs with encoded scene state
 - UX:
   - first-run onboarding
@@ -86,7 +91,7 @@ Shortcuts are ignored while typing in editable fields.
 
 ## Renderer Notes
 
-- `liquid`, `waves`, `voronoi`, `blobs`, `three`, `clouds`, and `sea` support deterministic `externalTime` playback and loop-safe export.
+- `liquid`, `waves`, `voronoi`, `blobs`, `three`, `clouds`, `sea`, and `prism` support deterministic `externalTime` playback and loop-safe export.
 - `particles` runs its simulation in a Web Worker.
 - `turing` prefers WebGPU when available and falls back to WebGL2.
 - `clouds` uses a WebGL2 volumetric ray-marcher with procedural gradient noise and a drag-to-orbit camera.

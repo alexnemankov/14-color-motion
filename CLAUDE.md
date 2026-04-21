@@ -83,7 +83,7 @@ No test or lint scripts are configured.
 
 - **[App.tsx](src/App.tsx)** — Main orchestrator. Manages scene state, localStorage persistence, URL share encoding, undo/redo history, randomization, and export workflows. The `GradientParams` object is the single unified parameter set passed to all renderers. When switching to `"clouds"` mode, `startModeTransition` automatically applies a Noon sky palette; switching to `"sea"` applies a Midday ocean palette.
 
-- **[Panel.tsx](src/components/Panel.tsx)** — Control panel. All parameter controls, palette selection, preset management, recording/export UI, and compact vs. advanced view modes. Mode switcher is a 2-column labeled grid (icon + name) for all 11 modes. Mode-specific sections: `topoLineWidth` for Topographic; **Cloud Type** selector (5 formations), **Sky Mood** presets (Noon/Dusk/Dawn/Storm), and **God Rays** toggle for Clouds; **Sea Mood** presets (Midday/Sunset/Tropic/Storm) for Sea.
+- **[Panel.tsx](src/components/Panel.tsx)** — Control panel. All parameter controls, palette selection, preset management, recording/export UI, and compact vs. advanced view modes. Mode switcher is a compact trigger button (same style as Palette Library) that opens a modal with a 3-column card grid for all 12 modes. Mode-specific sections: `topoLineWidth` for Topographic; **Cloud Type** selector (5 formations), **Sky Mood** presets (Noon/Dusk/Dawn/Storm), and **God Rays** toggle for Clouds; **Sea Mood** presets (Midday/Sunset/Tropic/Storm) for Sea; **Prism Mood** presets (Spectral/Neon/Plasma/Void) for Prism.
 
 - **[PaletteModal.tsx](src/components/PaletteModal.tsx)** — Palette browser with 67 curated palettes (defined in [palettes.ts](src/data/palettes.ts)), search, tag filters, and localStorage-backed favorites.
 
@@ -104,6 +104,7 @@ Eleven renderers each implement the `RendererHandle` interface from [rendererTyp
 | `NeonDripCanvas`    | Metaball drip blobs                              | Canvas 2D                |
 | `CloudsCanvas`      | Volumetric ray-marched sky                       | WebGL2                   |
 | `SeaCanvas`         | Height-field ocean                               | WebGL2                   |
+| `PrismCanvas`       | UV-displacement prism                            | WebGL2                   |
 
 The `RendererHandle` interface requires: `status`, `supportsExternalTime`, `supportsLoopSafeExport`, `getCanvas()`, `captureFrame()`. Renderers are wrapped in `RendererBoundary` for error isolation.
 
@@ -157,6 +158,18 @@ All renderers share a single `GradientParams` object. Most fields are universal;
 - **Euler convention**: `ang.z` = horizontal heading (`forward = (sin(z), 0, cos(z))`), `ang.y` = elevation (positive = tilt down). Mouse X drives `ang.z`; mouse Y drives `ang.y` inverted (`0.3 − (m.y − 0.5) × 0.8`) so drag-up shows more sky
 - **Sea Mood presets** in Panel (Midday, Sunset, Tropic, Storm); entering Sea mode auto-applies Midday palette
 
+### PrismCanvas Details
+
+`PrismCanvas` is a WebGL2 UV-displacement prism renderer with:
+
+- **3-pass chromatic loop**: runs once per RGB channel; each pass applies a different z-offset so the three channels receive distinct UV displacement, producing chromatic separation
+- **Displacement formula**: `uv += p/l * (sin(z)+1) * abs(sin(l*freq - z*2)) * amplitude`
+- **Palette mapping**: `colors[0]` → R channel tint, `colors[1]` → G channel tint, `colors[2]` → B channel tint, `colors[3]` → dark ambient fill
+- **`definition` → `zStep`**: maps 0–1 to 0.01–0.55 — controls how far apart the three channel phases sit (low = near-monochrome, high = heavy color separation)
+- **`seed`** offsets the initial z phase (`z = time + seed * 0.1`) so each seed value produces a distinct visual variant
+- **`blend`** desaturates toward luminance (controls color purity / saturation)
+- **Prism Mood presets** in Panel (Spectral, Neon, Plasma, Void); entering Prism mode auto-applies Spectral palette
+
 ### State & Persistence
 
 - Scene state is persisted to localStorage (`color-motion-session`) as versioned JSON payloads.
@@ -170,7 +183,7 @@ Exports go through phases tracked in App.tsx: `idle → preparing → capturing 
 
 - **PNG**: 1× and 2× resolution.
 - **WebM video**: 5s or 10s real-time recording, OR loop-safe deterministic export (for renderers where `supportsLoopSafeExport` is true, driven by external time steps).
-- Loop-safe export is supported by: `liquid`, `waves`, `voronoi`, `blobs`, `three`, `clouds`, `sea`.
+- Loop-safe export is supported by: `liquid`, `waves`, `voronoi`, `blobs`, `three`, `clouds`, `sea`, `prism`.
 - `ParticlesCanvas` uses a Web Worker ([particlesWorker.ts](src/workers/particlesWorker.ts)) for simulation; coordinate with the worker protocol when touching particle logic.
 
 ### Key Dependencies

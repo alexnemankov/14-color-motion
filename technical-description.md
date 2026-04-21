@@ -8,7 +8,7 @@ Color Motion Lab is a fullscreen generative motion app with a single active rend
 
 The shipped product currently includes:
 
-- eleven rendering modes
+- twelve rendering modes
 - a floating desktop panel and mobile bottom-sheet UI
 - palette library browsing with favorites and recents
 - local preset storage and recent scene tracking
@@ -66,6 +66,7 @@ src/
     NeonDripCanvas.tsx          Canvas 2D metaball drip blobs, external time support
     CloudsCanvas.tsx            WebGL2 volumetric ray-marched clouds, external time support
     SeaCanvas.tsx               WebGL2 height-field ocean, external time support
+    PrismCanvas.tsx             WebGL2 UV-displacement prism, external time support
 ```
 
 ## 4. Core Domain Model
@@ -87,6 +88,7 @@ src/
 - `neondrip`
 - `clouds`
 - `sea`
+- `prism`
 
 `GradientParams`
 
@@ -209,7 +211,7 @@ This smoothing is used inside render loops so parameter edits feel continuous in
 
 ### Deterministic renderers (support loop-safe export)
 
-`LiquidCanvas`, `WavesCanvas`, `VoronoiCanvas`, `BlobsCanvas`, `ThreeJSCanvas`, `CloudsCanvas`, `SeaCanvas`:
+`LiquidCanvas`, `WavesCanvas`, `VoronoiCanvas`, `BlobsCanvas`, `ThreeJSCanvas`, `CloudsCanvas`, `SeaCanvas`, `PrismCanvas`:
 
 - render to fullscreen canvas elements
 - support parameter smoothing via `rendererMotion`
@@ -416,6 +418,38 @@ When starting a new WebGL2 volumetric renderer, apply these four in order — ea
 
 4. **Add temporal accumulation as the final pass.** A ping-pong FBO pair with an 80/20 history blend is ~30 lines of code and delivers 2–3× perceived quality for free. Use adaptive alpha: `1.0` on reset, a higher value during fast motion (drag), and a lower value when idle. Tune the idle alpha to the scene's motion rate — slower-moving visuals tolerate heavier history blending.
 
+### Prism renderer
+
+`PrismCanvas` is a WebGL2 UV-displacement prism effect. Key design points:
+
+**Shader:**
+- Loops 3 times (one pass per RGB channel), each pass computing UV displacement from a radial field
+- Per-pass z-offset controlled by `uDefinition` (0–1 → `zStep` 0.01–0.55) — low values produce near-monochrome output; high values produce heavy chromatic separation across channels
+- Displacement: `uv += p/l * (sin(z)+1) * abs(sin(l*uFrequency - z*2)) * uAmplitude`
+- Each raw channel tinted by palette color: `col = (c[0]*uColor0 + c[1]*uColor1 + c[2]*uColor2) / l`
+- `uBlend` desaturates toward luminance at low values (controls color purity)
+- `uColor3` tints dark ambient regions
+- Reinhard tone map + gamma correction
+
+**Palette mapping (colors[0..3]):**
+- `colors[0]` → first channel tint (maps to the R displacement pass)
+- `colors[1]` → second channel tint (maps to the G displacement pass)
+- `colors[2]` → third channel tint (maps to the B displacement pass)
+- `colors[3]` → ambient/shadow tint for dark regions
+
+**GradientParams mapping:**
+- `speed` → animation speed (time multiplier)
+- `scale` → UV scale (zoom / tiling density)
+- `amplitude` → warp displacement strength
+- `frequency` → ripple frequency (×9)
+- `definition` → chromatic spread (z-step between channel passes, 0.01–0.55)
+- `blend` → color saturation / desaturation toward luminance
+- `seed` → initial phase offset (`z = time + seed * 0.1`)
+
+**Panel integration:**
+- Prism Mood section: 4 preset buttons (Spectral, Neon, Plasma, Void) each calling `setColors([...])` with a full 4-color palette
+- Entering Prism mode via `startModeTransition` auto-applies the Spectral palette
+
 ## 10. UI Architecture
 
 ### Panel
@@ -423,13 +457,14 @@ When starting a new WebGL2 volumetric renderer, apply these four in order — ea
 `src/components/Panel.tsx` is the main workspace surface. It contains:
 
 - workflow tools
-- mode selection (11 modes in a 2-column labeled grid — icon + name per button)
+- mode selection via a compact trigger button (same style as the Palette Library button) that opens a modal with a 3-column card grid of all 12 modes (icon + name + description per card)
 - palette editing
 - motion and structure controls
 - mode-specific sections:
   - Topographic: line width slider
   - Clouds: cloud type selector (5 formations) and Sky Mood presets (Noon, Dusk, Dawn, Storm)
   - Sea: Sea Mood presets (Midday, Sunset, Tropic, Storm)
+  - Prism: Prism Mood presets (Spectral, Neon, Plasma, Void)
 - workspace actions
 - export controls
 - reset actions
@@ -437,7 +472,7 @@ When starting a new WebGL2 volumetric renderer, apply these four in order — ea
 - recent scene browsing
 - transport controls
 
-The mode switcher uses a `grid-template-columns: 1fr 1fr` layout so all 11 modes fit in 6 rows of 2 with both icon and text label visible. The active mode's description is shown in a footer below the grid; the name is on the button itself.
+The mode switcher is a single trigger button (identical style to the Palette Library button) that displays the current mode's name and description. Clicking it opens a portal modal with a 3-column card grid of all 12 modes. Each card shows an icon, short name, and one-line description. The active mode is highlighted with the accent color. Clicking a card selects the mode and closes the modal; clicking the overlay or the × button dismisses it without a selection change.
 
 Current workflow features exposed in the panel:
 
@@ -484,7 +519,7 @@ The export system is entirely browser-side.
 
 - `MediaRecorder`-based WebM capture
 - standard `5s` and `10s` recordings
-- loop-safe recording for deterministic renderers (liquid, waves, voronoi, blobs, three, clouds, sea)
+- loop-safe recording for deterministic renderers (liquid, waves, voronoi, blobs, three, clouds, sea, prism)
 - progress state transitions through `preparing`, `recording`, `encoding`, and `complete`
 - progress arc and frame counter UI in the panel
 
@@ -539,7 +574,8 @@ Several features previously listed as future improvements are already implemente
 - neon drip metaball renderer
 - volumetric cloud renderer with 5 cloud types, sky mood presets, god rays, and drag-to-orbit camera
 - WebGL2 height-field sea renderer with sea mood presets and drag-to-orbit camera
-- labeled 2-column mode switcher (icon + name) for all 11 modes
+- WebGL2 UV-displacement prism renderer with chromatic channel separation and prism mood presets
+- modal-based mode switcher (trigger button + 3-column card grid) for all 12 modes
 
 Not implemented in the current codebase:
 
