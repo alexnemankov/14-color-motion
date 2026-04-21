@@ -10,6 +10,7 @@ import ThreeJSCanvas from "./components/ThreeJSCanvas";
 import TopographicCanvas from "./components/TopographicCanvas";
 import NeonDripCanvas from "./components/NeonDripCanvas";
 import CloudsCanvas from "./components/CloudsCanvas";
+import SeaCanvas from "./components/SeaCanvas";
 import Panel from "./components/Panel";
 import RendererBoundary from "./components/RendererBoundary";
 import { RendererHandle } from "./components/rendererTypes";
@@ -30,7 +31,8 @@ export type AnimationType =
   | "three"
   | "topographic"
   | "neondrip"
-  | "clouds";
+  | "clouds"
+  | "sea";
 
 export interface GradientParams {
   seed: number;
@@ -155,6 +157,7 @@ const VALID_ANIMATION_TYPES: AnimationType[] = [
   "topographic",
   "neondrip",
   "clouds",
+  "sea",
 ];
 const HISTORY_LIMIT = 40;
 const PALETTE_TRANSITION_MS = 1500;
@@ -231,7 +234,7 @@ function randomParams(
 ): GradientParams {
   const isTopo = animationType === "topographic";
   const isDrip = animationType === "neondrip";
-  const isClouds = animationType === "clouds";
+  const isClouds = animationType === "clouds" || animationType === "sea";
   return {
     seed: locks.seed ? base.seed : randomInt(0, 9999),
     speed: locks.motion ? base.speed
@@ -312,6 +315,7 @@ function animationTypeLabel(type: AnimationType) {
     topographic: "Topographic",
     neondrip: "Neon Drip",
     clouds: "Clouds",
+    sea: "Sea",
   }[type];
 }
 
@@ -1107,6 +1111,15 @@ function App() {
         [160, 172, 185],
       ]);
     }
+    if (nextType === "sea") {
+      // Ocean defaults: deep blue, sea-foam green, sky blue, golden sun
+      setColors([
+        [0, 23, 46],
+        [122, 138, 92],
+        [100, 168, 210],
+        [255, 195, 100],
+      ]);
+    }
   }
 
   const showToast = (title: string, message?: string) => {
@@ -1875,6 +1888,17 @@ function App() {
         )}
         {animationType === "clouds" && (
           <CloudsCanvas
+            ref={rendererRef}
+            params={params}
+            colors={renderColors}
+            paused={paused}
+            onStatusChange={setRendererStatus}
+            renderScale={renderScale}
+            externalTime={externalRenderTime}
+          />
+        )}
+        {animationType === "sea" && (
+          <SeaCanvas
             ref={rendererRef}
             params={params}
             colors={renderColors}

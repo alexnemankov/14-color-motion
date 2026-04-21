@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowCounterClockwise,
   Atom,
+  Boat,
   CaretDown,
   CaretRight,
   ClockCounterClockwise,
@@ -167,6 +168,10 @@ const MODE_DETAILS: Record<
   clouds: {
     name: "Clouds",
     description: "Volumetric ray-marched sky with five switchable cloud types.",
+  },
+  sea: {
+    name: "Sea",
+    description: "Procedural height-field ocean with realistic wave shading.",
   },
 };
 
@@ -563,6 +568,17 @@ export default function Panel({
       topoLineWidth: "",
       cloudType: "",
     },
+    sea: {
+      seed: "Seed",
+      speed: "Wave Speed",
+      scale: "Scale",
+      amplitude: "Wave Height",
+      frequency: "Frequency",
+      definition: "Wave Detail",
+      blend: "Choppiness",
+      topoLineWidth: "",
+      cloudType: "",
+    },
   }[animationType] ?? {
     seed: "Seed", speed: "Speed", scale: "Scale", amplitude: "Amplitude",
     frequency: "Frequency", definition: "Definition", blend: "Blend", topoLineWidth: "",
@@ -829,6 +845,17 @@ export default function Panel({
                 weight={animationType === "clouds" ? "fill" : "bold"}
               />
             </button>
+            <button
+              className={`mode-btn ${animationType === "sea" ? "active" : ""}`}
+              onClick={() => setAnimationType("sea")}
+              title="Sea"
+              aria-label="Switch to Sea mode"
+            >
+              <Boat
+                size={16}
+                weight={animationType === "sea" ? "fill" : "bold"}
+              />
+            </button>
           </div>
           <div className="mode-summary">
             <strong>{MODE_DETAILS[animationType].name}</strong>
@@ -932,7 +959,7 @@ export default function Panel({
           Tune time, zoom, and movement feel for the active renderer.
         </div>
         {viewMode === "advanced" && renderParamRow("seed", 0, 9999, 1)}
-        {renderParamRow("speed", 0, animationType === "topographic" ? 0.2 : animationType === "neondrip" ? 1 : animationType === "clouds" ? 1 : 10, animationType === "topographic" || animationType === "neondrip" || animationType === "clouds" ? 0.01 : 0.1)}
+        {renderParamRow("speed", 0, animationType === "topographic" ? 0.2 : animationType === "neondrip" ? 1 : (animationType === "clouds" || animationType === "sea") ? 1 : 10, animationType === "topographic" || animationType === "neondrip" || animationType === "clouds" || animationType === "sea" ? 0.01 : 0.1)}
         {renderParamRow("scale", 0.01, animationType === "topographic" ? 0.5 : 2, 0.01)}
         {viewMode === "advanced" && renderParamRow("amplitude", 0, 2, 0.01)}
       </div>

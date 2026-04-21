@@ -7,7 +7,8 @@
       "WebFetch(domain:alexnemankov.github.io)",
       "Bash(git reset:*)",
       "Bash(git push:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(node -e \"const icons = require\\('f:/Front/14-color-motion/node_modules/@phosphor-icons/react/dist/index.js'\\); const names = Object.keys\\(icons\\).filter\\(k => /wave|sea|ocean|drop|anchor|water|fish|boat/i.test\\(k\\)\\); console.log\\(names.slice\\(0,20\\)\\)\")"
     ]
   }
 }
