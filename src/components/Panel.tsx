@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { motion } from "framer-motion";
 import {
   ArrowCounterClockwise,
   Atom,
@@ -26,6 +28,7 @@ import {
   Trash,
   Waves,
   Diamond,
+  X,
 } from "@phosphor-icons/react";
 import { HexColorPicker } from "react-colorful";
 import {
@@ -124,6 +127,21 @@ const LOCK_LABELS: Record<keyof WorkflowLocks, string> = {
   seed: "Lock seed",
   motion: "Lock motion",
 };
+
+const MODES = [
+  { id: "liquid"      as const, Icon: Drop,          label: "Fluid"     },
+  { id: "waves"       as const, Icon: Waves,         label: "Waves"     },
+  { id: "voronoi"     as const, Icon: Hexagon,       label: "Voronoi"   },
+  { id: "turing"      as const, Icon: Atom,          label: "Turing"    },
+  { id: "particles"   as const, Icon: ShareNetwork,  label: "Particles" },
+  { id: "blobs"       as const, Icon: Gradient,      label: "Blobs"     },
+  { id: "three"       as const, Icon: Cube,          label: "3D Mesh"   },
+  { id: "topographic" as const, Icon: ChartLineIcon, label: "Topo"      },
+  { id: "neondrip"    as const, Icon: Flame,         label: "Neon Drip" },
+  { id: "clouds"      as const, Icon: Cloud,         label: "Clouds"    },
+  { id: "sea"         as const, Icon: Boat,          label: "Sea"       },
+  { id: "prism"       as const, Icon: Diamond,       label: "Prism"     },
+];
 
 const MODE_DETAILS: Record<
   AnimationType,
@@ -371,6 +389,7 @@ export default function Panel({
   openShortcuts,
 }: PanelProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isModeModalOpen, setIsModeModalOpen] = useState(false);
   const [workflowExpanded, setWorkflowExpanded] = useState(false);
   const [exportExpanded, setExportExpanded] = useState(false);
   const [savedExpanded, setSavedExpanded] = useState(false);
@@ -749,39 +768,53 @@ export default function Panel({
             Pick the visual engine first.
           </div>
         </div>
-        <div className="mode-card">
-          <div className="mode-switcher">
-            {(
-              [
-                { id: "liquid",      Icon: Drop,          label: "Fluid"     },
-                { id: "waves",       Icon: Waves,         label: "Waves"     },
-                { id: "voronoi",     Icon: Hexagon,       label: "Voronoi"   },
-                { id: "turing",      Icon: Atom,          label: "Turing"    },
-                { id: "particles",   Icon: ShareNetwork,  label: "Particles" },
-                { id: "blobs",       Icon: Gradient,      label: "Blobs"     },
-                { id: "three",       Icon: Cube,          label: "3D"        },
-                { id: "topographic", Icon: ChartLineIcon, label: "Topo"      },
-                { id: "neondrip",    Icon: Flame,         label: "Neon Drip" },
-                { id: "clouds",      Icon: Cloud,         label: "Clouds"    },
-                { id: "sea",         Icon: Boat,          label: "Sea"       },
-                { id: "prism",       Icon: Diamond,       label: "Prism"     },
-              ] as const
-            ).map(({ id, Icon, label }) => (
-              <button
-                key={id}
-                className={`mode-btn ${animationType === id ? "active" : ""}`}
-                onClick={() => setAnimationType(id)}
-                aria-label={`Switch to ${label} mode`}
-              >
-                <Icon size={13} weight={animationType === id ? "fill" : "bold"} />
-                <span>{label}</span>
-              </button>
-            ))}
+        <button
+          className="open-library-btn"
+          onClick={() => setIsModeModalOpen(true)}
+        >
+          {(() => { const m = MODES.find(m => m.id === animationType); return m ? <m.Icon size={16} weight="fill" /> : null; })()}
+          <div className="library-btn-text">
+            <span>{MODE_DETAILS[animationType].name}</span>
+            <small>{MODE_DETAILS[animationType].description}</small>
           </div>
-          <div className="mode-summary">
-            <p>{MODE_DETAILS[animationType].description}</p>
-          </div>
-        </div>
+        </button>
+
+        {isModeModalOpen && createPortal(
+          <div className="mode-modal-overlay" onClick={() => setIsModeModalOpen(false)}>
+            <motion.div
+              className="mode-modal-box"
+              onClick={e => e.stopPropagation()}
+              initial={{ y: 32, opacity: 0, scale: 0.97 }}
+              animate={{ y: 0, opacity: 1, scale: 1 }}
+              exit={{ y: 32, opacity: 0, scale: 0.97 }}
+              transition={{ type: "spring", damping: 26, stiffness: 220 }}
+            >
+              <div className="mode-modal-header">
+                <div>
+                  <span className="modal-kicker">Visual Engine</span>
+                  <h2>Choose a renderer</h2>
+                </div>
+                <button className="close-btn" onClick={() => setIsModeModalOpen(false)} aria-label="Close">
+                  <X size={20} weight="bold" />
+                </button>
+              </div>
+              <div className="mode-modal-grid">
+                {MODES.map(({ id, Icon, label }) => (
+                  <button
+                    key={id}
+                    className={`mode-modal-card ${animationType === id ? "active" : ""}`}
+                    onClick={() => { setAnimationType(id); setIsModeModalOpen(false); }}
+                  >
+                    <Icon size={20} weight={animationType === id ? "fill" : "bold"} />
+                    <strong>{label}</strong>
+                    <span>{MODE_DETAILS[id].description}</span>
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          </div>,
+          document.body,
+        )}
       </div>
 
       <div className="panel-section">
