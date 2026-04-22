@@ -4,7 +4,7 @@ Color Motion Lab is a browser-based motion design playground for building animat
 
 ## Current Feature Set
 
-- Twelve renderers:
+- Thirteen renderers:
   - Fluid FBM
   - Interference Waves
   - Cellular Voronoi
@@ -17,6 +17,7 @@ Color Motion Lab is a browser-based motion design playground for building animat
   - Clouds
   - Sea
   - Prism
+  - Octagrams
 - Shared scene controls:
   - `seed`
   - `speed`
@@ -44,6 +45,14 @@ Color Motion Lab is a browser-based motion design playground for building animat
   - UV-displacement prism with chromatic RGB channel separation
   - Prism Mood presets: Spectral, Neon, Plasma, Void (sets full 4-color palette)
   - Auto-applies Spectral palette on mode entry
+- Octagrams mode extras:
+  - Ray-marched tiled star fields with SDF box octagram shapes
+  - 4 shape variants: Classic (4-arm), Star (8-arm), Portal (compact), Crystal (no oscillation)
+  - 4 combined shape+color presets: Orbital, Inferno, Quantum, Ghost
+  - Optional: Camera altitude slider, tile scale slider
+  - Optional: Trails (temporal accumulation via ping-pong FBO)
+  - Optional: Color Cycle (palette oscillation over time)
+  - Auto-applies Orbital palette on mode entry
 - Mode switcher:
   - Compact trigger button (same style as Palette Library) showing the current mode name and description
   - Opens a modal with a 3-column card grid for all 12 modes (icon + name + description per card)

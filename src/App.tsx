@@ -12,6 +12,7 @@ import NeonDripCanvas from "./components/NeonDripCanvas";
 import CloudsCanvas from "./components/CloudsCanvas";
 import SeaCanvas from "./components/SeaCanvas";
 import PrismCanvas from "./components/PrismCanvas";
+import OctagramsCanvas from "./components/OctagramsCanvas";
 import Panel from "./components/Panel";
 import RendererBoundary from "./components/RendererBoundary";
 import { RendererHandle } from "./components/rendererTypes";
@@ -34,7 +35,8 @@ export type AnimationType =
   | "neondrip"
   | "clouds"
   | "sea"
-  | "prism";
+  | "prism"
+  | "octagrams";
 
 export interface GradientParams {
   seed: number;
@@ -53,6 +55,11 @@ export interface GradientParams {
   topoLineWidth: number;
   cloudType: number;
   godRays: boolean;
+  octagramType: number;
+  octagramAltitude: number;
+  octagramDensity: number;
+  octagramTrails: boolean;
+  octagramColorCycle: boolean;
 }
 
 export type ColorRgb = [number, number, number];
@@ -139,6 +146,11 @@ const DEFAULT_PARAMS: GradientParams = {
   topoLineWidth: 1,
   cloudType: 0,
   godRays: false,
+  octagramType: 0,
+  octagramAltitude: 0.4,
+  octagramDensity: 0.3,
+  octagramTrails: false,
+  octagramColorCycle: false,
 };
 
 const SESSION_STORAGE_KEY = "color-motion-session";
@@ -161,6 +173,7 @@ const VALID_ANIMATION_TYPES: AnimationType[] = [
   "clouds",
   "sea",
   "prism",
+  "octagrams",
 ];
 const HISTORY_LIMIT = 40;
 const PALETTE_TRANSITION_MS = 1500;
@@ -265,6 +278,11 @@ function randomParams(
     topoLineWidth: base.topoLineWidth,
     cloudType: base.cloudType,
     godRays: base.godRays,
+    octagramType: base.octagramType,
+    octagramAltitude: locks.motion ? base.octagramAltitude : randomBetween(0, 1),
+    octagramDensity: locks.motion ? base.octagramDensity : randomBetween(0, 1),
+    octagramTrails: base.octagramTrails,
+    octagramColorCycle: base.octagramColorCycle,
   };
 }
 
@@ -320,6 +338,7 @@ function animationTypeLabel(type: AnimationType) {
     clouds: "Clouds",
     sea: "Sea",
     prism: "Prism",
+    octagrams: "Octagrams",
   }[type];
 }
 
@@ -562,6 +581,26 @@ function normalizeSceneState(value: unknown): SceneState | null {
       typeof params.godRays === "boolean"
         ? params.godRays
         : DEFAULT_PARAMS.godRays,
+    octagramType:
+      typeof params.octagramType === "number"
+        ? params.octagramType
+        : DEFAULT_PARAMS.octagramType,
+    octagramAltitude:
+      typeof params.octagramAltitude === "number"
+        ? params.octagramAltitude
+        : DEFAULT_PARAMS.octagramAltitude,
+    octagramDensity:
+      typeof params.octagramDensity === "number"
+        ? params.octagramDensity
+        : DEFAULT_PARAMS.octagramDensity,
+    octagramTrails:
+      typeof params.octagramTrails === "boolean"
+        ? params.octagramTrails
+        : DEFAULT_PARAMS.octagramTrails,
+    octagramColorCycle:
+      typeof params.octagramColorCycle === "boolean"
+        ? params.octagramColorCycle
+        : DEFAULT_PARAMS.octagramColorCycle,
   };
 
   const colors = Array.isArray(candidate.colors)
@@ -1131,6 +1170,15 @@ function App() {
         [30, 255, 30],
         [30, 30, 255],
         [0, 0, 0],
+      ]);
+    }
+    if (nextType === "octagrams") {
+      // Orbital defaults: cyan primary, violet mid, gold highlight, near-black bg
+      setColors([
+        [30, 200, 255],
+        [180, 0, 255],
+        [255, 200, 50],
+        [5, 0, 20],
       ]);
     }
   }
@@ -1923,6 +1971,17 @@ function App() {
         )}
         {animationType === "prism" && (
           <PrismCanvas
+            ref={rendererRef}
+            params={params}
+            colors={renderColors}
+            paused={paused}
+            onStatusChange={setRendererStatus}
+            renderScale={renderScale}
+            externalTime={externalRenderTime}
+          />
+        )}
+        {animationType === "octagrams" && (
+          <OctagramsCanvas
             ref={rendererRef}
             params={params}
             colors={renderColors}

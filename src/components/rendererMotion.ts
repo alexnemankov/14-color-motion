@@ -28,5 +28,10 @@ export function stepSmoothedParams(current: GradientParams, target: GradientPara
       current.topoLineWidth + (target.topoLineWidth - current.topoLineWidth) * alpha,
     cloudType: current.cloudType + (target.cloudType - current.cloudType) * Math.min(1, alpha * 2),
     godRays: target.godRays,
+    octagramType: target.octagramType,
+    octagramAltitude: current.octagramAltitude + (target.octagramAltitude - current.octagramAltitude) * alpha,
+    octagramDensity: current.octagramDensity + (target.octagramDensity - current.octagramDensity) * alpha,
+    octagramTrails: target.octagramTrails,
+    octagramColorCycle: target.octagramColorCycle,
   };
 }

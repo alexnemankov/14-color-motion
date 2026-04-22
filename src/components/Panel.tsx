@@ -28,6 +28,7 @@ import {
   Trash,
   Waves,
   Diamond,
+  Octagon,
   X,
 } from "@phosphor-icons/react";
 import { HexColorPicker } from "react-colorful";
@@ -141,6 +142,7 @@ const MODES = [
   { id: "clouds"      as const, Icon: Cloud,         label: "Clouds"    },
   { id: "sea"         as const, Icon: Boat,          label: "Sea"       },
   { id: "prism"       as const, Icon: Diamond,       label: "Prism"     },
+  { id: "octagrams"   as const, Icon: Octagon,       label: "Octagrams" },
 ];
 
 const MODE_DETAILS: Record<
@@ -195,6 +197,10 @@ const MODE_DETAILS: Record<
   prism: {
     name: "Prism",
     description: "UV-displacement light prism with chromatic RGB channel separation.",
+  },
+  octagrams: {
+    name: "Octagrams",
+    description: "Ray-marched tiled star fields with chromatic glow and shape variants.",
   },
 };
 
@@ -420,14 +426,14 @@ export default function Panel({
   };
 
   const renderParamRow = (
-    key: keyof Omit<GradientParams, "dofEnabled" | "godRays">,
+    key: keyof Omit<GradientParams, "dofEnabled" | "godRays" | "octagramTrails" | "octagramColorCycle" | "octagramType">,
     min: number,
     max: number,
     step: number,
     disabled: boolean = false,
   ) => (
     <div className="param-row">
-      <span className="param-label">{labels[key]}</span>
+      <span className="param-label">{(labels as unknown as Record<string, string>)[key]}</span>
       <input
         className="param-input"
         type="number"
@@ -613,6 +619,19 @@ export default function Panel({
       blend: "Saturation",
       topoLineWidth: "",
       cloudType: "",
+    },
+    octagrams: {
+      seed: "Seed",
+      speed: "Speed",
+      scale: "Perspective",
+      amplitude: "Oscillation",
+      frequency: "Spin Speed",
+      definition: "March Quality",
+      blend: "Glow",
+      topoLineWidth: "",
+      cloudType: "",
+      octagramAltitude: "Altitude",
+      octagramDensity: "Tile Scale",
     },
   }[animationType] ?? {
     seed: "Seed", speed: "Speed", scale: "Scale", amplitude: "Amplitude",
@@ -1198,6 +1217,126 @@ export default function Panel({
                 </div>
               </button>
             ))}
+          </div>
+        </div>
+      )}
+
+      {animationType === "octagrams" && (
+        <div className="panel-section">
+          <span className="section-label">Octagram Presets</span>
+          <div className="section-copy">
+            Load a shape and color combination for this star-field aesthetic.
+          </div>
+          <div className="cloud-mood-selector">
+            {(
+              [
+                {
+                  label: "Orbital",
+                  sub: "cosmic, classic",
+                  type: 0,
+                  colors: [
+                    [30, 200, 255] as ColorRgb,
+                    [180, 0, 255] as ColorRgb,
+                    [255, 200, 50] as ColorRgb,
+                    [5, 0, 20] as ColorRgb,
+                  ],
+                },
+                {
+                  label: "Inferno",
+                  sub: "8-arm star, fire",
+                  type: 1,
+                  colors: [
+                    [255, 30, 0] as ColorRgb,
+                    [255, 120, 0] as ColorRgb,
+                    [255, 255, 100] as ColorRgb,
+                    [20, 5, 0] as ColorRgb,
+                  ],
+                },
+                {
+                  label: "Quantum",
+                  sub: "compact portal",
+                  type: 2,
+                  colors: [
+                    [0, 255, 180] as ColorRgb,
+                    [0, 120, 255] as ColorRgb,
+                    [180, 0, 255] as ColorRgb,
+                    [0, 5, 20] as ColorRgb,
+                  ],
+                },
+                {
+                  label: "Ghost",
+                  sub: "crystal, no pulse",
+                  type: 3,
+                  colors: [
+                    [220, 230, 255] as ColorRgb,
+                    [140, 160, 200] as ColorRgb,
+                    [60, 80, 120] as ColorRgb,
+                    [5, 8, 15] as ColorRgb,
+                  ],
+                },
+              ]
+            ).map(({ label, sub, type, colors }) => (
+              <button
+                key={label}
+                type="button"
+                className="cloud-mood-btn"
+                onClick={() => {
+                  setColors(colors);
+                  setParams((prev) => ({ ...prev, octagramType: type }));
+                }}
+              >
+                <div
+                  className="cloud-mood-swatch"
+                  style={{
+                    background: `linear-gradient(135deg,
+                      rgb(${colors[0].join(",")}) 0%,
+                      rgb(${colors[1].join(",")}) 50%,
+                      rgb(${colors[2].join(",")}) 100%)`,
+                  }}
+                />
+                <div className="cloud-mood-text">
+                  <strong>{label}</strong>
+                  <span>{sub}</span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {animationType === "octagrams" && (
+        <div className="panel-section">
+          <span className="section-label">Octagram Options</span>
+          <div className="section-copy">
+            Camera altitude, tile scale, and optional effects.
+          </div>
+          {renderParamRow("octagramAltitude", 0, 1, 0.01)}
+          {renderParamRow("octagramDensity", 0, 1, 0.01)}
+          <div className="param-row">
+            <span className="param-label">Trails</span>
+            <label className="switch">
+              <input
+                type="checkbox"
+                checked={params.octagramTrails ?? false}
+                onChange={(e) =>
+                  setParams((prev) => ({ ...prev, octagramTrails: e.target.checked }))
+                }
+              />
+              <span className="slider" />
+            </label>
+          </div>
+          <div className="param-row">
+            <span className="param-label">Color Cycle</span>
+            <label className="switch">
+              <input
+                type="checkbox"
+                checked={params.octagramColorCycle ?? false}
+                onChange={(e) =>
+                  setParams((prev) => ({ ...prev, octagramColorCycle: e.target.checked }))
+                }
+              />
+              <span className="slider" />
+            </label>
           </div>
         </div>
       )}

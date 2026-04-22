@@ -1,6 +1,6 @@
 import type { AnimationType, ColorRgb, GradientParams, SceneState } from '../App';
 
-export const CURRENT_SCENE_VERSION = 1;
+export const CURRENT_SCENE_VERSION = 2;
 
 interface MigrationContext {
   defaultParams: GradientParams;
@@ -16,17 +16,19 @@ interface PersistedScenePayload {
 
 type LegacyScenePayload = Partial<SceneState> & { version?: number };
 
-function migrateLegacyScene(payload: LegacyScenePayload): PersistedScenePayload {
-  return {
-    version: CURRENT_SCENE_VERSION,
-    animationType: payload.animationType as AnimationType,
-    params: payload.params ?? {},
-    colors: payload.colors ?? [],
-  };
-}
-
 const migrations: Record<number, (payload: LegacyScenePayload, context: MigrationContext) => PersistedScenePayload> = {
-  0: payload => migrateLegacyScene(payload),
+  0: (payload, context) => ({
+    version: 2,
+    animationType: payload.animationType as AnimationType,
+    params: { ...context.defaultParams, ...(payload.params ?? {}) },
+    colors: payload.colors ?? [],
+  }),
+  1: (payload, context) => ({
+    version: 2,
+    animationType: payload.animationType as AnimationType,
+    params: { ...context.defaultParams, ...(payload.params ?? {}) },
+    colors: payload.colors ?? [],
+  }),
 };
 
 export function serializeSceneForPersistence(scene: SceneState) {
