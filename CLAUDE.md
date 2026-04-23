@@ -106,7 +106,7 @@ Eleven renderers each implement the `RendererHandle` interface from [rendererTyp
 | `SeaCanvas`         | Height-field ocean                               | WebGL2                   |
 | `PrismCanvas`       | UV-displacement prism                            | WebGL2                   |
 | `OctagramsCanvas`   | Ray-marched octagram star fields                 | WebGL2                   |
-| `MetaballCanvas`    | Raymarched SDF metaballs                         | WebGL1                   |
+| `MetaballCanvas`    | Raymarched SDF metaballs                         | WebGL2                   |
 
 The `RendererHandle` interface requires: `status`, `supportsExternalTime`, `supportsLoopSafeExport`, `getCanvas()`, `captureFrame()`. Renderers are wrapped in `RendererBoundary` for error isolation.
 

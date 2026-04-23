@@ -55,7 +55,7 @@ Color Motion Lab is a browser-based motion design playground for building animat
   - Optional: Color Cycle (palette oscillation over time)
   - Auto-applies Orbital palette on mode entry
 - Metaballs mode extras:
-  - WebGL1 raymarched SDF metaballs with smooth-union blending (`opSmoothUnion`)
+  - WebGL2 raymarched SDF metaballs with smooth-union blending (`opSmoothUnion`)
   - 16 independently animated spheres per frame
   - 4 presets: Plasma, Magma, Abyss, Pearl
   - Auto-applies Plasma palette on mode entry

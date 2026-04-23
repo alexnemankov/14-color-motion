@@ -5,30 +5,31 @@ import { RendererHandle, RendererProps, captureCanvasImageData } from './rendere
 
 const toEvenSize = (v: number) => Math.max(2, Math.floor(v / 2) * 2);
 
-const vsSource = `
-attribute vec2 aPos;
+const vsSource = `#version 300 es
+in vec2 aPos;
 void main() { gl_Position = vec4(aPos, 0.0, 1.0); }
 `;
 
-const vsBlitSource = `
-attribute vec2 aPos;
-varying vec2 vUV;
+const vsBlitSource = `#version 300 es
+in vec2 aPos;
+out vec2 vUV;
 void main() {
   vUV = aPos * 0.5 + 0.5;
   gl_Position = vec4(aPos, 0.0, 1.0);
 }
 `;
 
-const fsBlitSource = `
+const fsBlitSource = `#version 300 es
 precision mediump float;
 uniform sampler2D uTex;
-varying vec2 vUV;
+in vec2 vUV;
+out vec4 fragColor;
 void main() {
-  gl_FragColor = texture2D(uTex, vUV);
+  fragColor = texture(uTex, vUV);
 }
 `;
 
-const fsSource = `
+const fsSource = `#version 300 es
 precision highp float;
 
 uniform vec2  uRes;
@@ -43,6 +44,8 @@ uniform vec3  uColor0;
 uniform vec3  uColor1;
 uniform vec3  uColor2;
 uniform vec3  uColor3;
+
+out vec4 fragColor;
 
 float sdSphere(vec3 p, float s) {
   return length(p) - s;
@@ -100,11 +103,11 @@ void main() {
   float hitFactor = exp(-depth * 3.0 / uScale);
   vec3 col = mix(uColor3, surfaceCol, hitFactor);
 
-  gl_FragColor = vec4(col, 1.0);
+  fragColor = vec4(col, 1.0);
 }
 `;
 
-function makeShader(gl: WebGLRenderingContext, type: number, src: string): WebGLShader | null {
+function makeShader(gl: WebGL2RenderingContext, type: number, src: string): WebGLShader | null {
   const s = gl.createShader(type);
   if (!s) return null;
   gl.shaderSource(s, src);
@@ -116,7 +119,7 @@ function makeShader(gl: WebGLRenderingContext, type: number, src: string): WebGL
   return s;
 }
 
-function makeProgram(gl: WebGLRenderingContext, vs: string, fs: string): WebGLProgram | null {
+function makeProgram(gl: WebGL2RenderingContext, vs: string, fs: string): WebGLProgram | null {
   const prog = gl.createProgram();
   if (!prog) return null;
   const vShader = makeShader(gl, gl.VERTEX_SHADER, vs);
@@ -171,15 +174,12 @@ const MetaballCanvas = forwardRef<RendererHandle, RendererProps>(function Metaba
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const gl = (
-      canvas.getContext('webgl', { preserveDrawingBuffer: true, alpha: false }) ||
-      canvas.getContext('experimental-webgl', { preserveDrawingBuffer: true, alpha: false })
-    ) as WebGLRenderingContext | null;
+    const gl = canvas.getContext('webgl2', { preserveDrawingBuffer: true, alpha: false });
 
     if (!gl) {
       statusRef.current = {
         title: 'Renderer unavailable',
-        message: 'Metaballs needs WebGL. Try another mode or enable graphics acceleration.',
+        message: 'Metaballs needs WebGL2. Try another mode or enable graphics acceleration.',
       };
       onStatusChange?.(statusRef.current);
       return;

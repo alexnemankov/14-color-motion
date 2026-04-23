@@ -86,7 +86,7 @@ src/
     SeaCanvas.tsx               WebGL2 height-field ocean, external time support
     PrismCanvas.tsx             WebGL2 UV-displacement prism, external time support
     OctagramsCanvas.tsx         WebGL2 ray-marched octagram star fields, external time support
-    MetaballCanvas.tsx          WebGL1 raymarched SDF metaballs, external time support
+    MetaballCanvas.tsx          WebGL2 raymarched SDF metaballs, external time support
   data/
     palettes.ts                 Curated palette library
 ```
@@ -348,7 +348,7 @@ Turing does not support `externalTime` or loop-safe export because it is simulat
 
 ### Metaballs renderer
 
-`MetaballCanvas` is a WebGL1 raymarched SDF metaball renderer. Key design points:
+`MetaballCanvas` is a WebGL2 raymarched SDF metaball renderer. Key design points:
 
 **Shader:**
 - 16 independently animated spheres, each with randomized phase offsets derived from `uSeed`
@@ -636,7 +636,7 @@ Several features previously listed as future improvements are already implemente
 - WebGL2 height-field sea renderer with sea mood presets and drag-to-orbit camera
 - WebGL2 UV-displacement prism renderer with chromatic channel separation and prism mood presets
 - modal-based mode switcher (trigger button + 3-column card grid) for all 14 modes
-- WebGL1 raymarched metaball renderer with smooth-union SDF blending
+- WebGL2 raymarched metaball renderer with smooth-union SDF blending
 - layered App architecture: types/, constants/, config/, utils/, services/, hooks/ — App.tsx reduced to ~280 lines
 - Mode Registry (`src/config/modes.ts`): `Record<AnimationType, ModeDefinition>` centralizes all mode metadata (icons, labels, descriptions, paramLabels, entryColors, presets, supportsExternalTime/LoopSafeExport) — adding a new mode requires only one registry entry + one RendererHost switch case
 
