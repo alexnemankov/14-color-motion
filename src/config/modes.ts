@@ -3,6 +3,7 @@ import type { AnimationType, ColorRgb, GradientParams } from '../types';
 import {
   Atom, Boat, Cloud, Cube, Diamond, Drop, Flame, Gradient,
   Hexagon, Octagon, ShareNetwork, Waves, CirclesFourIcon, ChartLineIcon,
+  StarFour,
 } from '@phosphor-icons/react';
 
 export interface ModePreset {
@@ -221,6 +222,27 @@ export const MODES: Record<AnimationType, ModeDefinition> = {
       { name: "Inferno", sub: "8-arm star, fire", params: { octagramType: 1 }, colors: [[255,30,0],[255,120,0],[255,255,100],[20,5,0]] },
       { name: "Quantum", sub: "compact portal",   params: { octagramType: 2 }, colors: [[0,255,180],[0,120,255],[180,0,255],[0,5,20]] },
       { name: "Ghost",   sub: "crystal, no pulse", params: { octagramType: 3 }, colors: [[220,230,255],[140,160,200],[60,80,120],[5,8,15]] },
+    ],
+  },
+  phantomstar: {
+    label: "Phantom Star",
+    name: "Phantom Star",
+    description: "IFS-folded tunnel with radial symmetry and phantom accumulation glow.",
+    icon: StarFour,
+    supportsExternalTime: true,
+    supportsLoopSafeExport: true,
+    entryColors: [[0, 100, 200], [0, 210, 255], [200, 240, 255], [2, 5, 18]],
+    paramLabels: {
+      seed: "Seed", speed: "Fly Speed", scale: "Camera Roll",
+      amplitude: "Structure Scale", frequency: "Symmetry", definition: "Glow Density", blend: "Pulse Rings",
+    },
+    presetsLabel: "Phantom Presets",
+    presetsDescription: "Load a color scheme for this phantom star tunnel.",
+    presets: [
+      { name: "Specter",  sub: "cold blue ghost",      colors: [[0,100,200],[0,210,255],[200,240,255],[2,5,18]] },
+      { name: "Inferno",  sub: "fire tunnel",           colors: [[180,30,0],[255,100,0],[255,220,80],[10,3,0]] },
+      { name: "Void",     sub: "deep purple cosmos",    colors: [[80,0,160],[200,0,255],[255,180,255],[5,0,15]] },
+      { name: "Circuit",  sub: "neon green grid",       colors: [[0,120,60],[0,255,120],[180,255,200],[0,8,4]] },
     ],
   },
   metaballs: {

@@ -12,7 +12,12 @@
       "Bash(grep -n \"const CloudsCanvas\\\\|export\\\\|useImperativeHandle\" \"f:\\\\\\\\Front\\\\\\\\14-color-motion\\\\\\\\src\\\\\\\\components\\\\\\\\CloudsCanvas.tsx\")",
       "Bash(awk '{print $5, $9}')",
       "Bash(grep -n \"useImperativeHandle\\(ref, \\(\\) => \\({\" /f/Front/14-color-motion/src/components/LiquidCanvas.tsx /f/Front/14-color-motion/src/components/MetaballCanvas.tsx /f/Front/14-color-motion/src/components/CloudsCanvas.tsx)",
-      "Bash(grep -n \"\\\\.map\\(\\({ label, sub\" /f/Front/14-color-motion/src/components/Panel.tsx)"
+      "Bash(grep -n \"\\\\.map\\(\\({ label, sub\" /f/Front/14-color-motion/src/components/Panel.tsx)",
+      "Bash(node -e \"const {Star} = require\\('@phosphor-icons/react'\\); console.log\\(typeof Star\\);\")",
+      "Bash(node -e \"const pkg = require\\('@phosphor-icons/react'\\); const keys = Object.keys\\(pkg\\).filter\\(k => /star|spark|asterisk|sun|radiant|burst|shine/i.test\\(k\\)\\); console.log\\(keys.slice\\(0, 20\\).join\\('\\\\n'\\)\\);\")",
+      "Bash(node -e \"const pkg = require\\('@phosphor-icons/react'\\); console.log\\(Object.keys\\(pkg\\).filter\\(k => /Star|Spark|Burst|Shine|Sun|Planet|Galaxy/i.test\\(k\\)\\).join\\('\\\\n'\\)\\);\")",
+      "Bash(node -e \"const pkg = require\\('@phosphor-icons/react'\\); const keys = Object.keys\\(pkg\\); console.log\\(keys.length\\); console.log\\(keys.slice\\(0, 20\\).join\\('\\\\n'\\)\\);\")",
+      "Bash(node --input-type=module -e \"import * as pkg from '@phosphor-icons/react'; const keys = Object.keys\\(pkg\\); console.log\\(keys.length\\); console.log\\(keys.filter\\(k => /tar|park|planet|sun|burst/i.test\\(k\\)\\).join\\('\\\\n'\\)\\);\")"
     ]
   }
 }

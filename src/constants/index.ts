@@ -46,6 +46,7 @@ export const VALID_ANIMATION_TYPES: AnimationType[] = [
   "prism",
   "octagrams",
   "metaballs",
+  "phantomstar",
 ];
 
 

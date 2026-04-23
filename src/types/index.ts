@@ -12,7 +12,8 @@ export type AnimationType =
   | "sea"
   | "prism"
   | "octagrams"
-  | "metaballs";
+  | "metaballs"
+  | "phantomstar";
 
 export interface GradientParams {
   seed: number;

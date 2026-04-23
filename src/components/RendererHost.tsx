@@ -15,6 +15,7 @@ import SeaCanvas from './SeaCanvas';
 import PrismCanvas from './PrismCanvas';
 import OctagramsCanvas from './OctagramsCanvas';
 import MetaballCanvas from './MetaballCanvas';
+import PhantomStarCanvas from './PhantomStarCanvas';
 
 interface RendererHostProps {
   animationType: AnimationType;
@@ -44,6 +45,7 @@ const RendererHost = forwardRef<RendererHandle, RendererHostProps>(
       case "prism":       return <PrismCanvas         {...withTime} />;
       case "octagrams":   return <OctagramsCanvas     {...withTime} />;
       case "metaballs":   return <MetaballCanvas      {...withTime} />;
+      case "phantomstar": return <PhantomStarCanvas   {...withTime} />;
       case "turing":      return <TuringCanvas        {...common} />;
       case "particles":   return <ParticlesCanvas     {...common} />;
     }
