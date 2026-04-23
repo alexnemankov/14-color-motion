@@ -29,6 +29,7 @@ import {
   Waves,
   Diamond,
   Octagon,
+  CirclesFourIcon,
   X,
 } from "@phosphor-icons/react";
 import { HexColorPicker } from "react-colorful";
@@ -142,7 +143,8 @@ const MODES = [
   { id: "clouds"      as const, Icon: Cloud,         label: "Clouds"    },
   { id: "sea"         as const, Icon: Boat,          label: "Sea"       },
   { id: "prism"       as const, Icon: Diamond,       label: "Prism"     },
-  { id: "octagrams"   as const, Icon: Octagon,       label: "Octagrams" },
+  { id: "octagrams"   as const, Icon: Octagon,           label: "Octagrams" },
+  { id: "metaballs"   as const, Icon: CirclesFourIcon,   label: "Metaballs" },
 ];
 
 const MODE_DETAILS: Record<
@@ -201,6 +203,10 @@ const MODE_DETAILS: Record<
   octagrams: {
     name: "Octagrams",
     description: "Ray-marched tiled star fields with chromatic glow and shape variants.",
+  },
+  metaballs: {
+    name: "Raymarched Metaballs",
+    description: "Organic blobs sculpted from smooth-union sphere fields.",
   },
 };
 
@@ -632,6 +638,17 @@ export default function Panel({
       cloudType: "",
       octagramAltitude: "Altitude",
       octagramDensity: "Tile Scale",
+    },
+    metaballs: {
+      seed: "Seed",
+      speed: "Speed",
+      scale: "View Zoom",
+      amplitude: "Blob Spread",
+      frequency: "Motion Rate",
+      definition: "Merge Radius",
+      blend: "Specular",
+      topoLineWidth: "",
+      cloudType: "",
     },
   }[animationType] ?? {
     seed: "Seed", speed: "Speed", scale: "Scale", amplitude: "Amplitude",
@@ -1337,6 +1354,82 @@ export default function Panel({
               />
               <span className="slider" />
             </label>
+          </div>
+        </div>
+      )}
+
+      {animationType === "metaballs" && (
+        <div className="panel-section">
+          <span className="section-label">Metaball Presets</span>
+          <div className="section-copy">
+            Load a color scheme for these organic blobs.
+          </div>
+          <div className="cloud-mood-selector">
+            {(
+              [
+                {
+                  label: "Plasma",
+                  sub: "magenta, cyan",
+                  colors: [
+                    [180, 0, 255] as ColorRgb,
+                    [0, 200, 255] as ColorRgb,
+                    [255, 255, 255] as ColorRgb,
+                    [5, 0, 20] as ColorRgb,
+                  ],
+                },
+                {
+                  label: "Magma",
+                  sub: "red, orange",
+                  colors: [
+                    [200, 30, 0] as ColorRgb,
+                    [255, 100, 0] as ColorRgb,
+                    [255, 240, 100] as ColorRgb,
+                    [15, 5, 0] as ColorRgb,
+                  ],
+                },
+                {
+                  label: "Abyss",
+                  sub: "deep blue, teal",
+                  colors: [
+                    [0, 20, 100] as ColorRgb,
+                    [60, 0, 180] as ColorRgb,
+                    [0, 220, 200] as ColorRgb,
+                    [0, 0, 10] as ColorRgb,
+                  ],
+                },
+                {
+                  label: "Pearl",
+                  sub: "warm ivory, gold",
+                  colors: [
+                    [180, 130, 80] as ColorRgb,
+                    [230, 190, 130] as ColorRgb,
+                    [255, 250, 220] as ColorRgb,
+                    [20, 15, 35] as ColorRgb,
+                  ],
+                },
+              ]
+            ).map(({ label, sub, colors }) => (
+              <button
+                key={label}
+                type="button"
+                className="cloud-mood-btn"
+                onClick={() => setColors(colors)}
+              >
+                <div
+                  className="cloud-mood-swatch"
+                  style={{
+                    background: `linear-gradient(135deg,
+                      rgb(${colors[0].join(",")}) 0%,
+                      rgb(${colors[1].join(",")}) 50%,
+                      rgb(${colors[2].join(",")}) 100%)`,
+                  }}
+                />
+                <div className="cloud-mood-text">
+                  <strong>{label}</strong>
+                  <span>{sub}</span>
+                </div>
+              </button>
+            ))}
           </div>
         </div>
       )}

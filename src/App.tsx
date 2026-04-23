@@ -13,6 +13,7 @@ import CloudsCanvas from "./components/CloudsCanvas";
 import SeaCanvas from "./components/SeaCanvas";
 import PrismCanvas from "./components/PrismCanvas";
 import OctagramsCanvas from "./components/OctagramsCanvas";
+import MetaballCanvas from "./components/MetaballCanvas";
 import Panel from "./components/Panel";
 import RendererBoundary from "./components/RendererBoundary";
 import { RendererHandle } from "./components/rendererTypes";
@@ -36,7 +37,8 @@ export type AnimationType =
   | "clouds"
   | "sea"
   | "prism"
-  | "octagrams";
+  | "octagrams"
+  | "metaballs";
 
 export interface GradientParams {
   seed: number;
@@ -174,6 +176,7 @@ const VALID_ANIMATION_TYPES: AnimationType[] = [
   "sea",
   "prism",
   "octagrams",
+  "metaballs",
 ];
 const HISTORY_LIMIT = 40;
 const PALETTE_TRANSITION_MS = 1500;
@@ -339,6 +342,7 @@ function animationTypeLabel(type: AnimationType) {
     sea: "Sea",
     prism: "Prism",
     octagrams: "Octagrams",
+    metaballs: "Metaballs",
   }[type];
 }
 
@@ -478,7 +482,8 @@ function supportsLoopSafeExport(type: AnimationType) {
     type === "voronoi" ||
     type === "blobs" ||
     type === "three" ||
-    type === "clouds"
+    type === "clouds" ||
+    type === "metaballs"
   );
 }
 
@@ -1178,6 +1183,15 @@ function App() {
         [30, 200, 255],
         [180, 0, 255],
         [255, 200, 50],
+        [5, 0, 20],
+      ]);
+    }
+    if (nextType === "metaballs") {
+      // Plasma defaults: purple shadow, cyan mid, white highlight, near-black bg
+      setColors([
+        [180, 0, 255],
+        [0, 200, 255],
+        [255, 255, 255],
         [5, 0, 20],
       ]);
     }
@@ -1982,6 +1996,17 @@ function App() {
         )}
         {animationType === "octagrams" && (
           <OctagramsCanvas
+            ref={rendererRef}
+            params={params}
+            colors={renderColors}
+            paused={paused}
+            onStatusChange={setRendererStatus}
+            renderScale={renderScale}
+            externalTime={externalRenderTime}
+          />
+        )}
+        {animationType === "metaballs" && (
+          <MetaballCanvas
             ref={rendererRef}
             params={params}
             colors={renderColors}
