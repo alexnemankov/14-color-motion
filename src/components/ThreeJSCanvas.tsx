@@ -3,7 +3,7 @@ import * as THREE from "three";
 import { BokehPass } from "three/examples/jsm/postprocessing/BokehPass.js";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
-import { RendererStatus } from "../App";
+import { RendererStatus } from '../types';
 import { cloneParams, stepSmoothedParams } from "./rendererMotion";
 import {
   RendererHandle,

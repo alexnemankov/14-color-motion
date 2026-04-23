@@ -1,5 +1,5 @@
 import React from 'react';
-import { RendererStatus } from '../App';
+import { RendererStatus } from '../types';
 
 interface RendererBoundaryProps {
   children: React.ReactNode;

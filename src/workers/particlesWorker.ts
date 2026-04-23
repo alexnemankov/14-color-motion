@@ -1,4 +1,4 @@
-import type { GradientParams } from '../App';
+import type { GradientParams } from '../types';
 
 interface Particle {
   x: number;

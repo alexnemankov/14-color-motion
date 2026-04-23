@@ -40,7 +40,7 @@ import {
   RecentScene,
   SavedPreset,
   WorkflowLocks,
-} from "../App";
+} from "../types";
 import PaletteModal from "./PaletteModal";
 
 interface PanelProps {

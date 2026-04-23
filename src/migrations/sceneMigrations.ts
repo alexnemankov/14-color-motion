@@ -1,4 +1,4 @@
-import type { AnimationType, ColorRgb, GradientParams, SceneState } from '../App';
+import type { AnimationType, ColorRgb, GradientParams, SceneState } from '../types';
 
 export const CURRENT_SCENE_VERSION = 2;
 

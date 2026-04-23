@@ -1,4 +1,4 @@
-import type { ColorRgb, GradientParams, RendererStatus } from '../App';
+import type { ColorRgb, GradientParams, RendererStatus } from '../types';
 
 export interface RendererProps {
   params: GradientParams;

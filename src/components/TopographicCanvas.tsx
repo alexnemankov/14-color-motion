@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
-import { ColorRgb, RendererStatus } from '../App';
+import { ColorRgb, RendererStatus } from '../types';
 import { cloneParams, stepSmoothedParams } from './rendererMotion';
 import { RendererHandle, RendererProps, captureCanvasImageData } from './rendererTypes';
 

@@ -1,4 +1,4 @@
-import { GradientParams } from '../App';
+import { GradientParams } from '../types';
 
 const SPRING_ALPHA = 0.08;
 

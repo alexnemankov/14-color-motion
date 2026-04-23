@@ -8,7 +8,7 @@ Color Motion Lab is a fullscreen generative motion app with a single active rend
 
 The shipped product currently includes:
 
-- twelve rendering modes
+- fourteen rendering modes
 - a floating desktop panel and mobile bottom-sheet UI
 - palette library browsing with favorites and recents
 - local preset storage and recent scene tracking
@@ -38,19 +38,33 @@ Rendering backends currently used in the codebase:
 
 ```text
 src/
-  App.tsx                       App state, orchestration, persistence, sharing, export
+  App.tsx                       Thin orchestrator (~280 lines); delegates to hooks and RendererHost
   main.tsx                      React entry point
   index.css                     Full visual system and responsive layout
-  data/
-    palettes.ts                 Curated palette library
+  types/
+    index.ts                    AnimationType, GradientParams, SceneState, ColorRgb, shared types
+  constants/
+    index.ts                    DEFAULT_COLORS/PARAMS, VALID_ANIMATION_TYPES, MODE_ENTRY_COLORS,
+                                storage keys, numeric limits, ONBOARDING_STEPS
+  utils/
+    colorUtils.ts               Color math: clamp, resample, interpolate, ease, rgb↔hex
+    sceneUtils.ts               Pure scene helpers: clone, label, randomize, normalize
+  services/
+    storageService.ts           localStorage read helpers (session, presets, recents, onboarding)
+    sharingService.ts           Base64url encode/decode, compact share scene serialization
   migrations/
     sceneMigrations.ts          Versioned scene persistence migration
+  hooks/
+    usePaletteTransition.ts     rAF-driven palette interpolation (easeInOutCubic, 1500ms)
+    useSceneManager.ts          Scene state + undo/redo history + mode crossfade transition
+    useExport.ts                PNG/WebM export pipeline, loop-safe recording, progress tracking
   workers/
     particlesWorker.ts          Background particle simulation
   components/
     Panel.tsx                   Main control surface
     PaletteModal.tsx            Palette library modal
     RendererBoundary.tsx        Renderer error boundary
+    RendererHost.tsx            Registry component: switch on animationType → correct canvas
     rendererTypes.ts            Shared renderer interfaces
     rendererMotion.ts           Shared parameter smoothing helpers
     LiquidCanvas.tsx            WebGL2 renderer, external time support
@@ -67,6 +81,10 @@ src/
     CloudsCanvas.tsx            WebGL2 volumetric ray-marched clouds, external time support
     SeaCanvas.tsx               WebGL2 height-field ocean, external time support
     PrismCanvas.tsx             WebGL2 UV-displacement prism, external time support
+    OctagramsCanvas.tsx         WebGL2 ray-marched octagram star fields, external time support
+    MetaballCanvas.tsx          WebGL1 raymarched SDF metaballs, external time support
+  data/
+    palettes.ts                 Curated palette library
 ```
 
 ## 4. Core Domain Model
@@ -89,6 +107,8 @@ src/
 - `clouds`
 - `sea`
 - `prism`
+- `octagrams`
+- `metaballs`
 
 `GradientParams`
 
@@ -116,6 +136,11 @@ Mode-specific:
 - `topoLineWidth` — contour line width (Topographic only)
 - `cloudType` — cloud formation 0–4 (Clouds only)
 - `godRays` — volumetric light shafts toggle (Clouds only)
+- `octagramType` — shape variant 0–3 (Octagrams only)
+- `octagramAltitude` — camera altitude 0–1 (Octagrams only)
+- `octagramDensity` — tile scale (Octagrams only)
+- `octagramTrails` — temporal accumulation toggle (Octagrams only)
+- `octagramColorCycle` — palette oscillation toggle (Octagrams only)
 
 `SceneState`
 
@@ -132,21 +157,18 @@ The application keeps one normalized scene model and lets each renderer interpre
 
 ## 5. App Responsibilities
 
-`src/App.tsx` is the system coordinator. Its responsibilities include:
+`src/App.tsx` is a thin orchestrator (~280 lines). Its logic has been distributed across dedicated hooks and services:
 
-- loading the initial scene from a share link or session storage
-- validating and migrating persisted scene data
-- maintaining active scene state and scene history
-- driving palette interpolation during palette changes
-- handling mode transition crossfades
-- injecting mode-specific default colors on mode switch (Noon palette for Clouds; Midday palette for Sea)
-- saving presets and recent scenes
-- copying share links to the clipboard
-- coordinating PNG and WebM export
-- driving deterministic loop-safe playback through `externalRenderTime`
-- showing toast, onboarding, dialog, and export status UI
+- **`useSceneManager`** — scene state + undo/redo history (limit 40) + mode crossfade transition + per-mode default palette injection (`MODE_ENTRY_COLORS`)
+- **`usePaletteTransition`** — rAF-driven palette interpolation with `easeInOutCubic` over 1500ms
+- **`useExport`** — PNG/WebM export pipeline, loop-safe recording, `externalRenderTime`, progress tracking, confetti on complete
+- **`storageService`** — localStorage reads for session, presets, recents, onboarding
+- **`sharingService`** — compact Base64url scene encode/decode
+- **`RendererHost`** — registry component: `switch (animationType)` returns the correct canvas component
 
-Important constants in the current implementation:
+`App.tsx` itself handles: initial scene bootstrap (share URL → session → default), toast UI, onboarding flow, save-preset dialog, keyboard shortcuts dialog, and wiring the above hooks together.
+
+Important constants (in `src/constants/index.ts`):
 
 - history limit: `40`
 - palette transition duration: `1500ms`
@@ -211,7 +233,7 @@ This smoothing is used inside render loops so parameter edits feel continuous in
 
 ### Deterministic renderers (support loop-safe export)
 
-`LiquidCanvas`, `WavesCanvas`, `VoronoiCanvas`, `BlobsCanvas`, `ThreeJSCanvas`, `CloudsCanvas`, `SeaCanvas`, `PrismCanvas`:
+`LiquidCanvas`, `WavesCanvas`, `VoronoiCanvas`, `BlobsCanvas`, `ThreeJSCanvas`, `CloudsCanvas`, `SeaCanvas`, `PrismCanvas`, `OctagramsCanvas`, `MetaballCanvas`:
 
 - render to fullscreen canvas elements
 - support parameter smoothing via `rendererMotion`
@@ -319,6 +341,37 @@ Turing does not support `externalTime` or loop-safe export because it is simulat
 **Panel integration:**
 - Sea Mood section: 4 preset buttons (Midday, Sunset, Tropic, Storm) each calling `setColors([...])` with a full 4-color palette
 - Entering Sea mode via `startModeTransition` auto-applies the Midday palette
+
+### Metaballs renderer
+
+`MetaballCanvas` is a WebGL1 raymarched SDF metaball renderer. Key design points:
+
+**Shader:**
+- 16 independently animated spheres, each with randomized phase offsets derived from `uSeed`
+- `opSmoothUnion(d1, d2, k)` blends all spheres with a single smoothness parameter (`uSmoothK`)
+- `mapScene()` is bounded-loop (static `int i < 16`) for GLSL ES 1.0 compatibility
+- Tetrahedron normal estimation: 4 `mapScene` calls × epsilon offset (no finite-difference axes)
+- Lighting: diffuse `dot(n, vec3(0.577))` + specular `pow(b, 4.0) * uBlend`; background fog via `exp(-depth * 3.0 / uScale)`
+- Two-program pipeline: march program renders to half-res FBO; blit program upscales with `LINEAR` filter
+
+**Palette mapping (colors[0..3]):**
+- `colors[0]` → shadow/dark side of blobs
+- `colors[1]` → lit surface (diffuse highlight)
+- `colors[2]` → specular glare (scaled by `blend`)
+- `colors[3]` → background fog color
+
+**GradientParams mapping:**
+- `speed` → animation speed (time multiplier)
+- `scale` → view extent (`viewScale = 3.0 + scale * 6.43`)
+- `amplitude` → blob spread radius (`× 2.0`)
+- `frequency` → individual sphere motion rate (`× 1.5`)
+- `definition` → smoothK blending radius (`0.15 + (definition-1)/11 * 1.35`)
+- `blend` → specular intensity
+- `seed` → per-sphere phase and size variation
+
+**Panel integration:**
+- 4 presets: Plasma, Magma, Abyss, Pearl
+- Entering Metaballs mode via `startModeTransition` auto-applies the Plasma palette
 
 ### Volumetric renderer performance architecture
 
@@ -457,7 +510,7 @@ When starting a new WebGL2 volumetric renderer, apply these four in order — ea
 `src/components/Panel.tsx` is the main workspace surface. It contains:
 
 - workflow tools
-- mode selection via a compact trigger button (same style as the Palette Library button) that opens a modal with a 3-column card grid of all 12 modes (icon + name + description per card)
+- mode selection via a compact trigger button (same style as the Palette Library button) that opens a modal with a 3-column card grid of all 14 modes (icon + name + description per card)
 - palette editing
 - motion and structure controls
 - mode-specific sections:
@@ -472,7 +525,7 @@ When starting a new WebGL2 volumetric renderer, apply these four in order — ea
 - recent scene browsing
 - transport controls
 
-The mode switcher is a single trigger button (identical style to the Palette Library button) that displays the current mode's name and description. Clicking it opens a portal modal with a 3-column card grid of all 12 modes. Each card shows an icon, short name, and one-line description. The active mode is highlighted with the accent color. Clicking a card selects the mode and closes the modal; clicking the overlay or the × button dismisses it without a selection change.
+The mode switcher is a single trigger button (identical style to the Palette Library button) that displays the current mode's name and description. Clicking it opens a portal modal with a 3-column card grid of all 14 modes. Each card shows an icon, short name, and one-line description. The active mode is highlighted with the accent color. Clicking a card selects the mode and closes the modal; clicking the overlay or the × button dismisses it without a selection change.
 
 Current workflow features exposed in the panel:
 
@@ -519,7 +572,7 @@ The export system is entirely browser-side.
 
 - `MediaRecorder`-based WebM capture
 - standard `5s` and `10s` recordings
-- loop-safe recording for deterministic renderers (liquid, waves, voronoi, blobs, three, clouds, sea, prism)
+- loop-safe recording for deterministic renderers (liquid, waves, voronoi, blobs, three, clouds, sea, prism, octagrams, metaballs)
 - progress state transitions through `preparing`, `recording`, `encoding`, and `complete`
 - progress arc and frame counter UI in the panel
 
@@ -575,7 +628,9 @@ Several features previously listed as future improvements are already implemente
 - volumetric cloud renderer with 5 cloud types, sky mood presets, god rays, and drag-to-orbit camera
 - WebGL2 height-field sea renderer with sea mood presets and drag-to-orbit camera
 - WebGL2 UV-displacement prism renderer with chromatic channel separation and prism mood presets
-- modal-based mode switcher (trigger button + 3-column card grid) for all 12 modes
+- modal-based mode switcher (trigger button + 3-column card grid) for all 14 modes
+- WebGL1 raymarched metaball renderer with smooth-union SDF blending
+- layered App architecture: types/, constants/, utils/, services/, hooks/ — App.tsx reduced to ~280 lines
 
 Not implemented in the current codebase:
 

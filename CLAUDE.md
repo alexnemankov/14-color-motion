@@ -81,9 +81,9 @@ No test or lint scripts are configured.
 
 ### Core Components
 
-- **[App.tsx](src/App.tsx)** — Main orchestrator. Manages scene state, localStorage persistence, URL share encoding, undo/redo history, randomization, and export workflows. The `GradientParams` object is the single unified parameter set passed to all renderers. When switching to `"clouds"` mode, `startModeTransition` automatically applies a Noon sky palette; switching to `"sea"` applies a Midday ocean palette.
+- **[App.tsx](src/App.tsx)** — Thin orchestrator (~280 lines). Wires together `useSceneManager`, `usePaletteTransition`, and `useExport` hooks; handles toast/onboarding/dialog UI. Scene state, history, export, and palette interpolation have moved to dedicated hooks under `src/hooks/`. Pure helpers live in `src/utils/` and `src/services/`. Types are canonical in `src/types/index.ts`; constants in `src/constants/index.ts`. The `GradientParams` object is the single unified parameter set passed to all renderers. When switching to `"clouds"` mode, `startModeTransition` automatically applies a Noon sky palette; switching to `"sea"` applies a Midday ocean palette; switching to `"metaballs"` applies a Plasma palette.
 
-- **[Panel.tsx](src/components/Panel.tsx)** — Control panel. All parameter controls, palette selection, preset management, recording/export UI, and compact vs. advanced view modes. Mode switcher is a compact trigger button (same style as Palette Library) that opens a modal with a 3-column card grid for all 12 modes. Mode-specific sections: `topoLineWidth` for Topographic; **Cloud Type** selector (5 formations), **Sky Mood** presets (Noon/Dusk/Dawn/Storm), and **God Rays** toggle for Clouds; **Sea Mood** presets (Midday/Sunset/Tropic/Storm) for Sea; **Prism Mood** presets (Spectral/Neon/Plasma/Void) for Prism.
+- **[Panel.tsx](src/components/Panel.tsx)** — Control panel. All parameter controls, palette selection, preset management, recording/export UI, and compact vs. advanced view modes. Mode switcher is a compact trigger button (same style as Palette Library) that opens a modal with a 3-column card grid for all 14 modes. Mode-specific sections: `topoLineWidth` for Topographic; **Cloud Type** selector (5 formations), **Sky Mood** presets (Noon/Dusk/Dawn/Storm), and **God Rays** toggle for Clouds; **Sea Mood** presets (Midday/Sunset/Tropic/Storm) for Sea; **Prism Mood** presets (Spectral/Neon/Plasma/Void) for Prism; **Metaball Presets** (Plasma/Magma/Abyss/Pearl) for Metaballs.
 
 - **[PaletteModal.tsx](src/components/PaletteModal.tsx)** — Palette browser with 67 curated palettes (defined in [palettes.ts](src/data/palettes.ts)), search, tag filters, and localStorage-backed favorites.
 
@@ -105,6 +105,8 @@ Eleven renderers each implement the `RendererHandle` interface from [rendererTyp
 | `CloudsCanvas`      | Volumetric ray-marched sky                       | WebGL2                   |
 | `SeaCanvas`         | Height-field ocean                               | WebGL2                   |
 | `PrismCanvas`       | UV-displacement prism                            | WebGL2                   |
+| `OctagramsCanvas`   | Ray-marched octagram star fields                 | WebGL2                   |
+| `MetaballCanvas`    | Raymarched SDF metaballs                         | WebGL1                   |
 
 The `RendererHandle` interface requires: `status`, `supportsExternalTime`, `supportsLoopSafeExport`, `getCanvas()`, `captureFrame()`. Renderers are wrapped in `RendererBoundary` for error isolation.
 
@@ -129,9 +131,14 @@ All renderers share a single `GradientParams` object. Most fields are universal;
 | `aperture`      | number  | DOF aperture (Three only)             |
 | `maxBlur`       | number  | DOF max blur (Three only)             |
 | `dofEnabled`    | boolean | DOF toggle (Three only)               |
-| `topoLineWidth` | number  | Contour line width (Topographic only) |
-| `cloudType`     | number  | 0–4 cloud formation (Clouds only)     |
-| `godRays`       | boolean | Volumetric light shafts (Clouds only) |
+| `topoLineWidth`       | number  | Contour line width (Topographic only)        |
+| `cloudType`           | number  | 0–4 cloud formation (Clouds only)            |
+| `godRays`             | boolean | Volumetric light shafts (Clouds only)        |
+| `octagramType`        | number  | 0–3 shape variant (Octagrams only)           |
+| `octagramAltitude`    | number  | Camera altitude 0–1 (Octagrams only)         |
+| `octagramDensity`     | number  | Tile scale (Octagrams only)                  |
+| `octagramTrails`      | boolean | Temporal accumulation toggle (Octagrams only)|
+| `octagramColorCycle`  | boolean | Palette oscillation toggle (Octagrams only)  |
 
 ### CloudsCanvas Details
 
@@ -170,6 +177,20 @@ All renderers share a single `GradientParams` object. Most fields are universal;
 - **`blend`** desaturates toward luminance (controls color purity / saturation)
 - **Prism Mood presets** in Panel (Spectral, Neon, Plasma, Void); entering Prism mode auto-applies Spectral palette
 
+### MetaballCanvas Details
+
+`MetaballCanvas` is a WebGL1 raymarched SDF metaball renderer with:
+
+- **16 animated spheres** with randomized phase/size from `uSeed`; orbits driven by `sin(t + i*vec3(...))` so each sphere traces a Lissajous-like path
+- **Smooth-union blending**: `opSmoothUnion(d1, d2, k)` — all spheres blended with a single `uSmoothK` value
+- **Tetrahedron normals**: 4 `mapScene` calls at epsilon offsets (avoids aligned finite-difference artifacts)
+- **Two-program pipeline**: march program renders to half-res FBO; blit program upscales with bilinear filter
+- **Palette mapping**: `colors[0]` → shadow, `colors[1]` → lit surface, `colors[2]` → specular glare, `colors[3]` → background fog
+- **`definition` → `smoothK`**: `0.15 + ((definition-1)/11) * 1.35` — low = sharp boundaries, high = fully merged blobs
+- **`scale` → `viewScale`**: `3.0 + scale * 6.43` — controls ray origin spread (zoom)
+- **Metaball Presets** in Panel (Plasma/Magma/Abyss/Pearl); entering Metaballs mode auto-applies Plasma palette
+- WebGL1 (not WebGL2) for maximum device compatibility; `preserveDrawingBuffer: true` for PNG export
+
 ### State & Persistence
 
 - Scene state is persisted to localStorage (`color-motion-session`) as versioned JSON payloads.
@@ -183,7 +204,7 @@ Exports go through phases tracked in App.tsx: `idle → preparing → capturing 
 
 - **PNG**: 1× and 2× resolution.
 - **WebM video**: 5s or 10s real-time recording, OR loop-safe deterministic export (for renderers where `supportsLoopSafeExport` is true, driven by external time steps).
-- Loop-safe export is supported by: `liquid`, `waves`, `voronoi`, `blobs`, `three`, `clouds`, `sea`, `prism`.
+- Loop-safe export is supported by: `liquid`, `waves`, `voronoi`, `blobs`, `three`, `clouds`, `sea`, `prism`, `octagrams`, `metaballs`.
 - `ParticlesCanvas` uses a Web Worker ([particlesWorker.ts](src/workers/particlesWorker.ts)) for simulation; coordinate with the worker protocol when touching particle logic.
 
 ### Key Dependencies
