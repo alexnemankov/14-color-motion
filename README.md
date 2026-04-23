@@ -80,7 +80,7 @@ Color Motion Lab is a browser-based motion design playground for building animat
   - PNG export
   - 2x PNG export
   - 5s and 10s WebM recording
-  - loop-safe WebM export for deterministic renderers (liquid, waves, voronoi, blobs, three, clouds, sea, prism, octagrams, metaballs)
+  - loop-safe WebM export for deterministic renderers (liquid, waves, voronoi, blobs, three, topographic, neondrip, clouds, sea, prism, octagrams, metaballs)
   - compact shareable URLs with encoded scene state
 - UX:
   - first-run onboarding
@@ -106,7 +106,7 @@ Shortcuts are ignored while typing in editable fields.
 
 ## Renderer Notes
 
-- `liquid`, `waves`, `voronoi`, `blobs`, `three`, `clouds`, `sea`, `prism`, `octagrams`, and `metaballs` support deterministic `externalTime` playback and loop-safe export.
+- `liquid`, `waves`, `voronoi`, `blobs`, `three`, `topographic`, `neondrip`, `clouds`, `sea`, `prism`, `octagrams`, and `metaballs` support deterministic `externalTime` playback and loop-safe export.
 - `particles` runs its simulation in a Web Worker.
 - `turing` prefers WebGPU when available and falls back to WebGL2.
 - `clouds` uses a WebGL2 volumetric ray-marcher with procedural gradient noise and a drag-to-orbit camera.

@@ -4,9 +4,9 @@ import type { AnimationType, ColorRgb, GradientParams, SceneState } from '../typ
 import {
   DEFAULT_PARAMS,
   DEFAULT_COLORS,
-  MODE_ENTRY_COLORS,
   HISTORY_LIMIT,
 } from '../constants';
+import { MODES } from '../config/modes';
 import { cloneScene, sceneKey } from '../utils/sceneUtils';
 import type { RendererHandle } from '../components/rendererTypes';
 
@@ -71,7 +71,7 @@ export function useSceneManager(
 
     setAnimationType(nextType);
 
-    const entryColors = MODE_ENTRY_COLORS[nextType];
+    const entryColors = MODES[nextType].entryColors;
     if (entryColors) setColors(entryColors);
   }, [animationType, rendererRef]); // eslint-disable-line react-hooks/exhaustive-deps
 

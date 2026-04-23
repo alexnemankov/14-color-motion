@@ -1,5 +1,6 @@
 import type { AnimationType, ColorRgb, GradientParams, SceneState, WorkflowLocks } from '../types';
 import { DEFAULT_PARAMS, VALID_ANIMATION_TYPES } from '../constants';
+import { MODES } from '../config/modes';
 import { PALETTES } from '../data/palettes';
 import {
   migratePersistedScene,
@@ -22,34 +23,11 @@ export function sceneKey(scene: SceneState): string {
 }
 
 export function animationTypeLabel(type: AnimationType): string {
-  return {
-    liquid: "Liquid",
-    waves: "Waves",
-    voronoi: "Voronoi",
-    turing: "Turing",
-    particles: "Particles",
-    blobs: "Blobs",
-    three: "3D Mesh",
-    topographic: "Topographic",
-    neondrip: "Neon Drip",
-    clouds: "Clouds",
-    sea: "Sea",
-    prism: "Prism",
-    octagrams: "Octagrams",
-    metaballs: "Metaballs",
-  }[type];
+  return MODES[type].label;
 }
 
 export function supportsLoopSafeExport(type: AnimationType): boolean {
-  return (
-    type === "liquid" ||
-    type === "waves" ||
-    type === "voronoi" ||
-    type === "blobs" ||
-    type === "three" ||
-    type === "clouds" ||
-    type === "metaballs"
-  );
+  return MODES[type].supportsLoopSafeExport;
 }
 
 export function randomBetween(min: number, max: number, precision = 2): number {

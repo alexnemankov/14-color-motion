@@ -44,8 +44,12 @@ src/
   types/
     index.ts                    AnimationType, GradientParams, SceneState, ColorRgb, shared types
   constants/
-    index.ts                    DEFAULT_COLORS/PARAMS, VALID_ANIMATION_TYPES, MODE_ENTRY_COLORS,
+    index.ts                    DEFAULT_COLORS/PARAMS, VALID_ANIMATION_TYPES,
                                 storage keys, numeric limits, ONBOARDING_STEPS
+  config/
+    modes.ts                    Mode registry: Record<AnimationType, ModeDefinition> — icons,
+                                labels, descriptions, paramLabels, entryColors, presets,
+                                supportsExternalTime, supportsLoopSafeExport for all 14 modes
   utils/
     colorUtils.ts               Color math: clamp, resample, interpolate, ease, rgb↔hex
     sceneUtils.ts               Pure scene helpers: clone, label, randomize, normalize
@@ -159,7 +163,7 @@ The application keeps one normalized scene model and lets each renderer interpre
 
 `src/App.tsx` is a thin orchestrator (~280 lines). Its logic has been distributed across dedicated hooks and services:
 
-- **`useSceneManager`** — scene state + undo/redo history (limit 40) + mode crossfade transition + per-mode default palette injection (`MODE_ENTRY_COLORS`)
+- **`useSceneManager`** — scene state + undo/redo history (limit 40) + mode crossfade transition + per-mode default palette injection (reads `MODES[type].entryColors` from the mode registry)
 - **`usePaletteTransition`** — rAF-driven palette interpolation with `easeInOutCubic` over 1500ms
 - **`useExport`** — PNG/WebM export pipeline, loop-safe recording, `externalRenderTime`, progress tracking, confetti on complete
 - **`storageService`** — localStorage reads for session, presets, recents, onboarding
@@ -233,7 +237,7 @@ This smoothing is used inside render loops so parameter edits feel continuous in
 
 ### Deterministic renderers (support loop-safe export)
 
-`LiquidCanvas`, `WavesCanvas`, `VoronoiCanvas`, `BlobsCanvas`, `ThreeJSCanvas`, `CloudsCanvas`, `SeaCanvas`, `PrismCanvas`, `OctagramsCanvas`, `MetaballCanvas`:
+`LiquidCanvas`, `WavesCanvas`, `VoronoiCanvas`, `BlobsCanvas`, `ThreeJSCanvas`, `TopographicCanvas`, `NeonDripCanvas`, `CloudsCanvas`, `SeaCanvas`, `PrismCanvas`, `OctagramsCanvas`, `MetaballCanvas`:
 
 - render to fullscreen canvas elements
 - support parameter smoothing via `rendererMotion`
@@ -518,6 +522,9 @@ When starting a new WebGL2 volumetric renderer, apply these four in order — ea
   - Clouds: cloud type selector (5 formations) and Sky Mood presets (Noon, Dusk, Dawn, Storm)
   - Sea: Sea Mood presets (Midday, Sunset, Tropic, Storm)
   - Prism: Prism Mood presets (Spectral, Neon, Plasma, Void)
+  - Octagrams: Octagram Presets (Orbital, Inferno, Quantum, Ghost) + altitude/density sliders + trails/colorCycle toggles
+  - Metaballs: Metaball Presets (Plasma, Magma, Abyss, Pearl)
+  - Preset sections for all modes above are data-driven from `MODES[animationType].presets` (single JSX block; no per-mode copy-paste)
 - workspace actions
 - export controls
 - reset actions
@@ -572,7 +579,7 @@ The export system is entirely browser-side.
 
 - `MediaRecorder`-based WebM capture
 - standard `5s` and `10s` recordings
-- loop-safe recording for deterministic renderers (liquid, waves, voronoi, blobs, three, clouds, sea, prism, octagrams, metaballs)
+- loop-safe recording for deterministic renderers (liquid, waves, voronoi, blobs, three, topographic, neondrip, clouds, sea, prism, octagrams, metaballs)
 - progress state transitions through `preparing`, `recording`, `encoding`, and `complete`
 - progress arc and frame counter UI in the panel
 
@@ -630,7 +637,8 @@ Several features previously listed as future improvements are already implemente
 - WebGL2 UV-displacement prism renderer with chromatic channel separation and prism mood presets
 - modal-based mode switcher (trigger button + 3-column card grid) for all 14 modes
 - WebGL1 raymarched metaball renderer with smooth-union SDF blending
-- layered App architecture: types/, constants/, utils/, services/, hooks/ — App.tsx reduced to ~280 lines
+- layered App architecture: types/, constants/, config/, utils/, services/, hooks/ — App.tsx reduced to ~280 lines
+- Mode Registry (`src/config/modes.ts`): `Record<AnimationType, ModeDefinition>` centralizes all mode metadata (icons, labels, descriptions, paramLabels, entryColors, presets, supportsExternalTime/LoopSafeExport) — adding a new mode requires only one registry entry + one RendererHost switch case
 
 Not implemented in the current codebase:
 

@@ -48,39 +48,6 @@ export const VALID_ANIMATION_TYPES: AnimationType[] = [
   "metaballs",
 ];
 
-// Colors applied automatically when switching to specific modes
-export const MODE_ENTRY_COLORS: Partial<Record<AnimationType, ColorRgb[]>> = {
-  clouds: [
-    [100, 168, 210],
-    [245, 240, 232],
-    [255, 195, 100],
-    [160, 172, 185],
-  ],
-  sea: [
-    [0, 23, 46],
-    [122, 138, 92],
-    [100, 168, 210],
-    [255, 195, 100],
-  ],
-  prism: [
-    [255, 30, 30],
-    [30, 255, 30],
-    [30, 30, 255],
-    [0, 0, 0],
-  ],
-  octagrams: [
-    [30, 200, 255],
-    [180, 0, 255],
-    [255, 200, 50],
-    [5, 0, 20],
-  ],
-  metaballs: [
-    [180, 0, 255],
-    [0, 200, 255],
-    [255, 255, 255],
-    [5, 0, 20],
-  ],
-};
 
 export const SESSION_STORAGE_KEY = "color-motion-session";
 export const PRESETS_STORAGE_KEY = "color-motion-presets";

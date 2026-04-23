@@ -3,35 +3,22 @@ import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
 import {
   ArrowCounterClockwise,
-  Atom,
-  Boat,
   CaretDown,
   CaretRight,
   ClockCounterClockwise,
-  Cloud,
   CornersOut,
-  Cube,
-  Drop,
   EyeSlash,
-  Gradient,
-  Hexagon,
   Lock,
   LockOpen,
-  ChartLineIcon,
-  Flame,
   Palette,
   PlayPause,
   Plus,
   Question,
-  ShareNetwork,
   Shuffle,
   Trash,
-  Waves,
-  Diamond,
-  Octagon,
-  CirclesFourIcon,
   X,
 } from "@phosphor-icons/react";
+import { MODES } from "../config/modes";
 import { HexColorPicker } from "react-colorful";
 import {
   AnimationType,
@@ -41,6 +28,7 @@ import {
   SavedPreset,
   WorkflowLocks,
 } from "../types";
+import { VALID_ANIMATION_TYPES } from "../constants";
 import PaletteModal from "./PaletteModal";
 
 interface PanelProps {
@@ -130,85 +118,6 @@ const LOCK_LABELS: Record<keyof WorkflowLocks, string> = {
   motion: "Lock motion",
 };
 
-const MODES = [
-  { id: "liquid"      as const, Icon: Drop,          label: "Fluid"     },
-  { id: "waves"       as const, Icon: Waves,         label: "Waves"     },
-  { id: "voronoi"     as const, Icon: Hexagon,       label: "Voronoi"   },
-  { id: "turing"      as const, Icon: Atom,          label: "Turing"    },
-  { id: "particles"   as const, Icon: ShareNetwork,  label: "Particles" },
-  { id: "blobs"       as const, Icon: Gradient,      label: "Blobs"     },
-  { id: "three"       as const, Icon: Cube,          label: "3D Mesh"   },
-  { id: "topographic" as const, Icon: ChartLineIcon, label: "Topo"      },
-  { id: "neondrip"    as const, Icon: Flame,         label: "Neon Drip" },
-  { id: "clouds"      as const, Icon: Cloud,         label: "Clouds"    },
-  { id: "sea"         as const, Icon: Boat,          label: "Sea"       },
-  { id: "prism"       as const, Icon: Diamond,       label: "Prism"     },
-  { id: "octagrams"   as const, Icon: Octagon,           label: "Octagrams" },
-  { id: "metaballs"   as const, Icon: CirclesFourIcon,   label: "Metaballs" },
-];
-
-const MODE_DETAILS: Record<
-  AnimationType,
-  { name: string; description: string }
-> = {
-  liquid: {
-    name: "Fluid FBM",
-    description: "Organic flow with soft warped noise.",
-  },
-  waves: {
-    name: "Interference Waves",
-    description: "Layered wave bands with shifting interference.",
-  },
-  voronoi: {
-    name: "Cellular Voronoi",
-    description: "Drifting cells that break into crisp structures.",
-  },
-  turing: {
-    name: "Reaction-Diffusion",
-    description: "Living spots and stripes from reaction-diffusion.",
-  },
-  particles: {
-    name: "Particle Web",
-    description: "Moving nodes that form a reactive network.",
-  },
-  blobs: {
-    name: "Molten Blobs",
-    description: "Soft overlapping masses with molten depth.",
-  },
-  three: {
-    name: "3D Mesh",
-    description:
-      "Volumetric 3D surface with soft camera orbit and shader palette.",
-  },
-  topographic: {
-    name: "Topographic",
-    description: "Animated contour lines from a flowing noise field.",
-  },
-  neondrip: {
-    name: "Neon Drip",
-    description: "Metaball blobs rising upward through neon-lit liquid.",
-  },
-  clouds: {
-    name: "Clouds",
-    description: "Volumetric ray-marched sky with five switchable cloud types.",
-  },
-  sea: {
-    name: "Sea",
-    description: "Procedural height-field ocean with realistic wave shading.",
-  },
-  prism: {
-    name: "Prism",
-    description: "UV-displacement light prism with chromatic RGB channel separation.",
-  },
-  octagrams: {
-    name: "Octagrams",
-    description: "Ray-marched tiled star fields with chromatic glow and shape variants.",
-  },
-  metaballs: {
-    name: "Raymarched Metaballs",
-    description: "Organic blobs sculpted from smooth-union sphere fields.",
-  },
-};
 
 const ColorRow = ({
   rgb,
@@ -461,7 +370,7 @@ export default function Panel({
     </div>
   );
 
-  const formatAnimationType = (type: AnimationType) => MODE_DETAILS[type].name;
+  const formatAnimationType = (type: AnimationType) => MODES[type].name;
 
   const filteredSavedPresets = useMemo(() => {
     const normalizedSearch = savedSearch.trim().toLowerCase();
@@ -488,172 +397,7 @@ export default function Panel({
       });
   }, [savedMode, savedSearch, savedSort, savedPresets]);
 
-  const labels = {
-    liquid: {
-      seed: "Seed",
-      speed: "Speed",
-      scale: "Scale",
-      amplitude: "Amplitude",
-      frequency: "Frequency",
-      definition: "Definition",
-      blend: "Blend",
-      topoLineWidth: "",
-      cloudType: "",
-    },
-    waves: {
-      seed: "Seed",
-      speed: "Phase Speed",
-      scale: "Zoom",
-      amplitude: "Phase Velocity",
-      frequency: "Base Freq",
-      definition: "Sources",
-      blend: "Sharpness",
-      topoLineWidth: "",
-      cloudType: "",
-    },
-    voronoi: {
-      seed: "Seed",
-      speed: "Global Speed",
-      scale: "Zoom",
-      amplitude: "Drift Rate",
-      frequency: "Cell Density",
-      definition: "Morph",
-      blend: "Contrast",
-      topoLineWidth: "",
-      cloudType: "",
-    },
-    turing: {
-      seed: "Reset Sim",
-      speed: "Sim Speed",
-      scale: "Zoom",
-      amplitude: "Feed Factor",
-      frequency: "Kill Factor",
-      definition: "Diffusion",
-      blend: "Contrast",
-      topoLineWidth: "",
-      cloudType: "",
-    },
-    particles: {
-      seed: "Reseed",
-      speed: "Velocity",
-      scale: "Zoom",
-      amplitude: "Link Dist",
-      frequency: "Wander Freq",
-      definition: "Count",
-      blend: "Opacity",
-      topoLineWidth: "",
-      cloudType: "",
-    },
-    blobs: {
-      seed: "Flux Seed",
-      speed: "Flow Speed",
-      scale: "Blob InvScale",
-      amplitude: "Wander Amp",
-      frequency: "Blob Count",
-      definition: "Sharpness",
-      blend: "Color Blend",
-      topoLineWidth: "",
-      cloudType: "",
-    },
-    three: {
-      seed: "Seed",
-      speed: "Orbit Speed",
-      scale: "Mesh Scale",
-      amplitude: "Height Amp",
-      frequency: "Noise Freq",
-      definition: "Detail",
-      blend: "Blend Edge",
-      morphSpeed: "Shift Speed",
-      morphAmount: "Shift Height",
-      focusDistance: "Focus Dist",
-      aperture: "Aperture",
-      maxBlur: "Max Blur",
-      topoLineWidth: "",
-      cloudType: "",
-    },
-    topographic: {
-      seed: "Seed",
-      speed: "Anim Speed",
-      scale: "Cell Size",
-      amplitude: "Detail",
-      frequency: "Noise Density",
-      definition: "Contour Count",
-      blend: "Line Opacity",
-      topoLineWidth: "Line Width",
-      cloudType: "",
-    },
-    neondrip: {
-      seed: "Seed",
-      speed: "Drip Speed",
-      scale: "Zoom",
-      amplitude: "Wobble",
-      frequency: "Tendrils",
-      definition: "Blob Count",
-      blend: "Glow",
-      topoLineWidth: "",
-      cloudType: "",
-    },
-    clouds: {
-      seed: "Seed",
-      speed: "Drift Speed",
-      scale: "Coverage",
-      amplitude: "Detail Amp",
-      frequency: "Frequency",
-      definition: "Octaves",
-      blend: "Shadow Soft",
-      topoLineWidth: "",
-      cloudType: "",
-    },
-    sea: {
-      seed: "Seed",
-      speed: "Wave Speed",
-      scale: "Scale",
-      amplitude: "Wave Height",
-      frequency: "Frequency",
-      definition: "Wave Detail",
-      blend: "Choppiness",
-      topoLineWidth: "",
-      cloudType: "",
-    },
-    prism: {
-      seed: "Seed",
-      speed: "Speed",
-      scale: "UV Scale",
-      amplitude: "Warp Strength",
-      frequency: "Ripple Freq",
-      definition: "Chroma Spread",
-      blend: "Saturation",
-      topoLineWidth: "",
-      cloudType: "",
-    },
-    octagrams: {
-      seed: "Seed",
-      speed: "Speed",
-      scale: "Perspective",
-      amplitude: "Oscillation",
-      frequency: "Spin Speed",
-      definition: "March Quality",
-      blend: "Glow",
-      topoLineWidth: "",
-      cloudType: "",
-      octagramAltitude: "Altitude",
-      octagramDensity: "Tile Scale",
-    },
-    metaballs: {
-      seed: "Seed",
-      speed: "Speed",
-      scale: "View Zoom",
-      amplitude: "Blob Spread",
-      frequency: "Motion Rate",
-      definition: "Merge Radius",
-      blend: "Specular",
-      topoLineWidth: "",
-      cloudType: "",
-    },
-  }[animationType] ?? {
-    seed: "Seed", speed: "Speed", scale: "Scale", amplitude: "Amplitude",
-    frequency: "Frequency", definition: "Definition", blend: "Blend", topoLineWidth: "",
-  };
+  const labels = MODES[animationType].paramLabels;
 
   const renderOnboardingCard = (stepIndex: number) => {
     if (onboardingStep !== stepIndex) return null;
@@ -808,10 +552,10 @@ export default function Panel({
           className="open-library-btn"
           onClick={() => setIsModeModalOpen(true)}
         >
-          {(() => { const m = MODES.find(m => m.id === animationType); return m ? <m.Icon size={16} weight="fill" /> : null; })()}
+          {(() => { const Icon = MODES[animationType].icon; return <Icon size={16} weight="fill" />; })()}
           <div className="library-btn-text">
-            <span>{MODE_DETAILS[animationType].name}</span>
-            <small>{MODE_DETAILS[animationType].description}</small>
+            <span>{MODES[animationType].name}</span>
+            <small>{MODES[animationType].description}</small>
           </div>
         </button>
 
@@ -835,17 +579,21 @@ export default function Panel({
                 </button>
               </div>
               <div className="mode-modal-grid">
-                {MODES.map(({ id, Icon, label }) => (
-                  <button
-                    key={id}
-                    className={`mode-modal-card ${animationType === id ? "active" : ""}`}
-                    onClick={() => { setAnimationType(id); setIsModeModalOpen(false); }}
-                  >
-                    <Icon size={20} weight={animationType === id ? "fill" : "bold"} />
-                    <strong>{label}</strong>
-                    <span>{MODE_DETAILS[id].description}</span>
-                  </button>
-                ))}
+                {VALID_ANIMATION_TYPES.map((id) => {
+                  const mode = MODES[id];
+                  const Icon = mode.icon;
+                  return (
+                    <button
+                      key={id}
+                      className={`mode-modal-card ${animationType === id ? "active" : ""}`}
+                      onClick={() => { setAnimationType(id); setIsModeModalOpen(false); }}
+                    >
+                      <Icon size={20} weight={animationType === id ? "fill" : "bold"} />
+                      <strong>{mode.label}</strong>
+                      <span>{mode.description}</span>
+                    </button>
+                  );
+                })}
               </div>
             </motion.div>
           </div>,
@@ -1010,309 +758,32 @@ export default function Panel({
         </div>
       )}
 
-      {animationType === "clouds" && (
+      {MODES[animationType].presets && (
         <div className="panel-section">
-          <span className="section-label">Sky Mood</span>
-          <div className="section-copy">
-            Load a palette tuned for this lighting condition.
-          </div>
+          <span className="section-label">{MODES[animationType].presetsLabel}</span>
+          <div className="section-copy">{MODES[animationType].presetsDescription}</div>
           <div className="cloud-mood-selector">
-            {(
-              [
-                {
-                  label: "Noon",
-                  sub: "clear blue sky",
-                  colors: [
-                    [100, 168, 210] as ColorRgb,
-                    [245, 240, 232] as ColorRgb,
-                    [255, 195, 100] as ColorRgb,
-                    [160, 172, 185] as ColorRgb,
-                  ],
-                },
-                {
-                  label: "Dusk",
-                  sub: "golden hour",
-                  colors: [
-                    [80, 100, 160] as ColorRgb,
-                    [255, 200, 160] as ColorRgb,
-                    [255, 110, 50] as ColorRgb,
-                    [55, 45, 80] as ColorRgb,
-                  ],
-                },
-                {
-                  label: "Dawn",
-                  sub: "soft morning glow",
-                  colors: [
-                    [230, 140, 110] as ColorRgb,
-                    [255, 225, 205] as ColorRgb,
-                    [255, 190, 130] as ColorRgb,
-                    [170, 105, 90] as ColorRgb,
-                  ],
-                },
-                {
-                  label: "Storm",
-                  sub: "overcast, heavy",
-                  colors: [
-                    [55, 65, 78] as ColorRgb,
-                    [110, 118, 128] as ColorRgb,
-                    [90, 105, 115] as ColorRgb,
-                    [35, 40, 48] as ColorRgb,
-                  ],
-                },
-              ]
-            ).map(({ label, sub, colors }) => (
+            {MODES[animationType].presets!.map(({ name, sub, colors: c, params: p }) => (
               <button
-                key={label}
-                type="button"
-                className="cloud-mood-btn"
-                onClick={() => setColors(colors)}
-              >
-                <div
-                  className="cloud-mood-swatch"
-                  style={{
-                    background: `linear-gradient(135deg,
-                      rgb(${colors[0].join(",")}) 0%,
-                      rgb(${colors[1].join(",")}) 50%,
-                      rgb(${colors[2].join(",")}) 100%)`,
-                  }}
-                />
-                <div className="cloud-mood-text">
-                  <strong>{label}</strong>
-                  <span>{sub}</span>
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {animationType === "sea" && (
-        <div className="panel-section">
-          <span className="section-label">Sea Mood</span>
-          <div className="section-copy">
-            Load a palette tuned for this lighting condition.
-          </div>
-          <div className="cloud-mood-selector">
-            {(
-              [
-                {
-                  label: "Midday",
-                  sub: "bright tropical",
-                  colors: [
-                    [0, 23, 46] as ColorRgb,
-                    [122, 138, 92] as ColorRgb,
-                    [100, 168, 210] as ColorRgb,
-                    [255, 195, 100] as ColorRgb,
-                  ],
-                },
-                {
-                  label: "Sunset",
-                  sub: "violet sky, copper sea",
-                  colors: [
-                    [8, 10, 35] as ColorRgb,
-                    [180, 90, 30] as ColorRgb,
-                    [52, 28, 90] as ColorRgb,
-                    [255, 115, 25] as ColorRgb,
-                  ],
-                },
-                {
-                  label: "Tropic",
-                  sub: "clear shallow water",
-                  colors: [
-                    [0, 45, 65] as ColorRgb,
-                    [80, 190, 160] as ColorRgb,
-                    [75, 170, 220] as ColorRgb,
-                    [255, 230, 120] as ColorRgb,
-                  ],
-                },
-                {
-                  label: "Storm",
-                  sub: "overcast, rough",
-                  colors: [
-                    [15, 22, 32] as ColorRgb,
-                    [55, 68, 75] as ColorRgb,
-                    [50, 60, 75] as ColorRgb,
-                    [90, 105, 120] as ColorRgb,
-                  ],
-                },
-              ]
-            ).map(({ label, sub, colors }) => (
-              <button
-                key={label}
-                type="button"
-                className="cloud-mood-btn"
-                onClick={() => setColors(colors)}
-              >
-                <div
-                  className="cloud-mood-swatch"
-                  style={{
-                    background: `linear-gradient(135deg,
-                      rgb(${colors[0].join(",")}) 0%,
-                      rgb(${colors[2].join(",")}) 50%,
-                      rgb(${colors[3].join(",")}) 100%)`,
-                  }}
-                />
-                <div className="cloud-mood-text">
-                  <strong>{label}</strong>
-                  <span>{sub}</span>
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {animationType === "prism" && (
-        <div className="panel-section">
-          <span className="section-label">Prism Mood</span>
-          <div className="section-copy">
-            Load a color harmony for this light-dispersion aesthetic.
-          </div>
-          <div className="cloud-mood-selector">
-            {(
-              [
-                {
-                  label: "Spectral",
-                  sub: "pure RGB prism",
-                  colors: [
-                    [255, 30, 30] as ColorRgb,
-                    [30, 255, 30] as ColorRgb,
-                    [30, 30, 255] as ColorRgb,
-                    [0, 0, 0] as ColorRgb,
-                  ],
-                },
-                {
-                  label: "Neon",
-                  sub: "cyberpunk glow",
-                  colors: [
-                    [255, 0, 110] as ColorRgb,
-                    [0, 230, 255] as ColorRgb,
-                    [80, 255, 120] as ColorRgb,
-                    [15, 0, 30] as ColorRgb,
-                  ],
-                },
-                {
-                  label: "Plasma",
-                  sub: "fire & electric",
-                  colors: [
-                    [255, 100, 0] as ColorRgb,
-                    [255, 0, 200] as ColorRgb,
-                    [0, 80, 255] as ColorRgb,
-                    [5, 0, 15] as ColorRgb,
-                  ],
-                },
-                {
-                  label: "Void",
-                  sub: "gold & ultraviolet",
-                  colors: [
-                    [255, 180, 30] as ColorRgb,
-                    [180, 0, 255] as ColorRgb,
-                    [220, 220, 255] as ColorRgb,
-                    [5, 0, 20] as ColorRgb,
-                  ],
-                },
-              ]
-            ).map(({ label, sub, colors }) => (
-              <button
-                key={label}
-                type="button"
-                className="cloud-mood-btn"
-                onClick={() => setColors(colors)}
-              >
-                <div
-                  className="cloud-mood-swatch"
-                  style={{
-                    background: `linear-gradient(135deg,
-                      rgb(${colors[0].join(",")}) 0%,
-                      rgb(${colors[1].join(",")}) 50%,
-                      rgb(${colors[2].join(",")}) 100%)`,
-                  }}
-                />
-                <div className="cloud-mood-text">
-                  <strong>{label}</strong>
-                  <span>{sub}</span>
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {animationType === "octagrams" && (
-        <div className="panel-section">
-          <span className="section-label">Octagram Presets</span>
-          <div className="section-copy">
-            Load a shape and color combination for this star-field aesthetic.
-          </div>
-          <div className="cloud-mood-selector">
-            {(
-              [
-                {
-                  label: "Orbital",
-                  sub: "cosmic, classic",
-                  type: 0,
-                  colors: [
-                    [30, 200, 255] as ColorRgb,
-                    [180, 0, 255] as ColorRgb,
-                    [255, 200, 50] as ColorRgb,
-                    [5, 0, 20] as ColorRgb,
-                  ],
-                },
-                {
-                  label: "Inferno",
-                  sub: "8-arm star, fire",
-                  type: 1,
-                  colors: [
-                    [255, 30, 0] as ColorRgb,
-                    [255, 120, 0] as ColorRgb,
-                    [255, 255, 100] as ColorRgb,
-                    [20, 5, 0] as ColorRgb,
-                  ],
-                },
-                {
-                  label: "Quantum",
-                  sub: "compact portal",
-                  type: 2,
-                  colors: [
-                    [0, 255, 180] as ColorRgb,
-                    [0, 120, 255] as ColorRgb,
-                    [180, 0, 255] as ColorRgb,
-                    [0, 5, 20] as ColorRgb,
-                  ],
-                },
-                {
-                  label: "Ghost",
-                  sub: "crystal, no pulse",
-                  type: 3,
-                  colors: [
-                    [220, 230, 255] as ColorRgb,
-                    [140, 160, 200] as ColorRgb,
-                    [60, 80, 120] as ColorRgb,
-                    [5, 8, 15] as ColorRgb,
-                  ],
-                },
-              ]
-            ).map(({ label, sub, type, colors }) => (
-              <button
-                key={label}
+                key={name}
                 type="button"
                 className="cloud-mood-btn"
                 onClick={() => {
-                  setColors(colors);
-                  setParams((prev) => ({ ...prev, octagramType: type }));
+                  setColors(c);
+                  if (p) setParams((prev) => ({ ...prev, ...p }));
                 }}
               >
                 <div
                   className="cloud-mood-swatch"
                   style={{
                     background: `linear-gradient(135deg,
-                      rgb(${colors[0].join(",")}) 0%,
-                      rgb(${colors[1].join(",")}) 50%,
-                      rgb(${colors[2].join(",")}) 100%)`,
+                      rgb(${c[0].join(",")}) 0%,
+                      rgb(${c[1].join(",")}) 50%,
+                      rgb(${c[2].join(",")}) 100%)`,
                   }}
                 />
                 <div className="cloud-mood-text">
-                  <strong>{label}</strong>
+                  <strong>{name}</strong>
                   <span>{sub}</span>
                 </div>
               </button>
@@ -1354,82 +825,6 @@ export default function Panel({
               />
               <span className="slider" />
             </label>
-          </div>
-        </div>
-      )}
-
-      {animationType === "metaballs" && (
-        <div className="panel-section">
-          <span className="section-label">Metaball Presets</span>
-          <div className="section-copy">
-            Load a color scheme for these organic blobs.
-          </div>
-          <div className="cloud-mood-selector">
-            {(
-              [
-                {
-                  label: "Plasma",
-                  sub: "magenta, cyan",
-                  colors: [
-                    [180, 0, 255] as ColorRgb,
-                    [0, 200, 255] as ColorRgb,
-                    [255, 255, 255] as ColorRgb,
-                    [5, 0, 20] as ColorRgb,
-                  ],
-                },
-                {
-                  label: "Magma",
-                  sub: "red, orange",
-                  colors: [
-                    [200, 30, 0] as ColorRgb,
-                    [255, 100, 0] as ColorRgb,
-                    [255, 240, 100] as ColorRgb,
-                    [15, 5, 0] as ColorRgb,
-                  ],
-                },
-                {
-                  label: "Abyss",
-                  sub: "deep blue, teal",
-                  colors: [
-                    [0, 20, 100] as ColorRgb,
-                    [60, 0, 180] as ColorRgb,
-                    [0, 220, 200] as ColorRgb,
-                    [0, 0, 10] as ColorRgb,
-                  ],
-                },
-                {
-                  label: "Pearl",
-                  sub: "warm ivory, gold",
-                  colors: [
-                    [180, 130, 80] as ColorRgb,
-                    [230, 190, 130] as ColorRgb,
-                    [255, 250, 220] as ColorRgb,
-                    [20, 15, 35] as ColorRgb,
-                  ],
-                },
-              ]
-            ).map(({ label, sub, colors }) => (
-              <button
-                key={label}
-                type="button"
-                className="cloud-mood-btn"
-                onClick={() => setColors(colors)}
-              >
-                <div
-                  className="cloud-mood-swatch"
-                  style={{
-                    background: `linear-gradient(135deg,
-                      rgb(${colors[0].join(",")}) 0%,
-                      rgb(${colors[1].join(",")}) 50%,
-                      rgb(${colors[2].join(",")}) 100%)`,
-                  }}
-                />
-                <div className="cloud-mood-text">
-                  <strong>{label}</strong>
-                  <span>{sub}</span>
-                </div>
-              </button>
-            ))}
           </div>
         </div>
       )}
@@ -1672,9 +1067,9 @@ export default function Panel({
                     onChange={setSavedMode}
                     options={[
                       { value: "all", label: "All modes" },
-                      ...Object.keys(MODE_DETAILS).map((type) => ({
-                        value: type as AnimationType,
-                        label: MODE_DETAILS[type as AnimationType].name,
+                      ...VALID_ANIMATION_TYPES.map((type) => ({
+                        value: type,
+                        label: MODES[type].name,
                       })),
                     ]}
                   />

@@ -81,9 +81,9 @@ No test or lint scripts are configured.
 
 ### Core Components
 
-- **[App.tsx](src/App.tsx)** — Thin orchestrator (~280 lines). Wires together `useSceneManager`, `usePaletteTransition`, and `useExport` hooks; handles toast/onboarding/dialog UI. Scene state, history, export, and palette interpolation have moved to dedicated hooks under `src/hooks/`. Pure helpers live in `src/utils/` and `src/services/`. Types are canonical in `src/types/index.ts`; constants in `src/constants/index.ts`. The `GradientParams` object is the single unified parameter set passed to all renderers. When switching to `"clouds"` mode, `startModeTransition` automatically applies a Noon sky palette; switching to `"sea"` applies a Midday ocean palette; switching to `"metaballs"` applies a Plasma palette.
+- **[App.tsx](src/App.tsx)** — Thin orchestrator (~280 lines). Wires together `useSceneManager`, `usePaletteTransition`, and `useExport` hooks; handles toast/onboarding/dialog UI. Scene state, history, export, and palette interpolation have moved to dedicated hooks under `src/hooks/`. Pure helpers live in `src/utils/` and `src/services/`. Types are canonical in `src/types/index.ts`; constants in `src/constants/index.ts`. Mode metadata (icons, labels, descriptions, presets, entryColors, param labels) lives in the **Mode Registry** at `src/config/modes.ts`. The `GradientParams` object is the single unified parameter set passed to all renderers. When switching modes, `startModeTransition` reads `MODES[nextType].entryColors` and auto-applies it (e.g. Noon for clouds, Midday for sea, Plasma for metaballs).
 
-- **[Panel.tsx](src/components/Panel.tsx)** — Control panel. All parameter controls, palette selection, preset management, recording/export UI, and compact vs. advanced view modes. Mode switcher is a compact trigger button (same style as Palette Library) that opens a modal with a 3-column card grid for all 14 modes. Mode-specific sections: `topoLineWidth` for Topographic; **Cloud Type** selector (5 formations), **Sky Mood** presets (Noon/Dusk/Dawn/Storm), and **God Rays** toggle for Clouds; **Sea Mood** presets (Midday/Sunset/Tropic/Storm) for Sea; **Prism Mood** presets (Spectral/Neon/Plasma/Void) for Prism; **Metaball Presets** (Plasma/Magma/Abyss/Pearl) for Metaballs.
+- **[Panel.tsx](src/components/Panel.tsx)** — Control panel. All parameter controls, palette selection, preset management, recording/export UI, and compact vs. advanced view modes. Mode switcher is a compact trigger button (same style as Palette Library) that opens a modal with a 3-column card grid for all 14 modes — card data (icon, name, description) comes from the Mode Registry. Parameter labels come from `MODES[animationType].paramLabels`. Mode-specific preset sections (Sky Mood, Sea Mood, Prism Mood, Octagram Presets, Metaball Presets) are rendered by a single data-driven block reading `MODES[animationType].presets` — no per-mode copy-paste. Topographic line width slider is the only hand-coded mode-specific section (it uses a numeric input, not a preset list).
 
 - **[PaletteModal.tsx](src/components/PaletteModal.tsx)** — Palette browser with 67 curated palettes (defined in [palettes.ts](src/data/palettes.ts)), search, tag filters, and localStorage-backed favorites.
 
@@ -204,7 +204,7 @@ Exports go through phases tracked in App.tsx: `idle → preparing → capturing 
 
 - **PNG**: 1× and 2× resolution.
 - **WebM video**: 5s or 10s real-time recording, OR loop-safe deterministic export (for renderers where `supportsLoopSafeExport` is true, driven by external time steps).
-- Loop-safe export is supported by: `liquid`, `waves`, `voronoi`, `blobs`, `three`, `clouds`, `sea`, `prism`, `octagrams`, `metaballs`.
+- Loop-safe export is supported by: `liquid`, `waves`, `voronoi`, `blobs`, `three`, `topographic`, `neondrip`, `clouds`, `sea`, `prism`, `octagrams`, `metaballs`.
 - `ParticlesCanvas` uses a Web Worker ([particlesWorker.ts](src/workers/particlesWorker.ts)) for simulation; coordinate with the worker protocol when touching particle logic.
 
 ### Key Dependencies

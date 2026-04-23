@@ -9,7 +9,10 @@
       "Bash(git push:*)",
       "Bash(npx tsc:*)",
       "Bash(node -e \"const icons = require\\('f:/Front/14-color-motion/node_modules/@phosphor-icons/react/dist/index.js'\\); const names = Object.keys\\(icons\\).filter\\(k => /wave|sea|ocean|drop|anchor|water|fish|boat/i.test\\(k\\)\\); console.log\\(names.slice\\(0,20\\)\\)\")",
-      "Bash(grep -n \"const CloudsCanvas\\\\|export\\\\|useImperativeHandle\" \"f:\\\\\\\\Front\\\\\\\\14-color-motion\\\\\\\\src\\\\\\\\components\\\\\\\\CloudsCanvas.tsx\")"
+      "Bash(grep -n \"const CloudsCanvas\\\\|export\\\\|useImperativeHandle\" \"f:\\\\\\\\Front\\\\\\\\14-color-motion\\\\\\\\src\\\\\\\\components\\\\\\\\CloudsCanvas.tsx\")",
+      "Bash(awk '{print $5, $9}')",
+      "Bash(grep -n \"useImperativeHandle\\(ref, \\(\\) => \\({\" /f/Front/14-color-motion/src/components/LiquidCanvas.tsx /f/Front/14-color-motion/src/components/MetaballCanvas.tsx /f/Front/14-color-motion/src/components/CloudsCanvas.tsx)",
+      "Bash(grep -n \"\\\\.map\\(\\({ label, sub\" /f/Front/14-color-motion/src/components/Panel.tsx)"
     ]
   }
 }
