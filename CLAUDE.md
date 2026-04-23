@@ -116,80 +116,29 @@ The `RendererHandle` interface requires: `status`, `supportsExternalTime`, `supp
 
 All renderers share a single `GradientParams` object. Most fields are universal; some are mode-specific:
 
-| Field           | Type    | Notes                                 |
-| --------------- | ------- | ------------------------------------- |
-| `seed`          | number  | Random seed / reseed trigger          |
-| `speed`         | number  | Animation speed                       |
-| `scale`         | number  | Zoom / scale                          |
-| `amplitude`     | number  | FBM amplitude or wander strength      |
-| `frequency`     | number  | Noise / cell frequency                |
-| `definition`    | number  | Octave count / detail level           |
-| `blend`         | number  | Color blend / contrast / softness     |
-| `morphSpeed`    | number  | 3D mesh drift speed (Three only)      |
-| `morphAmount`   | number  | 3D mesh drift height (Three only)     |
-| `focusDistance` | number  | DOF focus distance (Three only)       |
-| `aperture`      | number  | DOF aperture (Three only)             |
-| `maxBlur`       | number  | DOF max blur (Three only)             |
-| `dofEnabled`    | boolean | DOF toggle (Three only)               |
-| `topoLineWidth`       | number  | Contour line width (Topographic only)        |
-| `cloudType`           | number  | 0–4 cloud formation (Clouds only)            |
-| `godRays`             | boolean | Volumetric light shafts (Clouds only)        |
-| `octagramType`        | number  | 0–3 shape variant (Octagrams only)           |
-| `octagramAltitude`    | number  | Camera altitude 0–1 (Octagrams only)         |
-| `octagramDensity`     | number  | Tile scale (Octagrams only)                  |
-| `octagramTrails`      | boolean | Temporal accumulation toggle (Octagrams only)|
-| `octagramColorCycle`  | boolean | Palette oscillation toggle (Octagrams only)  |
-
-### CloudsCanvas Details
-
-`CloudsCanvas` is a WebGL2 volumetric ray-marcher with:
-
-- **Procedural gradient noise** (no textures required)
-- **5 cloud types** via `uniform int uCloudType`: Cumulus (0), Stratus (1), Cirrus (2), Cumulonimbus (3), Mammatus (4)
-- **4-pass progressive raymarch** with quality degrading by distance; all passes always sample — octave count is controlled via `uDefinition` (maps 1–12 → 1–5 octaves via `qualityOctaves()`)
-- **God rays** (screen-space radial blur toward sun/moon, Crytek technique, luminance-threshold)
-- **Drag-to-orbit camera**: mousedown captures drag origin, mousemove accumulates delta, mouseup releases — angle never jumps on new drag
-- **Palette mapping**: `colors[0]` → sky, `colors[1]` → cloud tint, `colors[2]` → sun/scatter, `colors[3]` → shadow
-- **Sky Mood presets** in Panel set all 4 colors at once (Noon, Dusk, Dawn, Storm)
-- Entering Clouds mode auto-applies Noon palette
-
-### SeaCanvas Details
-
-`SeaCanvas` is a WebGL2 height-field ocean renderer with:
-
-- **Procedural wave octaves**: `sea_octave()` combines noise-displaced sines with absolute cosine for sharp crests; two passes per octave (±travel direction) create interference
-- **Height-field tracing**: 32-step bisection (regula-falsi) converging to `EPSILON = 1e-3`; fast `map()` at 3 octaves for tracing, detailed `map_detailed()` at `uIterDetail` octaves for normals
-- **Half-res FBO + temporal accumulation** (idle alpha `0.5` — higher than clouds because wave surfaces move quickly)
-- **Palette mapping**: `colors[0]` → deep water (`uSeaBase`), `colors[1]` → surface tint (`uWaterColor`), `colors[2]` → sky zenith (`uSkyTop`), `colors[3]` → horizon/sun (`uSunColor`)
-- **Sky gradient**: `mix(uSkyTop, uSunColor, t²)` — enables violet-to-orange sunset gradients by separating zenith and horizon colors
-- **Euler convention**: `ang.z` = horizontal heading (`forward = (sin(z), 0, cos(z))`), `ang.y` = elevation (positive = tilt down). Mouse X drives `ang.z`; mouse Y drives `ang.y` inverted (`0.3 − (m.y − 0.5) × 0.8`) so drag-up shows more sky
-- **Sea Mood presets** in Panel (Midday, Sunset, Tropic, Storm); entering Sea mode auto-applies Midday palette
-
-### PrismCanvas Details
-
-`PrismCanvas` is a WebGL2 UV-displacement prism renderer with:
-
-- **3-pass chromatic loop**: runs once per RGB channel; each pass applies a different z-offset so the three channels receive distinct UV displacement, producing chromatic separation
-- **Displacement formula**: `uv += p/l * (sin(z)+1) * abs(sin(l*freq - z*2)) * amplitude`
-- **Palette mapping**: `colors[0]` → R channel tint, `colors[1]` → G channel tint, `colors[2]` → B channel tint, `colors[3]` → dark ambient fill
-- **`definition` → `zStep`**: maps 0–1 to 0.01–0.55 — controls how far apart the three channel phases sit (low = near-monochrome, high = heavy color separation)
-- **`seed`** offsets the initial z phase (`z = time + seed * 0.1`) so each seed value produces a distinct visual variant
-- **`blend`** desaturates toward luminance (controls color purity / saturation)
-- **Prism Mood presets** in Panel (Spectral, Neon, Plasma, Void); entering Prism mode auto-applies Spectral palette
-
-### MetaballCanvas Details
-
-`MetaballCanvas` is a WebGL1 raymarched SDF metaball renderer with:
-
-- **16 animated spheres** with randomized phase/size from `uSeed`; orbits driven by `sin(t + i*vec3(...))` so each sphere traces a Lissajous-like path
-- **Smooth-union blending**: `opSmoothUnion(d1, d2, k)` — all spheres blended with a single `uSmoothK` value
-- **Tetrahedron normals**: 4 `mapScene` calls at epsilon offsets (avoids aligned finite-difference artifacts)
-- **Two-program pipeline**: march program renders to half-res FBO; blit program upscales with bilinear filter
-- **Palette mapping**: `colors[0]` → shadow, `colors[1]` → lit surface, `colors[2]` → specular glare, `colors[3]` → background fog
-- **`definition` → `smoothK`**: `0.15 + ((definition-1)/11) * 1.35` — low = sharp boundaries, high = fully merged blobs
-- **`scale` → `viewScale`**: `3.0 + scale * 6.43` — controls ray origin spread (zoom)
-- **Metaball Presets** in Panel (Plasma/Magma/Abyss/Pearl); entering Metaballs mode auto-applies Plasma palette
-- WebGL1 (not WebGL2) for maximum device compatibility; `preserveDrawingBuffer: true` for PNG export
+| Field                | Type    | Notes                                         |
+| -------------------- | ------- | --------------------------------------------- |
+| `seed`               | number  | Random seed / reseed trigger                  |
+| `speed`              | number  | Animation speed                               |
+| `scale`              | number  | Zoom / scale                                  |
+| `amplitude`          | number  | FBM amplitude or wander strength              |
+| `frequency`          | number  | Noise / cell frequency                        |
+| `definition`         | number  | Octave count / detail level                   |
+| `blend`              | number  | Color blend / contrast / softness             |
+| `morphSpeed`         | number  | 3D mesh drift speed (Three only)              |
+| `morphAmount`        | number  | 3D mesh drift height (Three only)             |
+| `focusDistance`      | number  | DOF focus distance (Three only)               |
+| `aperture`           | number  | DOF aperture (Three only)                     |
+| `maxBlur`            | number  | DOF max blur (Three only)                     |
+| `dofEnabled`         | boolean | DOF toggle (Three only)                       |
+| `topoLineWidth`      | number  | Contour line width (Topographic only)         |
+| `cloudType`          | number  | 0–4 cloud formation (Clouds only)             |
+| `godRays`            | boolean | Volumetric light shafts (Clouds only)         |
+| `octagramType`       | number  | 0–3 shape variant (Octagrams only)            |
+| `octagramAltitude`   | number  | Camera altitude 0–1 (Octagrams only)          |
+| `octagramDensity`    | number  | Tile scale (Octagrams only)                   |
+| `octagramTrails`     | boolean | Temporal accumulation toggle (Octagrams only) |
+| `octagramColorCycle` | boolean | Palette oscillation toggle (Octagrams only)   |
 
 ### State & Persistence
 
